@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Karzstak Must Not Fall · MVP</title>
+<link rel="stylesheet" href="style.css?v=123">
+</head>
+<body>
+<div id="game">
+
+  <!-- Topo: HUD -->
+  <header id="hud">
+    <button id="hud-brasao" title="Seu Setor"></button>
+    <div class="hud-item" id="hud-hp">🧱 100</div>
+    <button id="btn-wave">▶ Turno</button>
+    <button id="btn-lock" title="Turnos automáticos">🔓</button>
+    <button id="btn-speed">1x</button>
+    <button id="btn-settings" title="Configurações / Sair">⋮</button>
+  </header>
+
+  <!-- Medidor Esperança × Medo -->
+  <div id="morale" title="Esperança × Medo">
+    <img class="morale-cap-img" src="MEDIDOR-MEDO.png?v=1" alt="Medo" title="Medo">
+    <div id="morale-track"><span id="morale-mark"></span></div>
+    <img class="morale-cap-img" src="MEDIDOR-ESPERANÇA.png?v=1" alt="Esperança" title="Esperança">
+  </div>
+
+  <!-- Campo de batalha: 5 lanes -->
+  <div id="battlefield">
+    <canvas id="canvas"></canvas>
+    <button id="astro-btn" title="Vigia da torre: próxima horda"></button>
+  </div>
+
+  <!-- Portões / torres: 5 slots -->
+  <div id="towers" class="slot-row"></div>
+
+  <!-- Esteira horizontal (topo do L) -->
+  <div id="conveyor"><div id="belt"></div></div>
+
+  <!-- Barra de recursos: sempre presente (alinha as muralhas). Cidade = 🪙💎✋; Feudo = recursos -->
+  <div id="res-bar"></div>
+
+  <!-- Cidade + esteira vertical (haste do L, sobe do D) -->
+  <div id="city-wrap">
+    <div id="city"></div>
+    <div id="conveyor-v"><div id="belt-v"></div></div>
+    <!-- Setinha: alterna Cidade ↔ O Feudo (círculo dourado, triângulo p/ baixo) -->
+    <button id="field-toggle" class="to-feud" title="Ir para O Feudo"><span class="ft-tri"></span></button>
+  </div>
+
+  <!-- Toast leve -->
+  <div id="toast"></div>
+
+  <!-- Barra inferior -->
+  <nav id="tabs">
+    <button class="tab" id="tab-melhorias">O Foral</button>
+    <button class="tab" id="tab-favores">As Alianças</button>
+    <button class="tab" id="tab-distrito">Seu Setor</button>
+  </nav>
+
+  <!-- Barra de posicionamento (modo construção) -->
+  <div id="placebar" class="hidden">
+    <span id="place-info"></span>
+    <button id="place-ok">✔ Construir</button>
+    <button id="place-cancel">✕</button>
+  </div>
+
+  <!-- Modal genérico -->
+  <div id="modal" class="hidden">
+    <div id="modal-box">
+      <div id="modal-head">
+        <h3 id="modal-title"></h3>
+        <button id="modal-close">✕</button>
+      </div>
+      <div id="modal-content"></div>
+    </div>
+  </div>
+
+  <!-- AS MELHORIAS: roda radial de leis do setor -->
+  <div id="laws-scr" class="hidden">
+    <div class="laws-top"><button class="tavola-round tavola-back" id="laws-back">‹</button><button class="tavola-round" id="laws-help-btn">?</button></div>
+    <div id="laws-help" class="hidden">
+      <b>As Leis do Setor</b>
+      <p>Cada melhoria é uma lei assinada por você, comandante. Leis são permanentes e pesam na moral do povo a cada turno — algumas melhoram a vida de todos, outras trocam bem-estar por poder.</p>
+      <p>Avance cada linha do centro para fora. As leis lendárias exigem as duas linhas vizinhas completas.</p>
+      <p class="laws-limit">Leis assinadas: <b id="laws-limit-n">0/30</b></p>
+      <button id="laws-dbg">debug: assinar tudo</button>
+    </div>
+    <h2 class="tavola-title laws-title"><span class="tt-a">— O —</span><span class="tt-main">FORAL</span></h2>
+    <div id="laws-viewport"><div id="laws-wheel"></div></div>
+    <div id="laws-detail" class="hidden"></div>
+  </div>
+
+  <!-- OS FAVORES: Rei, Rainha, Conde dos Ratos e Povo Comum (tela cheia) -->
+  <div id="fav-scr" class="hidden"></div>
+
+  <!-- Overlay de iluminação (dia/noite) -->
+  <div id="light"></div>
+
+  <!-- Menu inicial -->
+  <div id="menu">
+    <!-- Fundo ilustrado com ciclo dia/noite (fade lento) + vinheta esfumaçada sobre preto -->
+    <div id="menu-bg" aria-hidden="true">
+      <div id="menu-bg-day"></div>
+      <div id="menu-bg-night"></div>
+      <div id="menu-vignette"></div>
+    </div>
+    <button id="menu-help" title="Sobre / Como jogar">?</button>
+    <div id="menu-box">
+
+      <!-- HOME -->
+      <div id="scr-home" class="menu-screen">
+        <img id="menu-logo" src="ASSET_LOGO%20KMNF%20V2.png?v=1" alt="Karzstak Must Not Fall">
+        <div id="home-grid">
+          <button id="btn-infinito" class="hbtn">Infinito</button>
+          <button class="hbtn accent" data-scr="campanha">História</button>
+          <button id="btn-continue" class="hbtn ghost">Continuar</button>
+          <button id="btn-load" class="hbtn">Carregar Jogo</button>
+        </div>
+        <div id="home-icons">
+          <button class="home-icon" data-scr="miolo"><img src="ASSET_ICONE-MIOLO.png?v=1" alt=""><span>Miolo</span></button>
+          <button class="home-icon" data-scr="conselho"><img src="ASSET_ICONE-CONSELHO.png?v=1" alt=""><span>Távola</span></button>
+          <button class="home-icon" data-scr="arsenal"><img src="ASSET_ICONE-ARSENAL.png?v=1" alt=""><span>Arsenal</span></button>
+        </div>
+        <button class="home-ranking" data-scr="ranking">Ranking</button>
+        <p id="menu-note"></p>
+      </div>
+
+      <!-- CAMPANHA -->
+      <div id="scr-campanha" class="menu-screen hidden">
+        <div class="scr-head"><button class="scr-back" data-scr="home">‹ Voltar</button><h2 class="scr-title">História</h2></div>
+        <div class="camp-grid">
+          <button class="camp-card f-red"    disabled><span class="camp-icon">👑</span><span class="camp-name">O Rei</span><span class="camp-soon">Em desenvolvimento</span></button>
+          <button class="camp-card f-pink"   disabled><span class="camp-icon">🌹</span><span class="camp-name">A Rainha</span><span class="camp-soon">Em desenvolvimento</span></button>
+          <button class="camp-card f-black"  disabled><span class="camp-icon">🐀</span><span class="camp-name">O Conde dos Ratos</span><span class="camp-soon">Em desenvolvimento</span></button>
+          <button class="camp-card locked"   disabled><span class="camp-icon">🔒</span><span class="camp-name">O Último Sol</span><span class="camp-soon">Vença as três campanhas</span></button>
+        </div>
+      </div>
+
+      <!-- RANKING -->
+      <div id="scr-ranking" class="menu-screen hidden">
+        <div class="scr-head"><button class="scr-back" data-scr="home">‹ Voltar</button><h2 class="scr-title">Ranking</h2></div>
+        <div class="rank-tabs">
+          <button class="rank-tab active" data-rank="global">Global</button>
+          <button class="rank-tab" data-rank="local">Seus recordes</button>
+        </div>
+        <ol id="rank-list" class="rank-list"></ol>
+        <p class="scr-foot">Ranking global ilustrativo. Seus recordes locais ficam salvos entre partidas.</p>
+      </div>
+
+      <!-- ARSENAL -->
+      <div id="scr-arsenal" class="menu-screen hidden">
+        <div class="tavola-top"><button class="tavola-round tavola-back" data-scr="home">‹</button><span id="arsenal-medals" class="miolo-medals"></span></div>
+        <h2 class="tavola-title"><span class="tt-a">— O —</span><span class="tt-main">ARSENAL</span></h2>
+        <div class="ars-nav"><button id="ars-prev" class="ars-arrow">‹</button><h3 id="ars-page-title"></h3><button id="ars-next" class="ars-arrow">›</button></div>
+        <div id="ars-slots"></div>
+        <div id="arsenal-body"></div>
+        <div id="ars-more">⌄</div>
+      </div>
+
+      <!-- A TÁVOLA (Conselho) -->
+      <div id="scr-conselho" class="menu-screen hidden">
+        <div class="tavola-top">
+          <button class="tavola-round tavola-back" data-scr="home">‹</button>
+          <button id="tavola-help" class="tavola-round">?</button>
+        </div>
+        <h2 class="tavola-title"><span class="tt-a">— A —</span><span class="tt-main">TÁVOLA</span></h2>
+        <div id="tavola-ring"></div>
+        <div id="tavola-detail"></div>
+      </div>
+
+      <!-- O MIOLO -->
+      <div id="scr-miolo" class="menu-screen hidden">
+        <div class="tavola-top">
+          <button class="tavola-round tavola-back" data-scr="home">‹</button>
+          <span id="miolo-medals" class="miolo-medals"></span>
+        </div>
+        <h2 class="tavola-title"><span class="tt-a">— O —</span><span class="tt-main">MIOLO</span></h2>
+        <div id="miolo-grid"></div>
+        <div id="miolo-detail"></div>
+        <button id="miolo-help" class="tavola-round miolo-help">?</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Overlay de Configurações / Saída (pausa o jogo) -->
+  <div id="pause" class="hidden">
+    <div id="pause-box">
+      <div id="pause-head">
+        <h3>Pausa</h3>
+        <button id="pause-resume" title="Retomar">✕</button>
+      </div>
+      <div id="pause-actions">
+        <button id="settings-toggle" class="pause-btn collapse-btn"><span>⚙️ Configurações</span><span class="collapse-chevron">▸</span></button>
+        <div id="settings-list" class="hidden"></div>
+        <div class="pause-row">
+          <button id="pause-save" class="pause-btn">💾 Salvar jogo</button>
+          <button id="pause-load" class="pause-btn">📂 Carregar jogo</button>
+        </div>
+        <p class="pause-note">⚠ Os turnos só são salvos no começo deles — salvar no meio de um turno faz ele recomeçar ao carregar. Um autosave é feito a cada 5 dias.</p>
+        <button id="pause-debug" class="pause-btn" title="Menu de debug">🐞 Debug</button>
+        <div id="pause-debug-panel" class="hidden"></div>
+        <button id="pause-exit" class="pause-btn">🏰 Sair ao Menu</button>
+        <button id="pause-resume2" class="pause-btn primary">▶ Retomar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Overlay de mensagens -->
+  <div id="overlay" class="hidden">
+    <div id="overlay-box">
+      <h2 id="overlay-title"></h2>
+      <p id="overlay-text"></p>
+      <button id="overlay-btn">Continuar</button>
+    </div>
+  </div>
+
+  <!-- Tela de Vitória -->
+  <div id="victory" class="hidden">
+    <div id="victory-box">
+      <div class="vic-crown">👑</div>
+      <h2 class="vic-title">KARZSTAK AINDA NÃO CAIU</h2>
+      <p class="vic-text">Muito bem. 30 dias, 30 noites e seu Distrito ainda resiste. Você se provou como comandante, seu nome é talhado nas muralhas interiores para sempre. Enquanto Karzstak existir, sua linhagem será lembrada.
+
+Agora só resta continuar resistindo. O rei negativa não descansa, e nem suas hordas.</p>
+      <div class="vic-score" id="vic-score"></div>
+      <div class="vic-breakdown" id="vic-breakdown"></div>
+      <button id="vic-hold" class="vic-hold"><span class="vic-hold-fill" id="vic-hold-fill"></span><span class="vic-hold-label">Segure para prosseguir</span></button>
+      <div id="vic-choices" class="vic-choices hidden">
+        <button id="vic-infinite" class="vic-btn gold"><span class="vb-t">Karzstak não deve cair</span><span class="vb-s">continuar</span></button>
+        <button id="vic-menu" class="vic-btn"><span class="vb-t">Aposentar-se</span><span class="vb-s">voltar ao menu</span></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tela de Derrota (a muralha caiu) -->
+  <div id="defeat" class="hidden">
+    <div id="defeat-box" class="is-defeat">
+      <div class="vic-crown">💀</div>
+      <h2 class="vic-title">A MURALHA CAIU</h2>
+      <p class="vic-text" id="def-text"></p>
+      <div class="vic-score" id="def-score"></div>
+      <div class="vic-breakdown" id="def-breakdown"></div>
+      <div class="vic-choices" id="def-choices">
+        <button id="def-menu" class="vic-btn gold"><span class="vb-t">Aceitar o fim</span><span class="vb-s">voltar ao menu</span></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Escolha de Facções (início da run) -->
+  <div id="factions" class="hidden">
+    <div id="factions-box"></div>
+  </div>
+</div>
+<script src="game.js?v=180"></script>
+</body>
+</html>

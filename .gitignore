@@ -1,0 +1,11 @@
+# Ferramentas / ambiente
+.claude/
+
+# Material de desenvolvimento (não é usado pelo jogo)
+Telas Mockup/
+Ideias de Layout*.png
+NOTAS*.txt
+
+# Sistema
+Thumbs.db
+.DS_Store
