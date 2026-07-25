@@ -138,15 +138,25 @@ html, body {
 #btn-lock.on { opacity: 1; border-color: rgba(201,162,39,.55); background: rgba(201,162,39,.12); }
 #btn-speed:active { background: rgba(201,162,39,.15); }
 #btn-settings {
-  background: none;
-  border: 0;
-  padding: 2px 8px;
+  background: transparent;
+  border: 1px solid rgba(190,185,175,.5);
+  border-radius: 4px;
+  padding: 6px 8px;
   cursor: pointer;
-  font-size: 24px;
-  line-height: 1;
+  line-height: 0;
   color: var(--dim);
   opacity: .85;
   flex-shrink: 0;
+}
+/* ícone "hambúrguer": três barrinhas horizontais desenhadas via CSS */
+#btn-settings .bars {
+  display: block;
+  width: 18px;
+  height: 16px;
+  background:
+    linear-gradient(currentColor 0 0) top    / 100% 2px no-repeat,
+    linear-gradient(currentColor 0 0) center / 100% 2px no-repeat,
+    linear-gradient(currentColor 0 0) bottom / 100% 2px no-repeat;
 }
 #btn-settings:hover { color: var(--gold-hi); opacity: 1; }
 
