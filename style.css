@@ -1886,6 +1886,21 @@ body.fac-green  #towers { border-top-color: #4cae6a; }
 .dist-line .dl-v.gold { color: var(--gold-hi, #e8c95c); }
 .dist-line .dl-cost { font-family: inherit; font-size: 12px; color: #bfe0ff; letter-spacing: 0; }
 .dist-sub { font-size: 12.5px; color: var(--dim, #9b8f77); line-height: 1.35; margin-top: 1px; }
+/* Resumo de recursos (Seu Setor): tudo numa linha, com rolagem lateral se faltar espaço */
+.dist-res { display: block; }
+.dist-res .dr-line {
+  display: block;
+  font-family: var(--body, sans-serif);
+  font-weight: 700;
+  letter-spacing: 0;
+  font-size: 12px;
+  color: #e8e0cc;
+  white-space: nowrap;
+  text-align: center;
+  overflow-x: auto;               /* rede de segurança p/ números muito grandes */
+  -webkit-overflow-scrolling: touch;
+}
+.dist-res .dr-sep { color: var(--dim, #9b8f77); margin: 0 4px; font-weight: 400; }
 .dist-chron-h { text-align: center; font-style: italic; color: #cfc6b0; font-size: 14px; margin-bottom: 8px; }
 .dist-chron { display: flex; flex-direction: column; gap: 8px; max-height: 220px; overflow-y: auto; }
 .dist-none { text-align: center; color: var(--dim, #9b8f77); font-style: italic; font-size: 13px; }
