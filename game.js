@@ -4997,18 +4997,13 @@ function draw() {
   const ax = w / 2, ay = 34;
   // número do dia sobre o astro (badge escuro no centro)
   const drawDayBadge = () => {
-    // À noite a lua fica pequena: selo menor e SEM o anel dourado (o "círculo
-    // dourado atrás" que não deveria existir). De dia, o Sol mantém o selo cheio.
-    const badgeR = S.isNight ? 8 : 12;
     ctx.fillStyle = "rgba(22,15,6,.82)";
-    ctx.beginPath(); ctx.arc(ax, ay, badgeR, 0, 7); ctx.fill();
-    if (!S.isNight) {
-      ctx.strokeStyle = "rgba(201,162,39,.55)"; ctx.lineWidth = 1.5;
-      ctx.beginPath(); ctx.arc(ax, ay, badgeR, 0, 7); ctx.stroke();
-    }
+    ctx.beginPath(); ctx.arc(ax, ay, 12, 0, 7); ctx.fill();
+    ctx.strokeStyle = "rgba(201,162,39,.55)"; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(ax, ay, 12, 0, 7); ctx.stroke();
     ctx.fillStyle = "#f5f2ec";
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.font = `700 ${S.isNight ? 11 : 14}px Georgia, serif`;
+    ctx.font = "700 14px Georgia, serif";
     ctx.fillText(S.day, ax, ay + 1);
     ctx.textBaseline = "alphabetic";
   };
@@ -5032,8 +5027,8 @@ function draw() {
     const img = ASTRO_IMG.night;
     if (img.complete && img.naturalWidth) {
       if (fullMoon) { ctx.shadowColor = "#e0a080"; ctx.shadowBlur = 18; }
-      ctx.globalAlpha = 0.8;                          // lua a 80% de opacidade
-      ctx.drawImage(img, ax - 12, ay - 12, 24, 24);   // lua 60% menor (60→24px)
+      ctx.globalAlpha = 0.6;                          // lua mais transparente
+      ctx.drawImage(img, ax - 20, ay - 20, 40, 40);   // arte da lua menor (60→40px)
       ctx.globalAlpha = 1;
       ctx.shadowBlur = 0;
     } else {
