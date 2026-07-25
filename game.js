@@ -1071,9 +1071,9 @@ function openDistrict() {
     const br = getBrasao();
     const pos = Math.max(0, Math.min(100, Math.round((S.morale + 150) / 3)));
     // Resumo de recursos dos dois campos, em uma linha: Cidade (🪙💎✋) + Feudo (recursos brutos)
-    const cidadeRes = `🪙 ${Math.floor(S.gold)}&nbsp;&nbsp;💎 ${Math.floor(S.hearts)}&nbsp;&nbsp;✋ ${Math.floor(S.maos)}/${maosCap()}`;
-    const feudoRes = Object.entries(RESOURCES).map(([k, r]) => `${r.icon}&nbsp;${Math.floor(S.res[k] || 0)}`).join("&nbsp;&nbsp;");
-    const resSummary = `${cidadeRes}&nbsp;&nbsp;&nbsp;${feudoRes}`;
+    const cidadeRes = `🪙 ${Math.floor(S.gold)}&nbsp;💎 ${Math.floor(S.hearts)}&nbsp;✋ ${Math.floor(S.maos)}/${maosCap()}`;
+    const feudoRes = Object.entries(RESOURCES).map(([k, r]) => `${r.icon}&nbsp;${Math.floor(S.res[k] || 0)}`).join("&nbsp;");
+    const resSummary = `${cidadeRes}&nbsp;&nbsp;${feudoRes}`;
     const wrap = document.createElement("div");
     wrap.className = "dist";
     wrap.innerHTML = `
