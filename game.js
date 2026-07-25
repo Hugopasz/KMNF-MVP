@@ -5002,7 +5002,7 @@ function draw() {
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     ctx.font = "700 14px Georgia, serif";
     ctx.shadowColor = "rgba(0,0,0,.9)"; ctx.shadowBlur = 4;
-    ctx.fillText(S.day, ax, ay + 1);
+    ctx.fillText(S.day, ax, ay - 1);
     ctx.shadowBlur = 0;
     ctx.textBaseline = "alphabetic";
   };
