@@ -4997,13 +4997,13 @@ function draw() {
   const ax = w / 2, ay = 34;
   // número do dia sobre o astro (badge escuro no centro)
   const drawDayBadge = () => {
-    // disco escuro atrás do número (SEM o anel dourado); número no tamanho original
-    ctx.fillStyle = "rgba(22,15,6,.82)";
-    ctx.beginPath(); ctx.arc(ax, ay, 12, 0, 7); ctx.fill();
+    // só o número (sem disco escuro nem anel dourado); sombra p/ legibilidade
     ctx.fillStyle = "#f5f2ec";
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     ctx.font = "700 14px Georgia, serif";
+    ctx.shadowColor = "rgba(0,0,0,.9)"; ctx.shadowBlur = 4;
     ctx.fillText(S.day, ax, ay + 1);
+    ctx.shadowBlur = 0;
     ctx.textBaseline = "alphabetic";
   };
   if (bloodMoon()) {
