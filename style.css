@@ -1546,7 +1546,7 @@ html, body {
   background: linear-gradient(90deg, rgba(201,162,39,.35), rgba(232,185,58,.7));
   transition: transform .18s ease;
 }
-.oath-hold.holding .oath-fill { transform: scaleX(1); transition: transform 2s linear; }
+.oath-hold.holding .oath-fill { transform: scaleX(1); transition: transform 1s linear; }
 .oath-hold.holding { animation: oath-shake .12s linear infinite; border-color: var(--gold-hi); color: #fff; }
 .oath-hold.sworn { animation: oath-flash .26s ease-out forwards; }
 @keyframes oath-shake {

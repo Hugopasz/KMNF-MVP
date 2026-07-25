@@ -5930,7 +5930,7 @@ function showFactionChoose(onConfirm) {
     const actions = document.createElement("div"); actions.className = "fac-actions";
     const go = document.createElement("button"); go.className = "menu-btn oath-hold"; go.disabled = !chosen;
     go.innerHTML = `<span class="oath-fill"></span><span class="oath-label">Karzstak não deve cair</span>`;
-    // Segure por 2s para jurar.
+    // Segure por 1s para jurar.
     let holdT = null;
     const stopHold = () => { go.classList.remove("holding"); clearTimeout(holdT); holdT = null; };
     const startHold = (e) => {
@@ -5941,7 +5941,7 @@ function showFactionChoose(onConfirm) {
         stopHold();
         go.classList.add("sworn");
         setTimeout(() => { $("factions").classList.add("hidden"); onConfirm(chosen); }, 260);
-      }, 2000);
+      }, 1000);
     };
     go.addEventListener("pointerdown", startHold);
     ["pointerup", "pointerleave", "pointercancel"].forEach(ev => go.addEventListener(ev, stopHold));
