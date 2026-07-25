@@ -3518,6 +3518,8 @@ function renderDebugPanel() {
   p.append(
     row("Adicionar ouro", "🪙 +200", 0, true, () => { S.gold += 200; renderAll(); renderDebugPanel(); }),
     row("Adicionar Corações de Argamato", "💎 +20", 0, true, () => { S.hearts += 20; renderAll(); renderDebugPanel(); }),
+    row("Maximizar todos os recursos (🪙💎✋ + Feudo)", "⬆️ Max", 0, true, () => { S.gold = 9999; S.hearts = 999; S.maos = maosCap(); for (const k of Object.keys(RESOURCES)) S.res[k] = RES_CAP; renderAll(); renderDebugPanel(); }),
+    row("Zerar todos os recursos (🪙💎✋ + Feudo)", "⬇️ Zerar", 0, true, () => { S.gold = 0; S.hearts = 0; S.maos = 0; for (const k of Object.keys(RESOURCES)) S.res[k] = 0; renderAll(); renderDebugPanel(); }),
     row("Restaurar os hits da muralha", "🧱 Curar", 0, true, () => { S.hits = maxHits(); renderAll(); renderDebugPanel(); }),
     row("Encher a munição de todas as torres", "🎯 Munição", 0, true, () => { S.towers.forEach(t => { if (t) fillTowerAmmo(t); }); renderAll(); renderDebugPanel(); }),
     row("Eliminar todos os inimigos em campo", "☠️ Limpar", 0, true, () => { S.enemies.forEach(e => e.hp = 0); closePause(); }),
