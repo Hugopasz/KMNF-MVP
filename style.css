@@ -1065,7 +1065,8 @@ html, body {
 /* Grade de botões principais (2×2) */
 #home-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; max-width: 400px; margin: 0 auto; }
 .hbtn {
-  font-family: var(--display); font-weight: 800; font-size: 17px; letter-spacing: 1px;
+  font-family: var(--display); font-weight: 800; font-size: clamp(14px, 4vw, 17px); letter-spacing: .5px;
+  white-space: nowrap; /* mantém "Carregar Jogo" numa linha só no mobile */
   color: #f3ead2; padding: 15px 6px; border-radius: 8px; cursor: pointer;
   background: linear-gradient(180deg, rgba(20,17,14,.86), rgba(8,7,6,.9));
   border: 1.5px solid rgba(201,162,39,.4);
@@ -1081,7 +1082,7 @@ html, body {
 #home-icons { display: flex; justify-content: center; gap: clamp(18px, 7vw, 34px); margin: 30px auto 0; }
 .home-icon { display: flex; flex-direction: column; align-items: center; gap: 8px; background: none; border: 0; cursor: pointer; }
 .home-icon img {
-  width: 68px; height: 68px; padding: 13px; border-radius: 50%; box-sizing: border-box;
+  width: clamp(80px, 24vw, 96px); height: clamp(80px, 24vw, 96px); padding: 15px; border-radius: 50%; box-sizing: border-box;
   background: radial-gradient(circle at 50% 42%, rgba(22,18,14,.92), rgba(6,5,7,.96));
   border: 1.5px solid rgba(201,162,39,.45); box-shadow: 0 6px 16px rgba(0,0,0,.55);
   transition: border-color .15s, transform .1s;
