@@ -3613,6 +3613,9 @@ function promptSaveName() {
     const hint = document.createElement("div"); hint.className = "panel-hint";
     hint.textContent = "Dê um nome a este save (ou deixe em branco para um nome automático).";
     m.appendChild(hint);
+    const warn = document.createElement("div"); warn.className = "panel-hint";
+    warn.textContent = "⚠ Os turnos só são salvos no começo deles — salvar no meio de um turno faz ele recomeçar ao carregar. Um autosave é feito a cada 5 dias.";
+    m.appendChild(warn);
     const inp = document.createElement("input");
     inp.className = "save-name-input"; inp.type = "text"; inp.maxLength = 40;
     inp.placeholder = `Dia ${S.day} · ${S.hits} hits`;
