@@ -147,6 +147,7 @@ html, body {
   color: var(--dim);
   opacity: .85;
   flex-shrink: 0;
+  margin-left: -7px; /* mesmo espaçamento curto dos vizinhos (reduz o gap de 12px do HUD) */
 }
 /* ícone "hambúrguer": três barrinhas horizontais desenhadas via CSS */
 #btn-settings .bars {
