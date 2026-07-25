@@ -1070,13 +1070,15 @@ function openDistrict() {
     const turns = Math.max(0, (S.day - 1) * 2 + (S.isNight ? 1 : 0));
     const br = getBrasao();
     const pos = Math.max(0, Math.min(100, Math.round((S.morale + 150) / 3)));
-    // Resumo de recursos dos dois campos, em uma linha: Cidade (🪙💎✋) │ Feudo (recursos brutos)
+    // Resumo de recursos dos dois campos, em uma linha: Cidade (🪙💎✋) + Feudo (recursos brutos)
     const cidadeRes = `🪙 ${Math.floor(S.gold)}&nbsp;&nbsp;💎 ${Math.floor(S.hearts)}&nbsp;&nbsp;✋ ${Math.floor(S.maos)}/${maosCap()}`;
     const feudoRes = Object.entries(RESOURCES).map(([k, r]) => `${r.icon}&nbsp;${Math.floor(S.res[k] || 0)}`).join("&nbsp;&nbsp;");
-    const resSummary = `${cidadeRes}<span class="dr-sep">│</span>${feudoRes}`;
+    const resSummary = `${cidadeRes}&nbsp;&nbsp;&nbsp;${feudoRes}`;
     const wrap = document.createElement("div");
     wrap.className = "dist";
     wrap.innerHTML = `
+      <div class="dist-line dist-res"><span class="dl-v dr-line">${resSummary}</span></div>
+      <div class="dist-div"></div>
       <div class="dist-moral">MORAL: ${moralName.toUpperCase()}</div>
       <div class="dist-bar">
         <img class="db-cap" src="MEDIDOR-MEDO.png?v=1" alt="">
@@ -1095,8 +1097,6 @@ function openDistrict() {
         </div>
       </div>
       <div class="dist-sector">SETOR <b>${formatSectorId(S.sectorId)}</b> DE KARZSTAK · <b>${(S.sectorDir || "").toUpperCase()}</b></div>
-      <div class="dist-div"></div>
-      <div class="dist-line dist-res"><span class="dl-v dr-line">${resSummary}</span></div>
       <div class="dist-div"></div>
       <div class="dist-line"><span class="dl-k">IDEOLOGIA:</span> <span class="dl-v" style="color:${f ? FACTIONS[f].color : "#9b8f77"}">${f ? FACTIONS[f].name.toUpperCase() : "NENHUMA"}</span>${S.purpleThisRun ? ` <span style="color:#c89aff">· pacto sombrio</span>` : ""}</div>
       ${f ? `<div class="dist-sub">${FACTIONS[f].desc}</div>` : ""}
