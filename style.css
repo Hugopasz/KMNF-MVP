@@ -1086,6 +1086,9 @@ html, body {
   background: radial-gradient(circle at 50% 42%, rgba(22,18,14,.92), rgba(6,5,7,.96));
   border: 1.5px solid rgba(201,162,39,.45); box-shadow: 0 6px 16px rgba(0,0,0,.55);
   transition: border-color .15s, transform .1s;
+  /* isola numa camada própria: evita o pisca-pisca durante o decode dos fundos grandes no 1º load */
+  will-change: transform;
+  backface-visibility: hidden; -webkit-backface-visibility: hidden;
 }
 .home-icon:hover img { border-color: var(--gold-hi); transform: translateY(-2px); }
 .home-icon span { font-family: var(--display); font-size: 12px; letter-spacing: 1px; color: var(--beige); text-shadow: 0 1px 2px #000; }
