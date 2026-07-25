@@ -4997,10 +4997,9 @@ function draw() {
   const ax = w / 2, ay = 34;
   // número do dia sobre o astro (badge escuro no centro)
   const drawDayBadge = () => {
+    // disco escuro atrás do número (SEM o anel dourado); número no tamanho original
     ctx.fillStyle = "rgba(22,15,6,.82)";
     ctx.beginPath(); ctx.arc(ax, ay, 12, 0, 7); ctx.fill();
-    ctx.strokeStyle = "rgba(201,162,39,.55)"; ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.arc(ax, ay, 12, 0, 7); ctx.stroke();
     ctx.fillStyle = "#f5f2ec";
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     ctx.font = "700 14px Georgia, serif";
@@ -5027,7 +5026,7 @@ function draw() {
     const img = ASTRO_IMG.night;
     if (img.complete && img.naturalWidth) {
       if (fullMoon) { ctx.shadowColor = "#e0a080"; ctx.shadowBlur = 18; }
-      ctx.globalAlpha = 0.6;                          // lua mais transparente
+      ctx.globalAlpha = 0.45;                         // lua mais transparente
       ctx.drawImage(img, ax - 20, ay - 20, 40, 40);   // arte da lua menor (60→40px)
       ctx.globalAlpha = 1;
       ctx.shadowBlur = 0;
