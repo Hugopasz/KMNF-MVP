@@ -3524,7 +3524,7 @@ function renderDebugPanel() {
     row("Encher a munição de todas as torres", "🎯 Munição", 0, true, () => { S.towers.forEach(t => { if (t) fillTowerAmmo(t); }); renderAll(); renderDebugPanel(); }),
     row("Eliminar todos os inimigos em campo", "☠️ Limpar", 0, true, () => { S.enemies.forEach(e => e.hp = 0); closePause(); }),
     row("Invocar 5 mortos-vivos extras", "🧟 Invocar", 0, true, () => { if (S.waveActive) spawnQueue.push(...pickWave(5)); closePause(); }),
-    row("Pular para o próximo dia (fora de turno)", "⏭ Pular dia", 0, !S.waveActive, () => { S.isNight = false; S.day++; S.gold += 15 + S.day * 3; buildNextWave(); renderAll(); renderDebugPanel(); }),
+    row("Passar para o próximo turno (fora de turno)", "⏭ Passar turno", 0, !S.waveActive, () => { if (S.isNight) { S.isNight = false; S.day++; } else { S.isNight = true; } S.gold += 15 + S.day * 3; buildNextWave(); renderAll(); renderDebugPanel(); }),
     row(`Muralha invencível ${S.debug.god ? "✅" : "❌"}`, "🛡 God", 0, true, () => { S.debug.god = !S.debug.god; renderDebugPanel(); }),
     row(`Velocidade do jogo: ${S.debug.speed}x`, "⏩ Alternar", 0, true, () => { const i = SPEEDS.indexOf(S.debug.speed); S.debug.speed = SPEEDS[(i + 1) % SPEEDS.length]; renderHUD(); renderDebugPanel(); }),
     row(`Conselho: desbloquear todos (${councilUnlocked().length}/${COUNCIL_ORDER.length})`, "🤝 Rede", 0, councilUnlocked().length < COUNCIL_ORDER.length, () => { META.council = [...COUNCIL_ORDER]; saveMeta(META); toast("🤝 Conselho: todos apresentados."); renderDebugPanel(); }),
