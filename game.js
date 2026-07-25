@@ -1139,8 +1139,8 @@ const AMMO = {
 
 // ---------- Assets do campo (astro dia/noite) ----------
 const ASTRO_IMG = { day: new Image(), night: new Image() };
-ASTRO_IMG.day.src = "ICONE-SOL-LUA-DIA.png?v=1";
-ASTRO_IMG.night.src = "ICONE-SOL-LUA-NOITE.png?v=1";
+ASTRO_IMG.day.src = "ICONE-DIA.png?v=1";
+ASTRO_IMG.night.src = "ICONE-NOITE.png?v=1";
 
 // ---------- Torres — 3 categorias (Básicas 1 munição / Avançadas 2 / Icônicas 3) ----------
 // Cada torre exige TODAS as munições de `ammos` (estoque por tipo). Força ∝ categoria; custo em ouro 1×/2×/3×.
