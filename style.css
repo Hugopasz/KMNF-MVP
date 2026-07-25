@@ -777,9 +777,9 @@ html, body {
 .pause-btn.primary { background: linear-gradient(180deg, var(--gold-hi), var(--gold)); color: #241a06; border-color: var(--gold-hi); font-weight: 800; }
 
 /* ===== Configurações: seção colapsável de toggles ===== */
-.collapse-btn { display: flex; align-items: center; justify-content: space-between; }
-.collapse-chevron { transition: transform .15s ease; font-size: 12px; opacity: .8; }
-.collapse-btn.on .collapse-chevron { transform: rotate(90deg); }
+.collapse-btn { display: flex; align-items: center; justify-content: center; position: relative; }
+.collapse-chevron { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); transition: transform .15s ease; font-size: 12px; opacity: .8; }
+.collapse-btn.on .collapse-chevron { transform: translateY(-50%) rotate(90deg); }
 #settings-list.hidden { display: none; }
 #settings-list {
   display: flex; flex-direction: column; gap: 2px;
