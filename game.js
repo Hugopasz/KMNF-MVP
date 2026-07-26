@@ -2196,8 +2196,8 @@ canvas.addEventListener("contextmenu", (e) => {
 });
 // SEGURAR 2s (toque ou mouse): dispara a habilidade da Távola no ponto pressionado.
 // (substitui os antigos 3-toques.) Mover o dedo cancela (é desenho de selo).
-const COUNCIL_HOLD_MS = 2000;
-const COUNCIL_RING_DELAY = 320; // só mostra o anel após este atraso (evita o "pisca" ao desenhar)
+const COUNCIL_HOLD_MS = 1000;
+const COUNCIL_RING_DELAY = 200; // só mostra o anel após este atraso (evita o "pisca" ao desenhar)
 let councilHoldTimer = null, councilHoldStart = null, councilFired = false;
 function startCouncilHold(e) {
   cancelCouncilHold();
