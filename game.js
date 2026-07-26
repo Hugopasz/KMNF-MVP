@@ -2197,6 +2197,7 @@ canvas.addEventListener("contextmenu", (e) => {
 // SEGURAR 2s (toque ou mouse): dispara a habilidade da Távola no ponto pressionado.
 // (substitui os antigos 3-toques.) Mover o dedo cancela (é desenho de selo).
 const COUNCIL_HOLD_MS = 2000;
+const COUNCIL_RING_DELAY = 320; // só mostra o anel após este atraso (evita o "pisca" ao desenhar)
 let councilHoldTimer = null, councilHoldStart = null, councilFired = false;
 function startCouncilHold(e) {
   cancelCouncilHold();
@@ -5386,8 +5387,10 @@ function draw() {
     ctx.beginPath(); ctx.arc(fxx, fxy, 4 + k * (fx.type === "catapulta" ? 22 : 12), 0, 7); ctx.stroke();
   }
 
-  // Anel de progresso da Távola enquanto o jogador segura o ponto (0→100% em 2s)
-  if (S.councilCharge) {
+  // Anel de progresso da Távola enquanto o jogador segura o ponto (0→100% em 2s).
+  // Só aparece após um pequeno atraso: ao DESENHAR (mover o dedo) o hold é cancelado
+  // antes disso, então o anel não chega a piscar na tela.
+  if (S.councilCharge && (performance.now() - S.councilCharge.t0) > COUNCIL_RING_DELAY) {
     const c = S.councilCharge;
     const p = Math.min(1, (performance.now() - c.t0) / c.dur);
     const cx = c.fx * w, cy = c.fy * h;
