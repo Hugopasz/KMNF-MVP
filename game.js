@@ -172,11 +172,11 @@ function applyDailyEvent(ev) {
 // ---------- Facções ----------
 const FACTIONS = {
   red:    { ic: "🔴", name: "Os Vermelhos", tag: "Sacrifício pelo Reino",  flavor: "Guiados pelo Rei.",              color: "#c0392b", desc: "+12% de dano das torres." },
-  blue:   { ic: "🔵", name: "Os Azuis",     tag: "Esforço de Guerra",      flavor: "Ciência é Progresso.",          color: "#2f6fd6", desc: "+15% de produção das fábricas." },
-  yellow: { ic: "🟡", name: "Os Amarelos",  tag: "A Igreja do Amanhecer",  flavor: "Culto ao Deus do Sol.",         color: "#e8b93a", desc: "Ganho de moral (Esperança) +30%." },
+  blue:   { ic: "🔵", name: "Os Azuis",     tag: "Esforço de Guerra",      flavor: "Ciência é Progresso.",          color: "#2f6fd6", desc: "+15% de produção fabril." },
+  yellow: { ic: "🟡", name: "Os Amarelos",  tag: "A Igreja do Amanhecer",  flavor: "Culto ao Deus do Sol.",         color: "#e8b93a", desc: "+30% de ganho de moral." },
   pink:   { ic: "🌸", name: "As Rosas",      tag: "Lealdade pela Rainha",   flavor: "Admiradores da Matrona.",       color: "#d6608f", desc: "+1 hit máximo da muralha." },
-  purple: { ic: "🟣", name: "Os Roxos",      tag: "Culto da Lua",           flavor: "Filhos da Magia Negra.",        color: "#a86ae0", desc: "10% dos mortos viram Sombra aliada.", secret: true },
-  green:  { ic: "🟢", name: "Os Verdes",      tag: "Povos Mágicos",          flavor: "Refugiados das florestas antigas.", color: "#4cae6a", desc: "Tropas se regeneram a cada turno.", secret: true, dlc: true },
+  purple: { ic: "🟣", name: "Os Roxos",      tag: "Culto da Lua",           flavor: "Filhos da Magia Negra.",        color: "#a86ae0", desc: "Mortos viram Sombras (10%).", secret: true },
+  green:  { ic: "🟢", name: "Os Verdes",      tag: "Povos Mágicos",          flavor: "Refugiados das florestas antigas.", color: "#4cae6a", desc: "Tropas curam por turno.", secret: true, dlc: true },
 };
 // Ideologias párias: odiadas por todos, sofrem TODAS as penalidades — e, por não
 // terem rival, não impõem penalidade a ninguém.
@@ -459,9 +459,10 @@ function loadFavMeta() {
 }
 const FAVMETA = loadFavMeta();
 function saveFavMeta() { localStorage.setItem(FAV_KEY, JSON.stringify(FAVMETA)); }
-// As alianças só começam a visitar a partir deste dia; a cada dia UM visitante
-// fixo aparece (o jogador não escolhe) e só com ele é possível interagir.
-const FAV_VISIT_MIN_DAY = 5;
+// VISITAR (você vai até eles, escolhendo quem): liberado desde o dia 1.
+// RECEBER VISITA (um visitante fixo aparece sozinho e cobra atenção): só a partir
+// deste dia. De qualquer forma, é 1 interação por dia.
+const FAV_VISIT_MIN_DAY = 7;
 function favDefault() { return { rel: { rei: 50, rainha: 50, conde: 50, povo: 50 }, used: false, last: {}, bag: {}, visitor: null }; }
 
 function favTier(v, k) {
@@ -789,10 +790,11 @@ function favDrawEvent(k) {
 let favFreeVisits = false; // debug: visitas infinitas (botão discreto no "?")
 function favBusyChance(k) { return 0.3 * (1 - favRel(k) / 100); }
 function favTryAction(k, mode) {
-  if (S.fav.used && !favFreeVisits) { toast("Você já fez sua visita hoje. Volte amanhã."); return; }
-  // só é possível tratar com quem está visitando hoje
-  if (!favFreeVisits && S.fav.visitor !== k) {
-    toast(S.fav.visitor ? `Hoje quem veio foi ${FAV_CHARS[S.fav.visitor].name.split(" ")[0]}.` : `As alianças só recebem você a partir do dia ${FAV_VISIT_MIN_DAY}.`);
+  // 1 interação por dia — visitar qualquer aliança já é permitido desde o dia 1.
+  if (S.fav.used && !favFreeVisits) { toast("Você já tratou com uma aliança hoje. Volte amanhã."); return; }
+  // Se alguém veio até você (dia 7+), essa visita tem prioridade: trava as demais.
+  if (!favFreeVisits && S.fav.visitor && S.fav.visitor !== k) {
+    toast(`Hoje ${FAV_CHARS[S.fav.visitor].name.split(" ")[0]} veio até você — só com ${FAV_CHARS[S.fav.visitor].name.split(" ")[0]} dá pra tratar hoje.`);
     return;
   }
   if (mode === "talk") {
@@ -853,20 +855,20 @@ function renderFavHub(scr) {
   const prev = FAV_ORDER[(favSel + FAV_ORDER.length - 1) % FAV_ORDER.length];
   const next = FAV_ORDER[(favSel + 1) % FAV_ORDER.length];
   const punWarn = FAV_ORDER.filter(favPun).map(p => `${FAV_CHARS[p].punIc} ${FAV_CHARS[p].punDesc}`).join("<br>");
-  // Só é possível interagir com QUEM está visitando hoje (fixo, não escolhido).
+  // Você pode VISITAR qualquer aliança (desde o dia 1); é 1 interação por dia.
+  // Mas se alguém VEIO até você (dia 7+), essa visita tem prioridade e trava as demais.
   const visitor = S.fav.visitor;
   const isVisitor = visitor === k;
-  const interactable = favFreeVisits || (isVisitor && !S.fav.used);
+  const interactable = favFreeVisits || (!S.fav.used && (!visitor || isVisitor));
   const actDisabled = interactable ? "" : "disabled";
   const actNote = favFreeVisits ? ""
-    : !visitor ? `<div class="fav-used-note">As alianças só recebem você a partir do dia ${FAV_VISIT_MIN_DAY}.</div>`
-    : S.fav.used ? `<div class="fav-used-note">Visita de hoje já feita. Volte amanhã.</div>`
-    : !isVisitor ? `<div class="fav-used-note">Hoje quem veio foi ${FAV_CHARS[visitor].punIc} ${FAV_CHARS[visitor].name.split(" ")[0]} — só com ${FAV_CHARS[visitor].name.split(" ")[0]} dá pra tratar hoje.</div>`
+    : S.fav.used ? `<div class="fav-used-note">Você já tratou com uma aliança hoje. Volte amanhã.</div>`
+    : visitor && !isVisitor ? `<div class="fav-used-note">Hoje ${FAV_CHARS[visitor].punIc} ${FAV_CHARS[visitor].name.split(" ")[0]} veio até você — só com ${FAV_CHARS[visitor].name.split(" ")[0]} dá pra tratar hoje.</div>`
     : "";
   scr.innerHTML = `
     <div class="laws-top"><button class="tavola-round tavola-back" id="fav-back">‹</button><button class="tavola-round" id="fav-help-btn">?</button></div>
     <h2 class="tavola-title fav-title"><span class="tt-a">— AS —</span><span class="tt-main">ALIANÇAS</span></h2>
-    <div id="fav-help" class="hidden"><b>As Alianças</b><p>Quatro figuras de Karzstak podem ajudar (ou atrapalhar) sua muralha. A partir do <b>dia ${FAV_VISIT_MIN_DAY}</b>, <b>um deles visita a muralha por dia</b> (você não escolhe quem) — só com o visitante do dia dá pra tratar, entre os turnos: converse, peça algo ou presenteie.</p><p>Cada escolha muda a <b>relação</b> (0–100%). Relação no chão = <b>punição ativa</b>; relação no máximo = <b>bênção ativa</b>. O que você descobre nas conversas fica lembrado para sempre, entre todas as partidas.</p><button id="fav-dbg">debug: visitas infinitas ${favFreeVisits ? "✅" : "❌"}</button></div>
+    <div id="fav-help" class="hidden"><b>As Alianças</b><p>Quatro figuras de Karzstak podem ajudar (ou atrapalhar) sua muralha. Você pode <b>visitar</b> qualquer uma delas <b>desde o dia 1</b> — converse, peça algo ou presenteie, <b>1 vez por dia</b>, entre os turnos. A partir do <b>dia ${FAV_VISIT_MIN_DAY}</b>, uma delas também pode <b>vir até você</b>: ignorar quem veio custa relação com todos.</p><p>Cada escolha muda a <b>relação</b> (0–100%). Relação no chão = <b>punição ativa</b>; relação no máximo = <b>bênção ativa</b>. O que você descobre nas conversas fica lembrado para sempre, entre todas as partidas.</p><button id="fav-dbg">debug: visitas infinitas ${favFreeVisits ? "✅" : "❌"}</button></div>
     <div class="fav-carousel">
       <button class="fav-card fav-side left" data-k="${prev}"><img src="${FAV_CHARS[prev].img}?v=1" alt=""><div class="fav-card-t">-${FAV_CHARS[prev].art}-<br>${FAV_CHARS[prev].name}</div></button>
       <div class="fav-card fav-main"><img src="${c.img}?v=1" alt=""><div class="fav-card-t">-${c.art}-<br><b>${c.name}</b><span>${c.sub}</span></div></div>
@@ -1007,7 +1009,7 @@ function favIgnoreVisit() {
   saveGame();
   renderHUD();
 }
-// sorteia quem visita hoje (a partir do dia 5), sem repetir o visitante anterior
+// sorteia quem vem até você hoje (a partir do dia 7), sem repetir o visitante anterior
 function favPickVisitor() {
   if (S.day < FAV_VISIT_MIN_DAY) return null;
   const pool = FAV_ORDER.filter(k => k !== S.fav.visitor);
@@ -1015,7 +1017,7 @@ function favPickVisitor() {
 }
 function favNewDay() {
   S.fav.used = false; // a visita nasce disponível; o automático apenas a esconde (favVisitPending)
-  S.fav.visitor = favPickVisitor(); // UM visitante fixo por dia (null antes do dia 5)
+  S.fav.visitor = favPickVisitor(); // UM visitante que vem até você (null antes do dia 7)
   for (const k of FAV_ORDER) {
     if (favPun(k)) toast(`${FAV_CHARS[k].punIc} ${FAV_CHARS[k].punDesc}`);
     else if (favBless(k)) toast(`${FAV_CHARS[k].punIc} ${FAV_CHARS[k].blessDesc}`);
@@ -1078,8 +1080,6 @@ function openDistrict() {
     const wrap = document.createElement("div");
     wrap.className = "dist";
     wrap.innerHTML = `
-      <div class="dist-line dist-res"><span class="dl-v dr-line">${resSummary}</span></div>
-      <div class="dist-div"></div>
       <div class="dist-moral">MORAL: ${moralName.toUpperCase()}</div>
       <div class="dist-bar">
         <img class="db-cap" src="MEDIDOR-MEDO.png?v=1" alt="">
@@ -1108,8 +1108,16 @@ function openDistrict() {
       <div class="dist-div"></div>
       <div class="dist-chron-h">Crônicas do Setor</div>
       <div class="dist-chron"></div>
-      <div class="dist-foot">CLIQUE FORA PARA SAIR</div>`;
+      <div class="dist-div"></div>
+      <div class="dist-line dist-res"><span class="dl-v dr-line">${resSummary}</span></div>`;
     m.appendChild(wrap);
+    // "clique fora para sair" fica FORA do modal, sobre o fundo escurecido
+    const modal = $("modal");
+    modal.querySelector(".modal-foot")?.remove();
+    const foot = document.createElement("div");
+    foot.className = "modal-foot";
+    foot.textContent = "CLIQUE FORA PARA SAIR";
+    modal.appendChild(foot);
     wrap.querySelector("#dist-brasao").onclick = () => { cycleBrasao(); openDistrict(); };
     const chron = wrap.querySelector(".dist-chron");
     if (!S.eventLog.length) {
@@ -1264,9 +1272,9 @@ const BUILDINGS = {
   quartel:        { name: "Quartel",                  icon: "🏠", cost: 25, shape: [[0,0],[0,1]],             zones: ["1","0"],
                     desc: "tropas aliadas ganham +10% de vida" },
   cortico:        { name: "Cortiço",                   icon: "🏘️", cost: 30, shape: [[0,0],[0,1]],             zones: ["1","0"],
-                    desc: `abriga trabalhadores: +${CORTICO_PER} de LIMITE de ✋ Mãos por nível (teto ${MAOS_CAP_MAX})` },
+                    desc: `+${CORTICO_PER} de teto de ✋ Mãos por nível (máx. ${MAOS_CAP_MAX})` },
   praca_publica:  { name: "Praça Pública",            icon: "⛲", cost: 30, shape: [[0,0]],                   zones: ["1","0"],
-                    desc: "+1 🪙 por dia POR CONSTRUÇÃO que a toca (por nível)" },
+                    desc: "+1 🪙/dia por construção vizinha (por nível)" },
   praca_trabalho: { name: "Praça do Trabalho",        icon: "🛠️", cost: 35, shape: [[0,0]],                   zones: ["2","0"],
                     desc: "+1% de eficiência por nível às construções que a tocam" },
   // ===== Novas praças (sempre disponíveis, fora do Arsenal) =====
@@ -1285,7 +1293,7 @@ const BUILDINGS = {
   praca_cerimonial: { name: "Praça Cerimonial",       icon: "🕯️", cost: 40, shape: [[0,0]],                   zones: ["1","0"],
                     desc: "+1 💎 por turno por nível", locked: true, medalCost: 10 },
   praca_estranha:   { name: "Praça Estranha",         icon: "🌀", cost: 30, shape: [[0,0]],                   zones: ["2","0"],
-                    desc: "a cada turno, um bônus aleatório por nível (🪙 / moral / 💎)", locked: true, medalCost: 10 },
+                    desc: "bônus aleatório a cada turno por nível (🪙/moral/💎)", locked: true, medalCost: 10 },
   capela:         { name: "Capela",                   icon: "⛪", cost: 25, shape: [[0,0],[1,0]],             zones: ["1","0"],
                     desc: "cura as tropas aliadas em +3 de vida por nível a cada turno" },
   estabulo:       { name: "Estábulo",                 icon: "🐴", cost: 30, shape: [[0,0],[0,1]],             zones: ["1","0"],
@@ -3375,13 +3383,14 @@ function openGate() {
 // ---------- Modal genérico ----------
 function openModal(title, buildFn) {
   $("modal").classList.remove("dist-modal"); // limpa modificadores de painéis específicos
+  $("modal").querySelector(".modal-foot")?.remove(); // rodapé externo é exclusivo do "Seu Setor"
   $("modal-title").textContent = title;
   const m = $("modal-content");
   m.innerHTML = "";
   buildFn(m);
   $("modal").classList.remove("hidden");
 }
-function closeModal() { $("modal").classList.add("hidden"); }
+function closeModal() { $("modal").classList.add("hidden"); $("modal").querySelector(".modal-foot")?.remove(); }
 $("modal-close").onclick = closeModal;
 $("modal").onclick = (e) => { if (e.target === $("modal")) closeModal(); };
 $("field-toggle").onclick = toggleField;
@@ -5081,22 +5090,6 @@ function draw() {
   ctx.fillStyle = "#3e3122";
   ctx.fillRect(0, h - 3, w, 3);
 
-  // tochas nas QUINAS dos portões: 6 posições compartilhadas (0..5);
-  // a quina acende se um dos portões vizinhos tiver torre.
-  const t0 = performance.now() / 1000;
-  for (let i = 0; i <= LANES; i++) {
-    const lit = (i > 0 && S.towers[i - 1]) || (i < LANES && S.towers[i]);
-    if (!lit) continue;
-    const tx = i * laneW, ty = h - 8;
-    const fl = 6 + Math.sin(t0 * 9 + i * 2) * 1.6;
-    const tg = ctx.createRadialGradient(tx, ty, 2, tx, ty, fl * 3.2);
-    tg.addColorStop(0, "rgba(240,150,50,.5)"); tg.addColorStop(1, "transparent");
-    ctx.fillStyle = tg; ctx.fillRect(tx - fl * 3.5, ty - fl * 3.5, fl * 7, fl * 7);
-    // chama pequena no topo da quina
-    ctx.fillStyle = "rgba(255,190,90,.85)";
-    ctx.beginPath(); ctx.arc(tx, ty - 3, 2 + Math.sin(t0 * 11 + i) * 0.6, 0, 7); ctx.fill();
-  }
-
   // linhas de poder (traço em desenho + linhas ativas)
   const allLines = drawingLine ? [...S.powerLines, drawingLine] : S.powerLines;
   const nowMs = performance.now();
@@ -5717,47 +5710,47 @@ function toggleLoadout(kind, key) {
 // Lore curta exibida sob o nome de cada item do Arsenal
 const ARS_LORE = {
   // Torres — Básicas
-  besta:       "A primeira arma erguida nas ameias. Cada virote leva o nome de um vigia caído.",
-  catapulta:   "Madeira velha, contrapeso e ódio. Arremessa projéteis desde o primeiro cerco.",
-  caldeirao:   "A sopa que ninguém quer provar. Ferve dia e noite sobre os portões.",
-  tesla:       "Presente das oficinas a vapor: relâmpago engarrafado em bobinas de cobre.",
-  canalizador: "Um fio do Turbilhão Nexus corre por este pilar de runas.",
-  acido:       "Os alquimistas juram que a chuva verde não mancha a muralha. Mentem.",
+  besta:       "A primeira arma das ameias, fiel desde o início.",
+  catapulta:   "Madeira velha e ódio, desde o primeiro cerco.",
+  caldeirao:   "Sopa fervente que ninguém quer provar.",
+  tesla:       "Relâmpago engarrafado em bobinas de cobre.",
+  canalizador: "Um fio do Turbilhão Nexus corre por este pilar.",
+  acido:       "Chuva verde que, juram, não mancha a muralha.",
   // Torres — Avançadas
-  balista:     "Virotes untados em óleo: atravessam três mortos e ainda acendem o quarto.",
-  canhao:      "Pólvora e ferro fundido — o rugido que responde ao rugido da horda.",
-  cospefogo:   "Construído sobre a boca de uma forja. O fogo nunca dorme, só espera.",
-  soprador:    "Sopro do inverno preso em tubos: congela a marcha dos que não sentem frio.",
-  prisma:      "Lapidado de um único Coração de Argamato, parte a luz — e os mortos.",
-  lancaacido:  "A resposta dos engenheiros à carne que não teme lâminas.",
+  balista:     "Virotes que atravessam três mortos de uma vez.",
+  canhao:      "Pólvora e ferro: o rugido que responde à horda.",
+  cospefogo:   "Erguido sobre uma forja: o fogo nunca dorme.",
+  soprador:    "Inverno em tubos: congela a marcha dos mortos.",
+  prisma:      "Talhado de um Coração de Argamato, parte a luz.",
+  lancaacido:  "Para a carne que não teme lâminas.",
   // Torres — Icônicas
-  mortenegra:  "Dizem que o próprio rei negativo recua quando este sino dobra.",
-  apagador:    "Onde dispara, o cronista escreve apenas: 'não sobrou nada'.",
-  raiosolar:   "Relíquia da Igreja do Amanhecer: um pedaço do sol que odeia a noite.",
-  ritualcura:  "Cânticos antigos costuram os vivos enquanto a batalha ruge.",
-  infusor:     "Verte magia pura nas armas vizinhas, gota a gota, como vinho raro.",
+  mortenegra:  "Dizem que até o rei negativo recua ao seu dobre.",
+  apagador:    "Onde dispara, não sobra nada para contar.",
+  raiosolar:   "Um pedaço do sol que odeia a noite.",
+  ritualcura:  "Cânticos antigos costuram os vivos na batalha.",
+  infusor:     "Verte magia pura nas armas vizinhas, gota a gota.",
   // Edifícios
-  quartel:     "Beliches apertados e juramentos: aqui o povo vira guarnição.",
-  cortico:     "Tetos baixos, sonhos curtos. É o lar possível atrás da muralha.",
-  capela:      "Uma vela por cada tropa que voltou. As paredes já são de cera.",
-  estabulo:    "Cavalos nascidos ao som do cerco não conhecem o medo.",
-  tesouraria:  "Cofres do reino: até o ouro trabalha na guerra.",
-  laboratorio: "Vidros, vapores e teorias proibidas — o amanhã destilado às pressas.",
-  templo:      "Ergueram-no em uma noite de lua vermelha. A fé aqui é argamassa.",
-  oficina:     "Pedreiros dormem com as botas calçadas: a muralha se recusa a morrer.",
-  refinaria:   "Tritura Corações de Argamato até restar só o brilho que move o reino.",
+  quartel:     "Aqui o povo vira guarnição da muralha.",
+  cortico:     "O lar possível atrás da muralha.",
+  capela:      "Uma vela por cada tropa que voltou viva.",
+  estabulo:    "Cavalos criados no cerco não temem nada.",
+  tesouraria:  "Cofres do reino: até o ouro vai à guerra.",
+  laboratorio: "Vapores e teorias proibidas: o amanhã às pressas.",
+  templo:      "Erguido em lua vermelha; a fé é argamassa.",
+  oficina:     "A muralha se recusa a morrer, tijolo a tijolo.",
+  refinaria:   "Tritura Corações de Argamato até restar o brilho.",
   // Praças — Distrito do Povo
-  praca_publica:    "O coração da vizinhança: feira, fofoca e o censo do que ainda vive.",
-  praca_festival:   "Uma noite de música por semana. É o que segura o resto delas.",
-  praca_jardim:     "Flores em plena guerra são um ato de teimosia — e de cura.",
-  praca_chique:     "Os nobres pagam caro para esquecer o cheiro do cerco.",
-  praca_cerimonial: "Aqui os caídos viram nomes gravados, e os nomes viram cristal.",
+  praca_publica:    "Feira, fofoca e o censo do que ainda vive.",
+  praca_festival:   "Uma noite de música que segura as outras.",
+  praca_jardim:     "Flores na guerra: teimosia — e cura.",
+  praca_chique:     "Os nobres pagam caro para esquecer o cerco.",
+  praca_cerimonial: "Os caídos viram nomes; os nomes, cristal.",
   // Praças — Distrito das Fábricas
-  praca_trabalho:   "O sino bate, os turnos trocam, e Karzstak não para.",
-  praca_vigia:      "Da torre da praça se vê a horda antes que a horda veja a muralha.",
-  praca_militar:    "Recrutas marcham em círculos até o passo virar instinto.",
-  praca_abandonada: "Ninguém repara quem entra ou sai. Por isso paga tão bem.",
-  praca_estranha:   "As bússolas giram e os gatos evitam o centro. Algo dorme embaixo.",
+  praca_trabalho:   "O sino bate, os turnos trocam, Karzstak não para.",
+  praca_vigia:      "Da torre se vê a horda antes de todos.",
+  praca_militar:    "Recrutas marcham até o passo virar instinto.",
+  praca_abandonada: "Ninguém repara quem entra. Por isso paga bem.",
+  praca_estranha:   "As bússolas giram; algo dorme embaixo.",
 };
 const ARS_PAGES = [
   { kind: "towers",    title: "Escolha suas Torres:" },
@@ -5765,6 +5758,24 @@ const ARS_PAGES = [
   { kind: "pracas",    title: "Escolha suas Praças:" },
 ];
 let arsPage = 0, arsLastPage = -1;
+// Nomes curtos por página, para o aviso de slots incompletos.
+const ARS_KIND_LABEL = { towers: "Torres", buildings: "Edifícios", pracas: "Praças" };
+// Todos os slots (5 por página) precisam estar preenchidos para jogar.
+// Quantos itens estão DISPONÍVEIS (desbloqueados) para escolher em cada página.
+// Um jogador novo pode ter menos de 5 (ex.: só 4 edifícios base), então o mínimo
+// exigido é min(5, disponíveis) — nunca dá pra travar sem itens suficientes.
+function arsAvailable(kind) {
+  if (kind === "towers")
+    return Object.keys(TOWER_TYPES).filter(k => isUnlocked(k)).length;
+  if (kind === "buildings")
+    return Object.keys(BUILDINGS).filter(k => !isPraca(k) && !isFactoryKey(k) && isUnlocked(k)).length;
+  return Object.keys(BUILDINGS).filter(k => isPraca(k) && (BUILDINGS[k].zones.includes("1") || BUILDINGS[k].zones.includes("2")) && isUnlocked(k)).length;
+}
+function arsSlotsNeeded(kind) { return Math.min(5, arsAvailable(kind)); }
+function loadoutMissing() {
+  const lo = getLoadout();
+  return ARS_PAGES.filter(p => (lo[p.kind] || []).length < arsSlotsNeeded(p.kind)).map(p => ARS_KIND_LABEL[p.kind]);
+}
 // texto de traço da torre (mesmo do menu de construção)
 function towerTrait(tt) {
   return tt.support === "heal" ? "cura passiva das tropas" :
@@ -5828,7 +5839,8 @@ function renderArsenal() {
   $("ars-page-title").textContent = page.title;
   // losangos: slots preenchidos do loadout da página
   const filled = lo[page.kind].length;
-  $("ars-slots").innerHTML = Array.from({ length: 5 }, (_, i) => `<span class="ars-diamond${i < filled ? " on" : ""}"></span>`).join("");
+  const slots = Math.max(filled, arsSlotsNeeded(page.kind)); // nunca menos do que já foi escolhido
+  $("ars-slots").innerHTML = Array.from({ length: slots }, (_, i) => `<span class="ars-diamond${i < filled ? " on" : ""}"></span>`).join("");
   const body = $("arsenal-body"); body.innerHTML = "";
   const header = (txt) => {
     const h = document.createElement("div"); h.className = "ars-section";
@@ -6017,6 +6029,15 @@ function showFactionChoose(onConfirm) {
 }
 
 $("btn-infinito").onclick = () => {
+  const missing = loadoutMissing();
+  if (missing.length) {
+    toast(`⚠ Preencha os 5 slots do Arsenal antes de jogar (faltam: ${missing.join(", ")}).`);
+    showScreen("arsenal");
+    // abre direto na primeira página que ainda tem slot vazio
+    const idx = ARS_PAGES.findIndex(p => (getLoadout()[p.kind] || []).length < arsSlotsNeeded(p.kind));
+    if (idx >= 0) { arsPage = idx; renderArsenal(); }
+    return;
+  }
   resetGame();
   $("menu").classList.add("hidden");
   showFactionChoose((pick) => {
