@@ -254,9 +254,9 @@ function mioloIncomeMult() { return 1 + MIOLO.cofres.per * mioloLvl("cofres"); }
 function mioloHeartBonus() { return MIOLO.relicario.per * mioloLvl("relicario"); }
 
 // ---------- O Conselho: habilidade ativa (Fase 16) ----------
-// Vínculo persistente (META.counselor). Dispara por clique-direito / 3-toques. Custa 💎.
+// Vínculo persistente (META.counselor). Dispara segurando 2s no ponto (ou clique-direito no PC). Custa 💎.
 // `run(t)` aplica o efeito e retorna false para ABORTAR sem custo (nada a fazer).
-// A TÁVOLA: 8 Lordes. Vínculo persistente (META.counselor). Dispara por clique-direito / 3-toques. Custa 💎.
+// A TÁVOLA: 8 Lordes. Vínculo persistente (META.counselor). Dispara segurando 2s no ponto (ou clique-direito no PC). Custa 💎.
 const COUNCILORS = {
   arqueira:   { name: "Mestre Arqueira",     icon: "🏹", fac: "red",    cost: 3, target: "lane",   desc: "Rajada: 30 de dano a todos os inimigos da lane mirada.",
     flavor: "A guilda dos arqueiros mantém seu distrito seguro com uma chuva de flechas.",
@@ -316,10 +316,10 @@ function advanceCouncilNetwork(id) {
 }
 function useCouncil(t) {
   const id = META.counselor;
-  if (!id || !COUNCILORS[id]) { toast("Nenhum Lorde jurado. Abra A Távola no menu."); return; }
+  if (!id || !COUNCILORS[id]) { toast("Nenhum Lorde jurado. Abra A Távola no menu."); return false; }
   const c = COUNCILORS[id], cost = councilCost(id);
-  if (S.hearts < cost) { toast(`Sem 💎 para ${c.name} (custa ${cost}).`); return; }
-  if (c.run(t) === false) { toast(`${c.icon} ${c.name}: nada a mirar agora.`); return; }
+  if (S.hearts < cost) { toast(`Sem 💎 para ${c.name} (custa ${cost}).`); return false; }
+  if (c.run(t) === false) { toast(`${c.icon} ${c.name}: nada a mirar agora.`); return false; }
   S.hearts -= cost;
   renderHUD();
   // Rede: cada uso sobe 1 nível o Lorde ativo; ao chegar ao nível 10 apresenta o próximo.
@@ -329,6 +329,7 @@ function useCouncil(t) {
   const nxt = lv >= COUNCIL_LV_MAX ? advanceCouncilNetwork(id) : null;
   saveMeta(META);
   if (nxt) toast(`🤝 ${c.name} (nível ${COUNCIL_LV_MAX}) te apresentou a ${COUNCILORS[nxt].icon} ${COUNCILORS[nxt].name}!`);
+  return true;
 }
 // Desbloqueio / loadout (Arsenal). Itens novos têm `locked:true` + `medalCost`.
 function itemDef(k) { return TOWER_TYPES[k] || BUILDINGS[k]; }
@@ -2193,24 +2194,47 @@ canvas.addEventListener("contextmenu", (e) => {
   e.preventDefault();
   useCouncil(fieldTargetFromClient(e.clientX, e.clientY));
 });
-// 3-toques (mobile): idem, no centroide dos dedos; cancela desenho em curso
-canvas.addEventListener("touchstart", (e) => {
-  if (e.touches.length !== 3) return;
-  e.preventDefault();
-  drawingLine = null;
-  let sx = 0, sy = 0;
-  for (const tch of e.touches) { sx += tch.clientX; sy += tch.clientY; }
-  useCouncil(fieldTargetFromClient(sx / 3, sy / 3));
-}, { passive: false });
+// SEGURAR 2s (toque ou mouse): dispara a habilidade da Távola no ponto pressionado.
+// (substitui os antigos 3-toques.) Mover o dedo cancela (é desenho de selo).
+const COUNCIL_HOLD_MS = 2000;
+let councilHoldTimer = null, councilHoldStart = null, councilFired = false;
+function startCouncilHold(e) {
+  cancelCouncilHold();
+  councilFired = false;
+  councilHoldStart = { x: e.clientX, y: e.clientY };
+  const r = canvas.getBoundingClientRect();
+  const fracX = (e.clientX - r.left) / r.width, fracY = (e.clientY - r.top) / r.height;
+  const tgt = fieldTargetFromClient(e.clientX, e.clientY);
+  S.councilCharge = { fx: fracX, fy: fracY, t0: performance.now(), dur: COUNCIL_HOLD_MS };
+  councilHoldTimer = setTimeout(() => {
+    councilHoldTimer = null;
+    councilFired = true;
+    drawingLine = null;                 // não vira traço/selo
+    S.councilCharge = null;
+    // anima ao redor do ponto pressionado só quando a habilidade REALMENTE dispara
+    if (useCouncil(tgt)) S.effects.push({ x: fracX * LANES - 0.5, y: fracY, life: 0.6, max: 0.6, type: "council" });
+  }, COUNCIL_HOLD_MS);
+}
+function cancelCouncilHold() {
+  if (councilHoldTimer) { clearTimeout(councilHoldTimer); councilHoldTimer = null; }
+  councilHoldStart = null;
+  S.councilCharge = null;
+}
 
 canvas.addEventListener("pointerdown", (e) => {
   if (e.button !== 0 && e.pointerType !== "touch") return; // botão esquerdo ou dedo
   e.preventDefault();
   drawingLine = { pts: [canvasFrac(e)], life: POWER_LIFE, max: POWER_LIFE };
-  canvas.setPointerCapture(e.pointerId);
+  startCouncilHold(e); // segurar 2s = habilidade da Távola
+  try { canvas.setPointerCapture(e.pointerId); } catch { /* pointer já solto/sintético */ }
 });
 
 canvas.addEventListener("pointermove", (e) => {
+  // mover o dedo/mouse além de um limiar cancela o "segurar" (está desenhando)
+  if (councilHoldStart) {
+    const dx = e.clientX - councilHoldStart.x, dy = e.clientY - councilHoldStart.y;
+    if (dx * dx + dy * dy > 256) cancelCouncilHold(); // ~16px
+  }
   if (!drawingLine) return;
   const p = canvasFrac(e);
   const last = drawingLine.pts[drawingLine.pts.length - 1];
@@ -2278,8 +2302,12 @@ function finishLine() {
   }
   drawingLine = null;
 }
-canvas.addEventListener("pointerup", finishLine);
-canvas.addEventListener("pointercancel", () => { drawingLine = null; });
+canvas.addEventListener("pointerup", () => {
+  cancelCouncilHold();
+  if (councilFired) { councilFired = false; drawingLine = null; return; } // já disparou a Távola
+  finishLine();
+});
+canvas.addEventListener("pointercancel", () => { cancelCouncilHold(); drawingLine = null; });
 
 function resizeCanvas() {
   // sincroniza o backing store ao tamanho REAL exibido do canvas (senão estica: astro oval)
@@ -5265,6 +5293,19 @@ function draw() {
       continue;
     }
     // ===== VFX das habilidades do Conselho =====
+    if (fx.type === "council") { // ativação da Távola: anel dourado expandindo no ponto pressionado
+      ctx.save();
+      const r = 10 + k * 46;
+      ctx.shadowColor = "#eecd5c"; ctx.shadowBlur = 18;
+      ctx.strokeStyle = `rgba(238,205,92,${(1 - k) * 0.95})`;
+      ctx.lineWidth = 3 + (1 - k) * 4;
+      ctx.beginPath(); ctx.arc(fxx, fxy, r, 0, 7); ctx.stroke();
+      ctx.strokeStyle = `rgba(255,240,190,${(1 - k) * 0.7})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(fxx, fxy, r * 0.55, 0, 7); ctx.stroke();
+      ctx.restore();
+      continue;
+    }
     if (fx.type === "arrows") { // Mestra Arqueira: rajada de flechas descendo a lane
       ctx.save();
       ctx.strokeStyle = `rgba(238,205,92,${1 - k})`; ctx.lineWidth = 2.5; ctx.lineCap = "round";
@@ -5343,6 +5384,22 @@ function draw() {
       `rgba(240,208,96,${1 - k})`;
     ctx.lineWidth = 2;
     ctx.beginPath(); ctx.arc(fxx, fxy, 4 + k * (fx.type === "catapulta" ? 22 : 12), 0, 7); ctx.stroke();
+  }
+
+  // Anel de progresso da Távola enquanto o jogador segura o ponto (0→100% em 2s)
+  if (S.councilCharge) {
+    const c = S.councilCharge;
+    const p = Math.min(1, (performance.now() - c.t0) / c.dur);
+    const cx = c.fx * w, cy = c.fy * h;
+    ctx.save();
+    ctx.shadowColor = "#eecd5c"; ctx.shadowBlur = 10;
+    ctx.strokeStyle = "rgba(238,205,92,0.25)"; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(cx, cy, 24, 0, 7); ctx.stroke();
+    ctx.strokeStyle = "#eecd5c"; ctx.lineWidth = 4; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.arc(cx, cy, 24, -Math.PI / 2, -Math.PI / 2 + p * Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = `rgba(255,240,190,${0.4 + 0.4 * p})`;
+    ctx.beginPath(); ctx.arc(cx, cy, 3 + p * 3, 0, 7); ctx.fill();
+    ctx.restore();
   }
 
   for (const e of S.enemies) {
@@ -5516,7 +5573,7 @@ function renderConselho() {
 function openTavolaHelp() {
   openModal("A Távola", (m) => {
     const d = document.createElement("div"); d.className = "panel-hint";
-    d.innerHTML = "Jure a UM <b>Lorde</b>: sua habilidade ativa vale em <b>todas as runs</b>. Dispare no campo por <b>clique-direito</b> (PC) ou <b>3 toques</b> (celular), gastando 💎. Ideologia igual à da run: <b>−1 💎</b>."
+    d.innerHTML = "Jure a UM <b>Lorde</b>: sua habilidade ativa vale em <b>todas as runs</b>. Dispare no campo <b>segurando 2s</b> no ponto (celular ou mouse), gastando 💎. Ideologia igual à da run: <b>−1 💎</b>."
       + "<br><br>🧭 O <b>compasso</b> aponta para o Lorde ativo (o que você jurou)."
       + "<br><br>🤝 <b>Rede:</b> você começa com um Lorde. <b>Jogue com ele até o nível 10</b> (10 usos da habilidade) para o próximo se juntar à Távola.";
     m.appendChild(d);
