@@ -953,6 +953,102 @@ html, body {
 .gate-auto.on .ga-knob { transform: translateX(20px); background: var(--gold-hi); box-shadow: 0 0 8px var(--gold-hi); }
 .panel-hint { color: var(--dim); font-style: italic; padding: 4px 0 10px; line-height: 1.5; }
 
+/* ===== Painel da torre (repaginado) ===== */
+#modal.tower-modal { flex-direction: column; gap: 10px; } /* empilha o rodapé "clique fora" abaixo do box */
+#modal.tower-modal #modal-head { display: none; }
+#modal.tower-modal #modal-content { padding: 16px 16px 18px; }
+/* cabeçalho */
+.tw-head { display: grid; grid-template-columns: auto 1fr; align-items: start; gap: 12px; margin-bottom: 14px; }
+.tw-emoji {
+  width: 58px; height: 58px; border-radius: 50%; flex: 0 0 auto;
+  display: flex; align-items: center; justify-content: center; font-size: 30px;
+  background: rgba(8,7,6,.7); border: 2px solid rgba(201,162,39,.6);
+  box-shadow: 0 2px 8px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.06);
+}
+.tw-titles { min-width: 0; }
+.tw-name { font-family: var(--display); font-weight: 800; font-size: 20px; color: #f3ead2; letter-spacing: .4px; line-height: 1.12; }
+.tw-name .tw-lv { color: var(--gold-hi); }
+.tw-name .tw-pos { color: var(--dim); font-weight: 600; font-size: 14px; }
+.tw-desc { margin-top: 4px; font-size: 12.5px; color: var(--beige); line-height: 1.3; opacity: .85; }
+/* botões redondos padrão do projeto (estilo tavola) */
+.tw-round {
+  display: flex; align-items: center; justify-content: center; flex: 0 0 auto;
+  width: 46px; height: 46px; border-radius: 50%; padding: 0; cursor: pointer;
+  background: rgba(8,7,6,.6); border: 2px solid rgba(201,162,39,.6); color: var(--gold-hi);
+  font-size: 20px; line-height: 1; transition: border-color .15s, color .15s, transform .1s;
+}
+.tw-round:hover { border-color: var(--gold-hi); color: #fff; }
+.tw-round:active { transform: scale(.93); }
+/* linha 2: remover · suprimento · estrela */
+.tw-row2 { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; margin-bottom: 16px; }
+.tw-sq { flex-direction: column; gap: 1px; }
+.tw-remove { font-size: 19px; }
+.tw-prest { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.tw-prest-cost { font-family: var(--display); font-weight: 800; font-size: 13px; color: var(--gold-hi); white-space: nowrap; line-height: 1; }
+.tw-star { color: rgba(243,234,210,.4); border-color: rgba(243,234,210,.28); }
+.tw-star.ready { color: var(--gold-hi); border-color: var(--gold); box-shadow: 0 0 12px -3px var(--gold); }
+.tw-star-ic { font-size: 21px; }
+.tw-star-n { font-size: 10px; font-family: var(--display); font-weight: 800; margin-top: -2px; }
+.tw-supply { min-width: 0; }
+.tw-supply-lbl { font-size: 12px; color: #f3ead2; margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* a barra reutiliza .bd-bar/.bd-fill das fábricas; só damos um respiro de altura */
+.tw-supply .bd-bar { height: 14px; }
+/* caminhos */
+.tw-paths { display: flex; flex-direction: column; gap: 9px; }
+.tw-path {
+  display: grid; grid-template-columns: 1fr 128px auto; align-items: center; gap: 12px;
+  padding: 10px 12px; border-radius: 10px;
+  background: linear-gradient(160deg, rgba(22,19,26,.92), rgba(9,8,11,.92));
+  border: 1px solid rgba(201,162,39,.4);
+}
+.tw-path.maxed { border-color: var(--gold); box-shadow: 0 0 0 1px rgba(201,162,39,.35), 0 0 16px -6px var(--gold); }
+.tw-path.locked, .tw-path.cap { border-color: rgba(243,234,210,.14); background: rgba(9,8,11,.85); }
+.tw-path.locked .tw-path-mid, .tw-path.cap .tw-path-mid { opacity: .55; }
+/* botão retangular "MELHORAR": fundo escuro + borda/texto dourados (consistente) */
+.tw-act {
+  width: 100%; box-sizing: border-box; min-height: 52px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+  padding: 7px 8px; border-radius: 8px; border: 1px solid var(--gold);
+  background: rgba(8,7,6,.6); color: var(--gold-hi); cursor: pointer;
+  font-family: var(--display); transition: border-color .15s, transform .1s;
+}
+.tw-melhorar:not(.off):hover { border-color: var(--gold-hi); }
+.tw-melhorar:not(.off):active { transform: scale(.96); }
+.tw-mel-t { font-weight: 800; font-size: 14px; letter-spacing: 1.5px; }
+.tw-mel-c { font-weight: 700; font-size: 11px; }
+.tw-melhorar.off { border-color: rgba(190,185,175,.3); color: var(--dim); cursor: default; }
+.tw-act.state { cursor: default; color: rgba(243,234,210,.5); border-color: rgba(243,234,210,.28); font-weight: 800; }
+.tw-act-ic { font-size: 22px; line-height: 1; }
+.tw-act-s { font-size: 10px; letter-spacing: 1.5px; }
+.tw-act.state.cap { font-size: 17px; }
+.tw-path.maxed .tw-act.state.done { color: var(--gold-hi); border-color: var(--gold); }
+.tw-path-mid { min-width: 0; }
+.tw-path-tag { font-family: var(--display); font-weight: 700; font-size: 10px; letter-spacing: 1.5px; color: var(--gold-hi); text-transform: uppercase; opacity: .85; }
+.tw-path-name { font-family: var(--display); font-weight: 800; font-size: 16px; color: #f3ead2; line-height: 1.12; margin: 1px 0 2px; }
+.tw-path-name .tw-tier { color: var(--gold-hi); font-size: 13px; }
+.tw-path-desc { font-size: 12px; color: var(--beige); line-height: 1.25; opacity: .8; }
+.tw-pips { display: flex; flex-direction: column; gap: 6px; flex: 0 0 auto; }
+.tw-pip { width: 15px; height: 15px; border-radius: 50%; border: 2px solid rgba(201,162,39,.5); background: transparent; }
+.tw-pip.on { background: var(--gold-hi); border-color: var(--gold-hi); box-shadow: 0 0 6px rgba(201,162,39,.6); }
+/* prioridade de ataque — destacada, com filetes laterais dourados */
+.tw-aim { text-align: center; margin-top: 18px; }
+.tw-aim-lbl {
+  display: flex; align-items: center; justify-content: center; gap: 12px;
+  font-family: var(--display); font-weight: 800; font-size: 15px; letter-spacing: 3px; color: var(--gold-hi);
+}
+.tw-aim-lbl::before, .tw-aim-lbl::after { content: ""; height: 1px; width: 40px; background: linear-gradient(90deg, transparent, rgba(201,162,39,.7)); }
+.tw-aim-lbl::after { background: linear-gradient(90deg, rgba(201,162,39,.7), transparent); }
+.tw-aim-sel { display: flex; align-items: center; justify-content: center; gap: 14px; margin: 8px 0 0; }
+.tw-aim-arrow {
+  background: rgba(8,7,6,.6); border: 2px solid rgba(201,162,39,.6); border-radius: 50%;
+  width: 40px; height: 40px; color: var(--gold-hi);
+  font-family: var(--display); font-size: 22px; font-weight: 900; line-height: 1; cursor: pointer; padding: 0 0 3px;
+}
+.tw-aim-arrow:hover { border-color: var(--gold-hi); color: #fff; }
+.tw-aim-arrow:active { transform: scale(.92); }
+.tw-aim-name { font-family: var(--display); font-weight: 800; font-size: 19px; color: #f3ead2; letter-spacing: .5px; min-width: 190px; }
+.tw-note { text-align: center; font-size: 12px; color: var(--dim); font-style: italic; margin-top: 12px; }
+
 /* ===== Árvores de leis (bolinhas + linhas) ===== */
 .tier-row {
   display: flex;

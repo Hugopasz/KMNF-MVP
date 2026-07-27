@@ -392,6 +392,8 @@ function facTowerMult() {
   if (f === "pink" || isOutcast(f)) m -= 0.12; // penalidade (Rosas rival dos Vermelhos; párias tudo)
   return m;
 }
+// Bastião de Guerra: +6% de dano em TODAS as torres por nível somado.
+function buildingTowerMult() { return 1 + 0.06 * groupLvlSum("bastiao"); }
 function facProdMult() {
   const f = curFaction(); let m = 1;
   if (f === "blue") m += 0.15;
@@ -1185,6 +1187,35 @@ const TOWER_TYPES = {
   infusor:     { name: "Infusor Arcano",     tier: "legend", icon: "🧿", cost: 90,  dmg: 0,  rate: 2.5, range: 999, aoe: 0,   ptime: 0.4, ammos: ["essencia", "pedras", "condutores"], support: "buff", locked: true, medalCost: 40 },
 };
 const TIER_META = { basic: "Básicas", adv: "Avançadas", legend: "Icônicas" };
+// Lore mais longa (≈2 linhas) para o painel da torre. A ARS_LORE curta segue nos cards do Arsenal.
+const TOWER_LORE = {
+  besta:       "A primeira arma erguida nas ameias de Karzstak. Cada virote leva gravado o nome de um vigia que tombou na muralha.",
+  catapulta:   "Madeira velha, contrapeso e ódio acumulado. Arremessa pedregulhos sobre a horda desde o primeiro cerco desta cidade.",
+  caldeirao:   "Óleo fervente despejado do alto dos portões. A sopa que ninguém quer provar borbulha dia e noite à espera da carne fria.",
+  tesla:       "Presente das oficinas a vapor da cidade baixa. Relâmpago engarrafado em bobinas de cobre que salta de morto em morto.",
+  canalizador: "Um pilar de runas alimentado por um fio do Turbilhão Nexus. Destila a magia bruta em raios que ignoram carne e selo.",
+  acido:       "Os alquimistas juram que a chuva verde não corrói a muralha — mentem. Contra os mortos, porém, ela dissolve tudo que se move.",
+  balista:     "Virotes do tamanho de lanças, untados em óleo do reino. Atravessam três cadáveres e ainda acendem o quarto no caminho.",
+  canhao:      "Pólvora e ferro fundido nas velhas forjas reais. O rugido que responde ao rugido da horda, calando lanes inteiras.",
+  cospefogo:   "Construído sobre a boca de uma antiga forja. O fogo aqui nunca dorme — apenas espera a próxima leva de carne seca.",
+  soprador:    "Sopro do inverno preso em tubos de bronze. Congela a marcha dos que não sentem frio, prendendo-os como estátuas de gelo.",
+  prisma:      "Lapidado de um único Coração de Argamato. Parte a luz em feixes que também partem os mortos em cacos brilhantes.",
+  lancaacido:  "A resposta dos engenheiros à carne que não teme lâminas. Um jato pressurizado que corrói osso, tendão e feitiço.",
+  aquatico:    "Água canalizada a uma pressão impossível, afiada como aço. Corta fileiras inteiras antes que a lane sequer perceba.",
+  cacadores:   "Os últimos batedores das florestas mortas montam guarda. Suas lâminas curvas sempre voltam — às vezes com mais de uma cabeça.",
+  serras:      "Discos dentados arrancados de serrarias abandonadas. Giram pela lane inteira sem nunca perder o fio nem a fome por carne.",
+  escolamagos: "Os últimos eruditos de Karzstak dão aula sob cerco. Rompem os selos dos mortos e sussurram força aos vivos na muralha.",
+  propaganda:  "Alto-falantes de latão que cospem promessas antigas. Às vezes um morto escuta, hesita, e vira a lâmina contra os seus.",
+  mortenegra:  "Dizem que o próprio rei negativo recua quando este sino dobra. A peste que ele espalha não distingue morto de morto.",
+  apagador:    "Onde ele dispara, o cronista escreve só uma linha: 'não sobrou nada'. Nem pó, nem nome, nem lembrança de quem marchava ali.",
+  raiosolar:   "Relíquia da Igreja do Amanhecer, guardada por gerações. Um pedaço aprisionado do sol que odeia a noite e o que rasteja nela.",
+  midas:       "O tesouro do reino refundido em arma. Cada disparo custa uma fortuna — e cada morto tombado devolve um pouco do brilho.",
+  baladeira:   "Um estilingue abençoado que arremessa cristais vivos. Ricocheteiam entre os mortos como uma prece que nunca erra o alvo.",
+  trabuco:     "Karzstak arremessa os próprios escombros de volta ao inimigo. Entulho, ferro-velho e desespero caindo do céu sobre a horda.",
+  prisioneiros:"Quando faltam pedras, sobram condenados. A muralha os devolve à horda como aríetes de carne que ainda gritam ao voar.",
+  ritualcura:  "Cânticos antigos costuram os vivos enquanto a batalha ruge. Aqui a fé vira bandagem, e a esperança, sutura de última hora.",
+  infusor:     "Verte magia pura nas armas dos aliados, gota a gota, como vinho raro servido à tropa na véspera de uma execução.",
+};
 function towerAmmos(key) { return TOWER_TYPES[key].ammos; }
 function ammoOf(t, type) { return (t.ammoBy && t.ammoBy[type]) || 0; }
 // Torres "a combustível" (Icônicas): consomem direto do estoque global do reino
@@ -1309,6 +1340,8 @@ const BUILDINGS = {
                     desc: "repara +1 de vida da muralha a cada 30s (acelera por nível)", locked: true, medalCost: 30 },
   refinaria:      { name: "Refinaria de Argamato",    icon: "💎", cost: 50, shape: [[0,0],[0,1]],             zones: ["2","0"],
                     desc: "+1 💎 por turno por nível", locked: true, medalCost: 30 },
+  bastiao:        { name: "Bastião de Guerra",        icon: "🏯", cost: 70, shape: [[0,0],[1,0],[0,1],[1,1]], zones: ["1","0"],
+                    desc: "+6% de dano de TODAS as torres por nível", locked: true, medalCost: 50 },
 };
 
 // ---------- O Feudo: recursos & extratores (Fase 11) ----------
@@ -1651,160 +1684,11 @@ const ELDERS_DAY = 10, ELDERS_LOOT_MULT = 0.5;
 function killGoldMult() { return (S.day > ELDERS_DAY ? ELDERS_LOOT_MULT : 1) * (law("L6") ? 1.1 : 1); }
 function heartsPerTurn() { return (law("L13") ? 1 : 0) + groupLvlSum("refinaria") + groupLvlSum("praca_cerimonial"); }
 
-// ---------- Variantes de construções e torres (Lv1→5) ----------
+// ---------- Variantes de CONSTRUÇÕES (Lv1→5) ----------
+// (As torres agora usam TOWER_PATHS — 3 caminhos. Isto cobre só fábricas/quartel/praças.)
 // Lv2: escolha entre 3 caminhos. Lv3/4/5: escolha entre 2, dentro do caminho.
 // fx: efeitos somados ao longo do path.
 const VTREES = {
-  besta: { l2: [
-    { id: "pesada", n: "Besta Pesada",        d: "Dano +60%, cadência −20%",        fx: { d: .6, r: -.2 } },
-    { id: "repet",  n: "Besta de Repetição",  d: "Cadência +50%, dano −20%",        fx: { r: .5, d: -.2 } },
-    { id: "veneno", n: "Besta Envenenada",    d: "Tiros envenenam (3/s por 3s)",    fx: { poison: 3 } },
-  ], br: {
-    pesada: {
-      l3: [{ id: "perf",   n: "Perfurante",           d: "Atravessa e acerta um 2º atrás",      fx: { pierce: 1 } },
-           { id: "demol",  n: "Demolidora",           d: "+80% de dano vs resistentes",         fx: { vsArm: .8 } }],
-      l4: [{ id: "cerco",  n: "De Cerco",             d: "Dano ×2, consome 2 virotes",          fx: { d: 1, cost: 1 } },
-           { id: "gemea",  n: "Gêmea",                d: "Um segundo virote noutro alvo",       fx: { extra: 1 } }],
-      l5: [{ id: "balista",n: "Balista Divina",       d: "O tiro atravessa a lane inteira",     fx: { pierce: 9 } },
-           { id: "coloss", n: "Matadora de Colossos", d: "+3% da vida máx. do alvo por tiro",   fx: { maxhp: .03 } }],
-    },
-    repet: {
-      l3: [{ id: "rajada", n: "Rajada",               d: "Cadência +40%",                        fx: { r: .4 } },
-           { id: "gatilho",n: "Gatilho Leve",         d: "33% de não gastar virote",             fx: { save: .33 } }],
-      l4: [{ id: "metralha",n: "Metralha",            d: "Cadência +40%, dano −20%",             fx: { r: .4, d: -.2 } },
-           { id: "mira",   n: "Mira Fina",            d: "20% de crítico ×2",                    fx: { critC: .2, critM: 2 } }],
-      l5: [{ id: "tempest",n: "Tempestade de Virotes",d: "Cadência +60%",                        fx: { r: .6 } },
-           { id: "falcao", n: "Olho do Falcão",       d: "45% de crítico ×2",                    fx: { critC: .45, critM: 2 } }],
-    },
-    veneno: {
-      l3: [{ id: "corros", n: "Corrosiva",            d: "Veneno dissolve resistências",         fx: { shred: 1 } },
-           { id: "peste",  n: "Pestilenta",           d: "Veneno espalha quando o alvo morre",   fx: { pSpread: 1 } }],
-      l4: [{ id: "necro",  n: "Necrosante",           d: "Veneno +3/s",                          fx: { poison: 3 } },
-           { id: "paralis",n: "Paralisante",          d: "Envenenados 20% mais lentos",          fx: { pSlow: .2 } }],
-      l5: [{ id: "praga",  n: "Praga Verde",          d: "Veneno +6/s e espalha",                fx: { poison: 6, pSpread: 1 } },
-           { id: "agulha", n: "Agulha da Morte",      d: "Alvos abaixo de 15% morrem",           fx: { exec: .15 } }],
-    },
-  }},
-  catapulta: { l2: [
-    { id: "estilha", n: "De Estilhaços", d: "Área +50%, dano −25%",              fx: { aoeM: .5, d: -.25 } },
-    { id: "trebuchet",n: "Trebuchet",    d: "Dano ×2, área −30%",                fx: { d: 1, aoeM: -.3 } },
-    { id: "incend",  n: "Incendiária",   d: "Deixa fogo no chão do impacto",     fx: { ground: 4 } },
-  ], br: {
-    estilha: {
-      l3: [{ id: "metralhap", n: "Metralha de Projéteis", d: "2 alvos extras",             fx: { extra: 2 } },
-           { id: "frag",      n: "Fragmentação",      d: "1 alvo extra, área +20%",       fx: { extra: 1, aoeM: .2 } }],
-      l4: [{ id: "choque",    n: "Onda de Choque",    d: "Atingidos 30% lentos por 3s",   fx: { slow: .3 } },
-           { id: "bombard",   n: "Bombardeio",        d: "+1 alvo, área +20%",            fx: { extra: 1, aoeM: .2 } }],
-      l5: [{ id: "meteoros",  n: "Chuva de Meteoros", d: "+2 alvos, área +30%",           fx: { extra: 2, aoeM: .3 } },
-           { id: "terremoto", n: "Terremoto",         d: "Atingidos atordoados 1s",       fx: { stun: 1 } }],
-    },
-    trebuchet: {
-      l3: [{ id: "contrapeso",n: "Contrapeso de Ferro",d: "Dano +50%",                    fx: { d: .5 } },
-           { id: "alcance",   n: "Alcance Real",       d: "Mira o inimigo mais DISTANTE", fx: { far: 1 } }],
-      l4: [{ id: "dupla",     n: "Projétil Duplo",     d: "Dano ×2, consome 2 projéteis", fx: { d: 1, cost: 1 } },
-           { id: "precisao",  n: "Precisão de Mestre", d: "Voo 60% mais rápido",          fx: { fast: 1 } }],
-      l5: [{ id: "punho",     n: "Punho de Karzstak",  d: "Dano ×3, cadência −30%",       fx: { d: 2, r: -.3 } },
-           { id: "orbita",    n: "Órbita Baixa",       d: "Voo rápido e cadência +30%",   fx: { fast: 1, r: .3 } }],
-    },
-    incend: {
-      l3: [{ id: "piche",   n: "Piche Ardente",   d: "Fogo no chão dura mais",         fx: { groundDur: 2 } },
-           { id: "explos",  n: "Explosiva",       d: "Dano do impacto +50%",           fx: { d: .5 } }],
-      l4: [{ id: "napalm",  n: "Napalm Medieval", d: "Fogo no chão +4/s",              fx: { ground: 4 } },
-           { id: "mar",     n: "Mar de Chamas",   d: "Fogo cobre área maior",          fx: { groundR: .05 } }],
-      l5: [{ id: "inferno", n: "Inferno",         d: "Fogo no chão +8/s",              fx: { ground: 8 } },
-           { id: "cometa",  n: "Cometa",          d: "Impacto ×2 e fogo extra",        fx: { d: 1, ground: 2 } }],
-    },
-  }},
-  caldeirao: { l2: [
-    { id: "ferv",   n: "Fervente",      d: "Dano +50%",                          fx: { d: .5 } },
-    { id: "transb", n: "Transbordante", d: "Alcança metade do campo",            fx: { range: .55 } },
-    { id: "alquim", n: "Alquímico",     d: "Ácido corrói resistências",          fx: { shredHit: 1 } },
-  ], br: {
-    ferv: {
-      l3: [{ id: "banha", n: "Banha Ardente",  d: "Queima 3/s por 3s",             fx: { poison: 3 } },
-           { id: "vapor", n: "Vapor Escaldante",d: "Deixa vapor no chão (3/s)",    fx: { ground: 3 } }],
-      l4: [{ id: "ebul",  n: "Ponto de Ebulição",d: "Dano +50%",                   fx: { d: .5 } },
-           { id: "jato",  n: "Jato Direcionado", d: "Dano ×2, área menor",         fx: { d: 1, aoeM: -.3 } }],
-      l5: [{ id: "geiser",n: "Gêiser",           d: "+2 alvos por despejo",        fx: { extra: 2 } },
-           { id: "dragao",n: "Óleo do Dragão",   d: "Queimadura forte (+4/s)",     fx: { poison: 4 } }],
-    },
-    transb: {
-      l3: [{ id: "calha",   n: "Calha Longa",  d: "Alcança ¾ do campo",           fx: { range: .2 } },
-           { id: "espalha", n: "Espalhamento", d: "+1 alvo",                      fx: { extra: 1 } }],
-      l4: [{ id: "cascata", n: "Cascata",      d: "Escorre e acerta 2 atrás",     fx: { pierce: 2 } },
-           { id: "mares",   n: "Marés",        d: "+2 alvos",                     fx: { extra: 2 } }],
-      l5: [{ id: "diluvio", n: "Dilúvio Negro",d: "Campo inteiro, cadência −30%", fx: { rangeAll: 1, r: -.3, aoeM: .5 } },
-           { id: "corrente",n: "Correnteza",   d: "Empurra os atingidos p/ trás", fx: { knock: .06 } }],
-    },
-    alquim: {
-      l3: [{ id: "acidoreal", n: "Ácido Real", d: "Corrosão 2× mais rápida",      fx: { shredHit: 1 } },
-           { id: "solvente",  n: "Solvente",   d: "Dano +30%",                    fx: { d: .3 } }],
-      l4: [{ id: "catalis",   n: "Catalisador",d: "Atingidos tomam +25% de tudo", fx: { mark: .25 } },
-           { id: "mutag",     n: "Mutagênico", d: "+5% de 💎 nos abates",         fx: { kh: .05 } }],
-      l5: [{ id: "pedra",     n: "Pedra Filosofal", d: "+1 🪙 por abate",         fx: { kg: 1 } },
-           { id: "dissol",    n: "Dissolução",     d: "Ácido causa 5/s",          fx: { poison: 5 } }],
-    },
-  }},
-  canalizador: { l2: [
-    { id: "focal",  n: "Focalizador", d: "Dano +60%",                             fx: { d: .6 } },
-    { id: "difusor",n: "Difusor",     d: "O orbe ricocheteia p/ +1 alvo",         fx: { extra: 1 } },
-    { id: "umbral", n: "Umbral",      d: "+5% da vida máx. do alvo por tiro",     fx: { maxhp: .05 } },
-  ], br: {
-    focal: {
-      l3: [{ id: "lanca",  n: "Lança Arcana",  d: "Perfura 2 atrás do alvo",      fx: { pierce: 2 } },
-           { id: "desint", n: "Desintegrador", d: "+15% de dano acumulado por acerto no mesmo alvo", fx: { ramp: .15 } }],
-      l4: [{ id: "prisma", n: "Prisma",        d: "25% de crítico ×3",            fx: { critC: .25, critM: 3 } },
-           { id: "overload",n: "Overload",     d: "Dano ×2.5, consome 2 essências", fx: { d: 1.5, cost: 1 } }],
-      l5: [{ id: "raioarg",n: "Raio de Argamato", d: "Cadência +80% e dano +30%", fx: { r: .8, d: .3 } },
-           { id: "aniq",   n: "Aniquilação",      d: "Alvos abaixo de 20% morrem", fx: { exec: .2 } }],
-    },
-    difusor: {
-      l3: [{ id: "triplice", n: "Tríplice",     d: "+2 ricochetes",               fx: { extra: 2 } },
-           { id: "eco",      n: "Eco Arcano",   d: "Dano +40%",                   fx: { d: .4 } }],
-      l4: [{ id: "teia",     n: "Teia de Mana", d: "+2 alvos conectados",         fx: { extra: 2 } },
-           { id: "astral",   n: "Frag. Astral", d: "Explosão em área no final",   fx: { aoeM: .4, aoeOn: 1 } }],
-      l5: [{ id: "constel",  n: "Constelação",  d: "+4 ricochetes",               fx: { extra: 4 } },
-           { id: "bigbang",  n: "Big Bang",     d: "Área grande, dano +50%",      fx: { aoeM: .8, aoeOn: 1, d: .5 } }],
-    },
-    umbral: {
-      l3: [{ id: "dreno",    n: "Dreno",          d: "+2% da vida máx.",          fx: { maxhp: .02 } },
-           { id: "maldicao", n: "Maldição",       d: "Marcados tomam +30% de tudo", fx: { mark: .3 } }],
-      l4: [{ id: "ceifador", n: "Ceifador",       d: "Cadência +30%",             fx: { r: .3 } },
-           { id: "vinculo",  n: "Vínculo Sombrio",d: "33% de não gastar essência", fx: { save: .33 } }],
-      l5: [{ id: "devorador",n: "Devorador de Almas", d: "+5% vida máx. e +15% de 💎", fx: { maxhp: .05, kh: .15 } },
-           { id: "eclipse",  n: "Eclipse",            d: "Atingidos 50% lentos 3s",   fx: { slow: .5 } }],
-    },
-  }},
-  tesla: { l2: [
-    { id: "encad", n: "Encadeadora", d: "Cadeia atinge 5 alvos",                  fx: { chain: 2 } },
-    { id: "volt",  n: "Voltaica",    d: "Dano +70%",                              fx: { d: .7 } },
-    { id: "capac", n: "Capacitora",  d: "33% de descarga crítica ×3",             fx: { critC: .33, critM: 3 } },
-  ], br: {
-    encad: {
-      l3: [{ id: "arco",     n: "Arco Longo",         d: "+1 elo na cadeia",       fx: { chain: 1 } },
-           { id: "corrente2",n: "Corrente Contínua",  d: "Dano +30%",              fx: { d: .3 } }],
-      l4: [{ id: "rede",     n: "Rede Elétrica",      d: "+2 elos",                fx: { chain: 2 } },
-           { id: "serie",    n: "Sobrecarga em Série",d: "Dano +30%",              fx: { d: .3 } }],
-      l5: [{ id: "tempestE", n: "Tempestade",         d: "+2 alvos extras",        fx: { extra: 2 } },
-           { id: "malha",    n: "Malha Total",        d: "+5 elos, dano −30%",     fx: { chain: 5, d: -.3 } }],
-    },
-    volt: {
-      l3: [{ id: "tensao",  n: "Alta Tensão", d: "Dano +50%",                      fx: { d: .5 } },
-           { id: "fusivel", n: "Fusível",     d: "Área elétrica no impacto",       fx: { aoeM: .3, aoeOn: 1 } }],
-      l4: [{ id: "relamp",  n: "Relâmpago",   d: "Raio instantâneo",               fx: { fast: 1 } },
-           { id: "ioniz",   n: "Ionização",   d: "Atingidos tomam +20% de tudo",   fx: { mark: .2 } }],
-      l5: [{ id: "zeus",    n: "Zeus",        d: "Dano ×3.5, cadência −40%",       fx: { d: 2.5, r: -.4 } },
-           { id: "reator",  n: "Reator",      d: "Cadência ×2, consome 2 condutores", fx: { r: 1, cost: 1 } }],
-    },
-    capac: {
-      l3: [{ id: "bateria",  n: "Bateria Dupla",     d: "+15% de crítico",         fx: { critC: .15 } },
-           { id: "estatica", n: "Descarga Estática", d: "Dano +30%",               fx: { d: .3 } }],
-      l4: [{ id: "supercond",n: "Supercondutor",     d: "Cadência +40%",           fx: { r: .4 } },
-           { id: "pararraios",n: "Pararraios",       d: "25% de não gastar condutor", fx: { save: .25 } }],
-      l5: [{ id: "singular", n: "Singularidade",     d: "Dano +150%",              fx: { d: 1.5 } },
-           { id: "usina",    n: "Usina",             d: "50% de não gastar condutor", fx: { save: .5 } }],
-    },
-  }},
   fabrica: { l2: [
     { id: "massa", n: "Produção em Massa", d: "Produção +50%",                    fx: { pM: .5 } },
     { id: "artes", n: "Artesanal",         d: "Caixas levam +1 munição",          fx: { crate: 1 } },
@@ -1897,6 +1781,508 @@ const VTREES = {
   }},
 };
 
+// ============================================================================
+// NOVO SISTEMA DE TORRES — 3 caminhos × 3 tiers (estilo Bloons TD)
+// Regra crosspath 3+2: um caminho vai ao tier 3, um segundo até tier 2, o
+// terceiro trava. As torres presentes aqui usam este sistema; as demais seguem
+// nas VTREES antigas até serem convertidas (rollout incremental).
+// Os `fx` reaproveitam as mesmas chaves das VTREES (d, r, pierce, poison, ...).
+// ============================================================================
+const TIER_COST_MULT = [0.8, 1.6, 3.2]; // custo do tier 1/2/3 = múltiplo do custo de construção
+const TOWER_PATHS = {
+  besta: {
+    paths: [
+      { key: "poder", name: "Poder", tiers: [
+        { n: "Besta Pesada",    d: "Dano +60%, cadência −20%",                fx: { d: .6, r: -.2 } },
+        { n: "Perfurante",      d: "Atravessa e acerta 1 atrás; dano +30%",   fx: { pierce: 1, d: .3 } },
+        { n: "Balista Divina",  d: "O virote varre a lane inteira; dano +50%",fx: { pierce: 9, d: .5 } },
+      ] },
+      { key: "cadencia", name: "Cadência", tiers: [
+        { n: "Besta de Repetição", d: "Cadência +50%, dano −20%",            fx: { r: .5, d: -.2 } },
+        { n: "Metralha",           d: "Cadência +40%",                        fx: { r: .4 } },
+        { n: "Tempestade de Virotes", d: "Cadência +60% e 25% de crítico ×2", fx: { r: .6, critC: .25, critM: 2 } },
+      ] },
+      { key: "veneno", name: "Veneno", tiers: [
+        { n: "Besta Envenenada", d: "Os tiros envenenam (3/s por 3s)",        fx: { poison: 3 } },
+        { n: "Necrosante",       d: "Veneno +3/s e espalha ao matar",         fx: { poison: 3, pSpread: 1 } },
+        { n: "Praga Verde",      d: "Veneno +6/s; alvos abaixo de 15% morrem", fx: { poison: 6, exec: .15 } },
+      ] },
+    ],
+  },
+  catapulta: { paths: [
+    { key: "poder", name: "Poder", tiers: [
+      { n: "Contrapeso de Ferro", d: "Dano +50%",                        fx: { d: .5 } },
+      { n: "Projétil Duplo",      d: "Dano ×2, consome 2 projéteis",     fx: { d: 1, cost: 1 } },
+      { n: "Punho de Karzstak",   d: "Dano ×3, cadência −30%",           fx: { d: 2, r: -.3 } },
+    ] },
+    { key: "estilhaco", name: "Estilhaços", tiers: [
+      { n: "De Estilhaços", d: "Área +50%, dano −25%",                   fx: { aoeM: .5, d: -.25 } },
+      { n: "Bombardeio",    d: "+2 alvos, área +20%",                    fx: { extra: 2, aoeM: .2 } },
+      { n: "Chuva de Meteoros", d: "+2 alvos, atordoa 1s",              fx: { extra: 2, stun: 1 } },
+    ] },
+    { key: "incend", name: "Incendiária", tiers: [
+      { n: "Incendiária",   d: "Deixa fogo no chão do impacto",          fx: { ground: 4 } },
+      { n: "Napalm Medieval", d: "Fogo +4/s e dura mais",                fx: { ground: 4, groundDur: 2 } },
+      { n: "Inferno",       d: "Fogo +8/s, área maior",                  fx: { ground: 8, groundR: .05 } },
+    ] },
+  ] },
+  caldeirao: { paths: [
+    { key: "fervura", name: "Fervura", tiers: [
+      { n: "Fervente",          d: "Dano +50%",                          fx: { d: .5 } },
+      { n: "Ponto de Ebulição", d: "Dano +50% e queima 3/s",             fx: { d: .5, poison: 3 } },
+      { n: "Óleo do Dragão",    d: "+2 alvos e queima +4/s",             fx: { extra: 2, poison: 4 } },
+    ] },
+    { key: "alcance", name: "Alcance", tiers: [
+      { n: "Transbordante", d: "Alcança metade do campo",                fx: { range: .4 } },
+      { n: "Cascata",       d: "+1 alvo e escorre 2 atrás",              fx: { extra: 1, pierce: 2 } },
+      { n: "Dilúvio Negro", d: "Campo inteiro, cadência −30%",           fx: { rangeAll: 1, r: -.3 } },
+    ] },
+    { key: "alquimico", name: "Alquímico", tiers: [
+      { n: "Alquímico",   d: "Ácido corrói resistências",               fx: { shredHit: 1 } },
+      { n: "Catalisador", d: "Atingidos tomam +25% de tudo",            fx: { mark: .25 } },
+      { n: "Dissolução",  d: "Ácido causa 5/s e dano +30%",             fx: { poison: 5, d: .3 } },
+    ] },
+  ] },
+  tesla: { paths: [
+    { key: "encad", name: "Encadeadora", tiers: [
+      { n: "Encadeadora",   d: "+2 elos na cadeia",                      fx: { chain: 2 } },
+      { n: "Rede Elétrica", d: "+2 elos e dano +30%",                    fx: { chain: 2, d: .3 } },
+      { n: "Tempestade",    d: "+2 alvos extras e +2 elos",              fx: { extra: 2, chain: 2 } },
+    ] },
+    { key: "voltaica", name: "Voltaica", tiers: [
+      { n: "Voltaica",    d: "Dano +70%",                               fx: { d: .7 } },
+      { n: "Alta Tensão", d: "Dano +50% e área elétrica",               fx: { d: .5, aoeM: .3, aoeOn: 1 } },
+      { n: "Zeus",        d: "Dano ×3.5, cadência −40%",                fx: { d: 2.5, r: -.4 } },
+    ] },
+    { key: "capac", name: "Capacitora", tiers: [
+      { n: "Capacitora",    d: "33% de descarga crítica ×3",            fx: { critC: .33, critM: 3 } },
+      { n: "Supercondutor", d: "Cadência +40%",                         fx: { r: .4 } },
+      { n: "Singularidade", d: "Dano +150%",                            fx: { d: 1.5 } },
+    ] },
+  ] },
+  canalizador: { paths: [
+    { key: "focal", name: "Focalizador", tiers: [
+      { n: "Focalizador",     d: "Dano +60%",                           fx: { d: .6 } },
+      { n: "Prisma",          d: "25% de crítico ×3",                   fx: { critC: .25, critM: 3 } },
+      { n: "Raio de Argamato", d: "Cadência +80% e dano +30%",          fx: { r: .8, d: .3 } },
+    ] },
+    { key: "difusor", name: "Difusor", tiers: [
+      { n: "Difusor",     d: "O orbe ricocheteia p/ +1 alvo",           fx: { extra: 1 } },
+      { n: "Teia de Mana", d: "+2 alvos conectados",                    fx: { extra: 2 } },
+      { n: "Constelação", d: "+4 ricochetes",                           fx: { extra: 4 } },
+    ] },
+    { key: "umbral", name: "Umbral", tiers: [
+      { n: "Umbral",    d: "+5% da vida máx. do alvo por tiro",         fx: { maxhp: .05 } },
+      { n: "Maldição",  d: "Marcados tomam +30% de tudo",              fx: { mark: .3 } },
+      { n: "Devorador de Almas", d: "+5% vida máx. e +15% de 💎",       fx: { maxhp: .05, kh: .15 } },
+    ] },
+  ] },
+  acido: { paths: [
+    { key: "corrosao", name: "Corrosão", tiers: [
+      { n: "Concentrado", d: "Dano +50%",                               fx: { d: .5 } },
+      { n: "Água-Forte",  d: "Corrói resistências, dano +20%",          fx: { shredHit: 1, d: .2 } },
+      { n: "Aqua Regia",  d: "+80% vs resistentes e dano +40%",         fx: { vsArm: .8, d: .4 } },
+    ] },
+    { key: "diluvio", name: "Dilúvio", tiers: [
+      { n: "Aspersor",    d: "Área +50%",                               fx: { aoeM: .5 } },
+      { n: "Chuva Ácida", d: "+1 alvo e área +30%",                     fx: { extra: 1, aoeM: .3 } },
+      { n: "Tempestade Corrosiva", d: "+2 alvos e cadência +30%",       fx: { extra: 2, r: .3 } },
+    ] },
+    { key: "toxina", name: "Toxina", tiers: [
+      { n: "Peçonhento",  d: "Veneno 3/s",                              fx: { poison: 3 } },
+      { n: "Neurotóxico", d: "Envenenados 20% mais lentos",             fx: { pSlow: .2, poison: 2 } },
+      { n: "Necrose",     d: "Veneno +5/s; abaixo de 15% morrem",       fx: { poison: 5, exec: .15 } },
+    ] },
+  ] },
+  balista: { paths: [
+    { key: "perfuracao", name: "Perfuração", tiers: [
+      { n: "Vira-Aço",     d: "Atravessa e acerta 2 atrás",             fx: { pierce: 2 } },
+      { n: "Perfurante",   d: "Dano +40% e +80% vs resistentes",        fx: { d: .4, vsArm: .8 } },
+      { n: "Lança de Guerra", d: "Varre a lane e dano +60%",            fx: { pierce: 9, d: .6 } },
+    ] },
+    { key: "cadencia", name: "Cadência", tiers: [
+      { n: "Manivela Dupla", d: "Cadência +50%",                        fx: { r: .5 } },
+      { n: "Repetidora",     d: "Cadência +40% e 20% de crítico ×2",    fx: { r: .4, critC: .2, critM: 2 } },
+      { n: "Metralha de Aço", d: "Cadência +60% e dano +20%",           fx: { r: .6, d: .2 } },
+    ] },
+    { key: "chamas", name: "Chamas", tiers: [
+      { n: "Virote Flamejante", d: "Deixa fogo no impacto",             fx: { ground: 4 } },
+      { n: "Óleo Fervente",  d: "Fogo +4/s e dura mais",                fx: { ground: 4, groundDur: 2 } },
+      { n: "Ferrão Infernal", d: "Fogo +6/s; abaixo de 15% morrem",     fx: { ground: 6, exec: .15 } },
+    ] },
+  ] },
+  canhao: { paths: [
+    { key: "calibre", name: "Calibre", tiers: [
+      { n: "Bala de Aço",  d: "Dano +60%",                              fx: { d: .6 } },
+      { n: "Perfurante",   d: "+80% vs resistentes",                    fx: { vsArm: .8 } },
+      { n: "Bomba de Cerco", d: "Dano ×2, cadência −20%",               fx: { d: 1, r: -.2 } },
+    ] },
+    { key: "bombardeio", name: "Bombardeio", tiers: [
+      { n: "Metralha",  d: "+1 alvo e área +30%",                       fx: { extra: 1, aoeM: .3 } },
+      { n: "Barragem",  d: "+2 alvos",                                  fx: { extra: 2 } },
+      { n: "Tapete de Bombas", d: "+2 alvos e atordoa 1s",              fx: { extra: 2, stun: 1 } },
+    ] },
+    { key: "cadencia", name: "Cadência", tiers: [
+      { n: "Recarga Rápida", d: "Cadência +40%",                        fx: { r: .4 } },
+      { n: "Pólvora Seca",   d: "Cadência +40% e dano +20%",            fx: { r: .4, d: .2 } },
+      { n: "Fogo de Barragem", d: "Cadência +60% e projétil rápido",    fx: { r: .6, fast: 1 } },
+    ] },
+  ] },
+  cospefogo: { paths: [
+    { key: "brasa", name: "Brasa", tiers: [
+      { n: "Chama Viva",  d: "Dano +50%",                               fx: { d: .5 } },
+      { n: "Piromancia",  d: "Queima 4/s",                              fx: { poison: 4 } },
+      { n: "Dragão de Karzstak", d: "Dano +60% e queima +4/s",          fx: { d: .6, poison: 4 } },
+    ] },
+    { key: "napalm", name: "Napalm", tiers: [
+      { n: "Piche Ardente", d: "Fogo no chão",                          fx: { ground: 4 } },
+      { n: "Napalm",     d: "Fogo +4/s e dura mais",                    fx: { ground: 4, groundDur: 2 } },
+      { n: "Mar de Chamas", d: "Fogo +8/s, área maior",                 fx: { ground: 8, groundR: .06 } },
+    ] },
+    { key: "sopro", name: "Sopro", tiers: [
+      { n: "Foles Reforçados", d: "Alcance maior",                      fx: { range: .3 } },
+      { n: "Labareda Larga", d: "+1 alvo e área +30%",                  fx: { extra: 1, aoeM: .3 } },
+      { n: "Vendaval Ígneo", d: "Alcança ¾ do campo e +2 alvos",        fx: { range: .3, extra: 2 } },
+    ] },
+  ] },
+  soprador: { paths: [
+    { key: "geada", name: "Geada", tiers: [
+      { n: "Congelante",     d: "Inimigos 30% mais lentos",             fx: { slow: .3 } },
+      { n: "Nevoeiro Gélido", d: "Atordoa 1s",                          fx: { stun: 1 } },
+      { n: "Zero Absoluto",  d: "50% lentos e atordoa 1s",              fx: { slow: .5, stun: 1 } },
+    ] },
+    { key: "nevasca", name: "Nevasca", tiers: [
+      { n: "Rajada",   d: "Área +50%",                                  fx: { aoeM: .5 } },
+      { n: "Ventania", d: "+1 alvo e área +30%",                        fx: { extra: 1, aoeM: .3 } },
+      { n: "Nevasca",  d: "+2 alvos",                                   fx: { extra: 2 } },
+    ] },
+    { key: "corte", name: "Frio Cortante", tiers: [
+      { n: "Estilhaço de Gelo", d: "Dano +60%",                         fx: { d: .6 } },
+      { n: "Lâmina Glacial", d: "+80% vs resistentes",                  fx: { vsArm: .8 } },
+      { n: "Inverno Eterno", d: "Dano +80%; abaixo de 15% morrem",      fx: { d: .8, exec: .15 } },
+    ] },
+  ] },
+  prisma: { paths: [
+    { key: "refracao", name: "Refração", tiers: [
+      { n: "Lente Focal",  d: "Dano +60%",                              fx: { d: .6 } },
+      { n: "Prisma Duplo", d: "25% de crítico ×3",                      fx: { critC: .25, critM: 3 } },
+      { n: "Feixe Concentrado", d: "Dano ×2, cadência −20%",            fx: { d: 1, r: -.2 } },
+    ] },
+    { key: "espectro", name: "Espectro", tiers: [
+      { n: "Dispersão", d: "+1 elo",                                    fx: { chain: 1 } },
+      { n: "Arco-Íris", d: "+2 alvos",                                  fx: { extra: 2 } },
+      { n: "Prisma Total", d: "+2 elos e +2 alvos",                     fx: { chain: 2, extra: 2 } },
+    ] },
+    { key: "luz", name: "Luz", tiers: [
+      { n: "Marca de Luz", d: "Marcados tomam +25%",                    fx: { mark: .25 } },
+      { n: "Radiância",   d: "+30% vs resistentes",                     fx: { vsArm: .3 } },
+      { n: "Julgamento",  d: "Abaixo de 20% morrem",                    fx: { exec: .2 } },
+    ] },
+  ] },
+  lancaacido: { paths: [
+    { key: "corrosao", name: "Corrosão", tiers: [
+      { n: "Concentrada", d: "Dano +50%",                              fx: { d: .5 } },
+      { n: "Ácido Real",  d: "Corrói resistências",                    fx: { shredHit: 1, vsArm: .5 } },
+      { n: "Solvente Universal", d: "Dano +60% e +80% vs resistentes", fx: { d: .6, vsArm: .8 } },
+    ] },
+    { key: "jato", name: "Jato", tiers: [
+      { n: "Jato Pressurizado", d: "Perfura 2 atrás",                  fx: { pierce: 2 } },
+      { n: "Lança Longa", d: "Mira o mais distante e perfura +2",      fx: { far: 1, pierce: 2 } },
+      { n: "Lança de Guerra", d: "Varre a lane inteira",               fx: { pierce: 9 } },
+    ] },
+    { key: "pecanha", name: "Peçonha", tiers: [
+      { n: "Venenosa",   d: "Veneno 3/s",                              fx: { poison: 3 } },
+      { n: "Pestilenta", d: "Espalha ao matar e veneno +3/s",         fx: { pSpread: 1, poison: 3 } },
+      { n: "Praga Ácida", d: "Veneno +5/s; abaixo de 15% morrem",      fx: { poison: 5, exec: .15 } },
+    ] },
+  ] },
+  aquatico: { paths: [
+    { key: "lamina", name: "Lâmina", tiers: [
+      { n: "Corte Fino", d: "Dano +60%",                               fx: { d: .6 } },
+      { n: "Jato de Pressão", d: "Perfura 2 atrás",                    fx: { pierce: 2 } },
+      { n: "Lâmina Abissal", d: "Dano ×2 e perfura a lane",            fx: { d: 1, pierce: 9 } },
+    ] },
+    { key: "mare", name: "Maré", tiers: [
+      { n: "Correnteza", d: "Alcança metade do campo",                 fx: { range: .4 } },
+      { n: "Ressaca",    d: "+1 alvo e empurra",                       fx: { extra: 1, knock: .05 } },
+      { n: "Maremoto",   d: "Campo inteiro e +1 alvo",                 fx: { rangeAll: 1, extra: 1 } },
+    ] },
+    { key: "turbilhao", name: "Turbilhão", tiers: [
+      { n: "Redemoinho", d: "30% mais lentos",                         fx: { slow: .3 } },
+      { n: "Vórtice",    d: "Atordoa 1s",                              fx: { stun: 1 } },
+      { n: "Maelström",  d: "50% lentos e atordoa 1s",                 fx: { slow: .5, stun: 1 } },
+    ] },
+  ] },
+  cacadores: { paths: [
+    { key: "precisao", name: "Precisão", tiers: [
+      { n: "Mira de Águia", d: "Dano +50%",                            fx: { d: .5 } },
+      { n: "Tiro Certeiro", d: "25% de crítico ×2",                    fx: { critC: .25, critM: 2 } },
+      { n: "Olho do Falcão", d: "45% de crítico ×3",                   fx: { critC: .45, critM: 3 } },
+    ] },
+    { key: "bumerangue", name: "Bumerangue", tiers: [
+      { n: "Lâmina Curva", d: "+1 alvo",                               fx: { extra: 1 } },
+      { n: "Voo Duplo",    d: "+2 alvos",                              fx: { extra: 2 } },
+      { n: "Enxame de Lâminas", d: "+2 alvos e cadência +40%",         fx: { extra: 2, r: .4 } },
+    ] },
+    { key: "armadilha", name: "Armadilha", tiers: [
+      { n: "Ponta Envenenada", d: "Veneno 3/s",                        fx: { poison: 3 } },
+      { n: "Rede de Caça", d: "20% mais lentos",                       fx: { pSlow: .2, poison: 2 } },
+      { n: "Cilada Mortal", d: "Marca +30%; abaixo de 15% morrem",     fx: { mark: .3, exec: .15 } },
+    ] },
+  ] },
+  serras: { paths: [
+    { key: "serra", name: "Serra", tiers: [
+      { n: "Dente de Aço",  d: "Dano +50%",                            fx: { d: .5 } },
+      { n: "Serra de Guerra", d: "+80% vs resistentes",               fx: { vsArm: .8 } },
+      { n: "Roda Dentada",  d: "Dano ×2, cadência −20%",              fx: { d: 1, r: -.2 } },
+    ] },
+    { key: "velocidade", name: "Velocidade", tiers: [
+      { n: "Eixo Lubrificado", d: "Cadência +50%",                     fx: { r: .5 } },
+      { n: "Turbina",     d: "Cadência +40% e projétil rápido",        fx: { r: .4, fast: 1 } },
+      { n: "Moedor",      d: "Cadência +60% e dano +20%",              fx: { r: .6, d: .2 } },
+    ] },
+    { key: "ricochete", name: "Ricochete", tiers: [
+      { n: "Serra Saltitante", d: "+1 alvo",                           fx: { extra: 1 } },
+      { n: "Estilhaços",  d: "+2 alvos e empurra",                     fx: { extra: 2, knock: .04 } },
+      { n: "Triturador",  d: "+2 alvos; abaixo de 15% morrem",         fx: { extra: 2, exec: .15 } },
+    ] },
+  ] },
+  mortenegra: { paths: [
+    { key: "peste", name: "Peste", tiers: [
+      { n: "Miasma",   d: "Veneno 4/s",                                fx: { poison: 4 } },
+      { n: "Pandemia", d: "Espalha ao matar e veneno +3/s",            fx: { pSpread: 1, poison: 3 } },
+      { n: "Peste Negra", d: "Veneno +6/s; abaixo de 20% morrem",      fx: { poison: 6, exec: .2 } },
+    ] },
+    { key: "ceifa", name: "Ceifa", tiers: [
+      { n: "Foice Afiada", d: "Dano +60%",                             fx: { d: .6 } },
+      { n: "Ceifadora",  d: "+80% vs resistentes",                     fx: { vsArm: .8 } },
+      { n: "Colheita Sombria", d: "Dano ×2, cadência −20%",            fx: { d: 1, r: -.2 } },
+    ] },
+    { key: "terror", name: "Terror", tiers: [
+      { n: "Aura de Medo", d: "30% mais lentos",                       fx: { slow: .3 } },
+      { n: "Maldição",   d: "Marcados tomam +30%",                     fx: { mark: .3 } },
+      { n: "Toque da Morte", d: "+2 alvos e área maior",               fx: { extra: 2, aoeM: .4 } },
+    ] },
+  ] },
+  apagador: { paths: [
+    { key: "aniquilacao", name: "Aniquilação", tiers: [
+      { n: "Sobrecarga", d: "Dano +60%",                               fx: { d: .6 } },
+      { n: "Desintegração", d: "Abaixo de 20% morrem",                 fx: { exec: .2 } },
+      { n: "Vazio",      d: "Dano ×2; limiar de execução +5%",         fx: { d: 1, exec: .05 } },
+    ] },
+    { key: "cratera", name: "Cratera", tiers: [
+      { n: "Onda de Choque", d: "+1 alvo e área +30%",                 fx: { extra: 1, aoeM: .3 } },
+      { n: "Cratera",    d: "+2 alvos e atordoa 1s",                   fx: { extra: 2, stun: 1 } },
+      { n: "Apocalipse", d: "+2 alvos e área +50%",                    fx: { extra: 2, aoeM: .5 } },
+    ] },
+    { key: "cadencia", name: "Cadência", tiers: [
+      { n: "Ciclo Rápido", d: "Cadência +40%",                         fx: { r: .4 } },
+      { n: "Detonação em Cadeia", d: "Cadência +40% e projétil rápido", fx: { r: .4, fast: 1 } },
+      { n: "Fim de Tudo", d: "Cadência +60% e dano +30%",              fx: { r: .6, d: .3 } },
+    ] },
+  ] },
+  raiosolar: { paths: [
+    { key: "feixe", name: "Feixe", tiers: [
+      { n: "Lente Solar", d: "Dano +70%",                              fx: { d: .7 } },
+      { n: "Chama Solar", d: "25% de crítico ×3",                      fx: { critC: .25, critM: 3 } },
+      { n: "Supernova",   d: "Dano ×2, cadência −20%",                 fx: { d: 1, r: -.2 } },
+    ] },
+    { key: "aurora", name: "Aurora", tiers: [
+      { n: "Reflexo",     d: "+1 elo",                                 fx: { chain: 1 } },
+      { n: "Prisma Solar", d: "+2 alvos",                              fx: { extra: 2 } },
+      { n: "Aurora Boreal", d: "+2 elos e +2 alvos",                   fx: { chain: 2, extra: 2 } },
+    ] },
+    { key: "purificacao", name: "Purificação", tiers: [
+      { n: "Luz Sagrada", d: "Marcados tomam +25%",                    fx: { mark: .25 } },
+      { n: "Brasa Solar", d: "Deixa fogo no chão",                     fx: { ground: 5 } },
+      { n: "Juízo Final", d: "Fogo +6/s; abaixo de 20% morrem",        fx: { ground: 6, exec: .2 } },
+    ] },
+  ] },
+  midas: { paths: [
+    { key: "ganancia", name: "Ganância", tiers: [
+      { n: "Cunhagem Pesada", d: "Dano +60%",                          fx: { d: .6 } },
+      { n: "Ouro Maciço", d: "+80% vs resistentes",                    fx: { vsArm: .8 } },
+      { n: "Peso do Tesouro", d: "Dano ×2, cadência −20%",             fx: { d: 1, r: -.2 } },
+    ] },
+    { key: "chuvaouro", name: "Chuva de Ouro", tiers: [
+      { n: "Moedas Espalhadas", d: "+1 alvo e área +30%",              fx: { extra: 1, aoeM: .3 } },
+      { n: "Cofre Estourado", d: "+2 alvos",                           fx: { extra: 2 } },
+      { n: "Fortuna",     d: "+2 alvos e área +40%",                   fx: { extra: 2, aoeM: .4 } },
+    ] },
+    { key: "toque", name: "Toque de Midas", tiers: [
+      { n: "Toque Dourado", d: "+1 🪙 por abate",                      fx: { kg: 1 } },
+      { n: "Alquimia Real", d: "+2 🪙 por abate e marca +25%",         fx: { kg: 2, mark: .25 } },
+      { n: "Rei Midas",   d: "Abaixo de 20% viram ouro (+3 🪙)",       fx: { exec: .2, kg: 3 } },
+    ] },
+  ] },
+  baladeira: { paths: [
+    { key: "estilingue", name: "Estilingue", tiers: [
+      { n: "Correia Reforçada", d: "Dano +60%",                        fx: { d: .6 } },
+      { n: "Pedra Encantada", d: "25% de crítico ×3",                  fx: { critC: .25, critM: 3 } },
+      { n: "Disparo Divino", d: "Dano ×2, cadência −20%",              fx: { d: 1, r: -.2 } },
+    ] },
+    { key: "ricochete", name: "Ricochete", tiers: [
+      { n: "Salto Duplo", d: "+1 elo",                                 fx: { chain: 1 } },
+      { n: "Estilhaço Astral", d: "+2 alvos",                          fx: { extra: 2 } },
+      { n: "Chuva de Estrelas", d: "+2 elos e +2 alvos",               fx: { chain: 2, extra: 2 } },
+    ] },
+    { key: "encanto", name: "Encanto", tiers: [
+      { n: "Selo de Sangue", d: "+10% de 💎 por abate",                fx: { kh: .1 } },
+      { n: "Maldição",   d: "Marcados tomam +30%",                     fx: { mark: .3 } },
+      { n: "Coração Partido", d: "+20% de 💎; abaixo de 20% morrem",   fx: { kh: .2, exec: .2 } },
+    ] },
+  ] },
+  trabuco: { paths: [
+    { key: "entulho", name: "Entulho", tiers: [
+      { n: "Carga Pesada", d: "Dano +60%",                             fx: { d: .6 } },
+      { n: "Ferro-Velho", d: "+80% vs resistentes",                    fx: { vsArm: .8 } },
+      { n: "Demolidor",   d: "Dano ×2, cadência −20%",                 fx: { d: 1, r: -.2 } },
+    ] },
+    { key: "chuvalixo", name: "Chuva de Lixo", tiers: [
+      { n: "Estilhaços",  d: "+1 alvo e área +30%",                    fx: { extra: 1, aoeM: .3 } },
+      { n: "Sucata Voadora", d: "+2 alvos",                            fx: { extra: 2 } },
+      { n: "Aterro",      d: "+2 alvos e atordoa 1s",                  fx: { extra: 2, stun: 1 } },
+    ] },
+    { key: "praga", name: "Praga", tiers: [
+      { n: "Lixo Tóxico", d: "Veneno 4/s",                             fx: { poison: 4 } },
+      { n: "Chorume",     d: "20% mais lentos",                        fx: { pSlow: .2, poison: 2 } },
+      { n: "Peste Urbana", d: "Veneno +6/s e espalha",                 fx: { poison: 6, pSpread: 1 } },
+    ] },
+  ] },
+  prisioneiros: { paths: [
+    { key: "carne", name: "Carne", tiers: [
+      { n: "Fardo Humano", d: "Dano +50%",                             fx: { d: .5 } },
+      { n: "Impacto Brutal", d: "Empurra os atingidos e dano +30%",    fx: { knock: .05, d: .3 } },
+      { n: "Aríete de Corpos", d: "Dano ×2, cadência −20%",            fx: { d: 1, r: -.2 } },
+    ] },
+    { key: "massa", name: "Massa", tiers: [
+      { n: "Amontoado", d: "+1 alvo e área +30%",                      fx: { extra: 1, aoeM: .3 } },
+      { n: "Legião",    d: "+2 alvos",                                 fx: { extra: 2 } },
+      { n: "Vala Comum", d: "+2 alvos e área +40%",                    fx: { extra: 2, aoeM: .4 } },
+    ] },
+    { key: "terror", name: "Terror", tiers: [
+      { n: "Gritaria", d: "30% mais lentos",                           fx: { slow: .3 } },
+      { n: "Pânico",   d: "Atordoa 1s",                                fx: { stun: 1 } },
+      { n: "Horror",   d: "Atordoa 1s; abaixo de 20% morrem",          fx: { stun: 1, exec: .2 } },
+    ] },
+  ] },
+  // ===== Torres de SUPORTE (fx próprios: heal, buffAtk, buffT, dispelVuln, charmC, charmDur, charmN) =====
+  ritualcura: { paths: [
+    { key: "bencao", name: "Bênção", tiers: [
+      { n: "Prece",          d: "+4 de cura por pulso",                fx: { heal: 4 } },
+      { n: "Bálsamo Sagrado", d: "+8 de cura por pulso",               fx: { heal: 8 } },
+      { n: "Milagre",        d: "+16 de cura por pulso",               fx: { heal: 16 } },
+    ] },
+    { key: "litania", name: "Litania", tiers: [
+      { n: "Canto Rápido", d: "Cadência +40%",                         fx: { r: .4 } },
+      { n: "Coro",       d: "Cadência +40% e +4 de cura",              fx: { r: .4, heal: 4 } },
+      { n: "Êxtase",     d: "Cadência +70%",                           fx: { r: .7 } },
+    ] },
+    { key: "fe", name: "Fé", tiers: [
+      { n: "Inspiração", d: "Tropas atacam +10% enquanto cura",        fx: { buffAtk: .1 } },
+      { n: "Fervor",     d: "+15% de ataque e +4 de cura",             fx: { buffAtk: .15, heal: 4 } },
+      { n: "Santidade",  d: "Tropas atacam +25%",                      fx: { buffAtk: .25 } },
+    ] },
+  ] },
+  infusor: { paths: [
+    { key: "vigor", name: "Vigor", tiers: [
+      { n: "Fúria",   d: "Buff de ataque +10%",                        fx: { buffAtk: .1 } },
+      { n: "Frenesi", d: "Buff de ataque +15%",                        fx: { buffAtk: .15 } },
+      { n: "Berserk", d: "Buff de ataque +25%",                        fx: { buffAtk: .25 } },
+    ] },
+    { key: "duracao", name: "Duração", tiers: [
+      { n: "Eco",        d: "Buff dura +1s",                           fx: { buffT: 1 } },
+      { n: "Ressonância", d: "Buff dura +2s",                          fx: { buffT: 2 } },
+      { n: "Perpétua",   d: "Buff dura +3s e ataque +10%",             fx: { buffT: 3, buffAtk: .1 } },
+    ] },
+    { key: "cadencia", name: "Cadência", tiers: [
+      { n: "Ritmo",    d: "Cadência +40%",                             fx: { r: .4 } },
+      { n: "Compasso", d: "Cadência +40% e cura leve (+4)",            fx: { r: .4, heal: 4 } },
+      { n: "Sinfonia", d: "Cadência +70%",                             fx: { r: .7 } },
+    ] },
+  ] },
+  escolamagos: { paths: [
+    { key: "dissonancia", name: "Dissonância", tiers: [
+      { n: "Contra-Selo", d: "Selos rompidos ficam +10% vulneráveis", fx: { dispelVuln: .1 } },
+      { n: "Anulação",  d: "+15% de vulnerabilidade ao romper",       fx: { dispelVuln: .15 } },
+      { n: "Silêncio Arcano", d: "+25% de vulnerabilidade ao romper", fx: { dispelVuln: .25 } },
+    ] },
+    { key: "preceptor", name: "Preceptor", tiers: [
+      { n: "Tutela",    d: "Reforço de +10% de ataque",               fx: { buffAtk: .1 } },
+      { n: "Erudição",  d: "+5 de cura no reforço",                    fx: { heal: 5 } },
+      { n: "Sabedoria", d: "+20% de ataque e +5 de cura",             fx: { buffAtk: .2, heal: 5 } },
+    ] },
+    { key: "cadencia", name: "Cadência", tiers: [
+      { n: "Estudo Rápido", d: "Cadência +40%",                        fx: { r: .4 } },
+      { n: "Trivium",   d: "Cadência +40% e +10% de vulnerabilidade",  fx: { r: .4, dispelVuln: .1 } },
+      { n: "Quadrivium", d: "Cadência +70%",                           fx: { r: .7 } },
+    ] },
+  ] },
+  propaganda: { paths: [
+    { key: "retorica", name: "Retórica", tiers: [
+      { n: "Discurso",     d: "+15% de chance de converter",          fx: { charmC: .15 } },
+      { n: "Manifesto",    d: "+20% de chance de converter",          fx: { charmC: .2 } },
+      { n: "Doutrinação",  d: "+40% de chance de converter",          fx: { charmC: .4 } },
+    ] },
+    { key: "legiao", name: "Legião", tiers: [
+      { n: "Panfletos", d: "Conversão dura +2s",                       fx: { charmDur: 2 } },
+      { n: "Comício",   d: "Converte +1 inimigo por vez",             fx: { charmN: 1 } },
+      { n: "Revolução", d: "Converte +1 e dura +3s",                  fx: { charmN: 1, charmDur: 3 } },
+    ] },
+    { key: "cadencia", name: "Cadência", tiers: [
+      { n: "Alto-Falante", d: "Cadência +40%",                         fx: { r: .4 } },
+      { n: "Rede de Rádio", d: "Cadência +40% e +15% de chance",       fx: { r: .4, charmC: .15 } },
+      { n: "Propaganda Total", d: "Cadência +70%",                     fx: { r: .7 } },
+    ] },
+  ] },
+};
+function towerPathsOf(t) { return TOWER_PATHS[t && t.type] || null; }
+function isNewTower(t) { return !!towerPathsOf(t); }
+function towerTiers(t) { // garante array [a,b,c]
+  if (!Array.isArray(t.tiers)) t.tiers = [0, 0, 0];
+  return t.tiers;
+}
+function towerTotalTiers(t) { return towerTiers(t).reduce((a, b) => a + b, 0); }
+// custo (ouro) para comprar o PRÓXIMO tier do caminho pi
+function towerTierCost(t, pi) {
+  const cur = towerTiers(t)[pi];
+  return Math.round(TOWER_TYPES[t.type].cost * TIER_COST_MULT[cur]);
+}
+// pode comprar o próximo tier do caminho pi? (regra crosspath 3+2)
+function towerCanBuy(t, pi) {
+  const tiers = towerTiers(t), cur = tiers[pi];
+  if (cur >= 3) return false;
+  const invested = tiers.filter(v => v > 0).length;
+  if (cur === 0 && invested >= 2) return false;                 // terceiro caminho travado
+  if (cur === 2 && tiers.some((v, i) => i !== pi && v >= 3)) return false; // só um caminho chega ao 3
+  return true;
+}
+// caminho travado permanentemente (terceiro, quando dois já têm pontos)
+function towerPathLocked(t, pi) {
+  const tiers = towerTiers(t);
+  return tiers[pi] === 0 && tiers.filter(v => v > 0).length >= 2;
+}
+function isTowerMaxed(t) {
+  return isNewTower(t) ? Math.max(...towerTiers(t)) >= 3 : (t.lvl >= MAX_LVL);
+}
+// fx acumulado dos tiers comprados em todos os caminhos
+function towerPathFx(t) {
+  const out = {};
+  const P = towerPathsOf(t), tiers = towerTiers(t);
+  P.paths.forEach((p, pi) => {
+    for (let i = 0; i < tiers[pi]; i++)
+      for (const [k, v] of Object.entries(p.tiers[i].fx || {})) out[k] = (out[k] || 0) + v;
+  });
+  return out;
+}
+// nome exibido: último tier comprado no caminho de maior investimento
+function towerPathName(t) {
+  const P = towerPathsOf(t), tiers = towerTiers(t);
+  let best = -1, name = null;
+  P.paths.forEach((p, pi) => { if (tiers[pi] > best && tiers[pi] > 0) { best = tiers[pi]; name = p.tiers[tiers[pi] - 1].n; } });
+  return name;
+}
+
 // Rebalanceamento extremo: renda cresce ~linear, custo cresce ~exponencial (×~1.9 no topo).
 // O último nível é um "projeto" de end-game — o jogador nunca satura tudo cedo.
 const EV_COST_TOWER = [0, 30, 65, 140, 300];  // climb cheio 535🪙 (era 215)
@@ -1954,7 +2340,7 @@ function vFx(treeKey, path) {
   return out;
 }
 
-function towerFx(t) { return vFx(t.type, t.path || []); }
+function towerFx(t) { return isNewTower(t) ? towerPathFx(t) : vFx(t.type, t.path || []); }
 function groupFx(gid) {
   const c = S.city.find(c => c.gid === gid);
   return c ? vFx(vTreeKeyOf(c.built), c.path || []) : {};
@@ -3148,7 +3534,7 @@ function onTowerClick(i) {
           card.onclick = () => {
             if (S.gold < tt.cost) return;
             S.gold -= tt.cost;
-            S.towers[i] = { type: key, ammoBy: {}, lvl: 1, path: [] };
+            S.towers[i] = { type: key, ammoBy: {}, lvl: 1, path: [], tiers: [0, 0, 0] };
             closeModal(); renderAll();
           };
           grid.appendChild(card);
@@ -3157,123 +3543,155 @@ function onTowerClick(i) {
       }
     });
   } else {
-    const tt = TOWER_TYPES[t.type];
-    const vn = vName(t.type, t.path || []);
-    const pTag = prestigeOf(t) ? ` ⭐${prestigeOf(t)}` : "";
-    openModal(`${tt.icon} ${vn || tt.name} Lv${t.lvl}${pTag} · Portão ${i + 1}`, (m) => {
-      if (t.lvl < MAX_LVL) {
-        const upCost = EV_COST_TOWER[t.lvl];
-        if (VTREES[t.type]) {
-          appendVariantChoice(m, t.type, t.lvl, t.path || [], upCost, "gold", (id) => {
-            S.gold -= upCost;
-            t.path = [...(t.path || []), id];
-            t.lvl++;
-            closeModal(); renderAll();
-          });
-        } else {
-          // torres sem árvore de variantes: evolução simples (dano/eficiência escalam por nível)
-          m.append(row(`Evoluir para Lv${t.lvl + 1}: mais forte`, "🪙 Evoluir", upCost, S.gold >= upCost, () => {
-            S.gold -= upCost; t.lvl++; closeModal(); renderAll();
-          }));
-        }
-      } else {
-        // Nível máximo: sistema de PRESTÍGIO (objetivo opcional de end-game)
-        const p = prestigeOf(t);
-        const d = document.createElement("div");
-        d.className = "panel-hint";
-        d.innerHTML = p
-          ? `Nível máximo · <b style="color:${PRESTIGE_STAR[p]}">Prestígio ${p}/${PRESTIGE_MAX}</b> — dano ×${prestigeDmgMult(t).toFixed(2)}, cadência +${Math.round((prestigeRateMult(t) - 1) * 100)}%.`
-          : "Nível máximo alcançado. Prestigie para superar o teto: cada prestígio dá <b>+60% dano</b> e <b>+10% cadência</b> permanentes (mantém o build).";
-        m.appendChild(d);
-        if (p < PRESTIGE_MAX) {
-          const cost = prestigeCost(p);
-          m.append(row(`Prestigiar (⭐${p}→⭐${p + 1}): bônus permanente e empilhável`, "🪙 Prestigiar", cost, S.gold >= cost && !S.waveActive, () => {
-            S.gold -= cost; t.prestige = p + 1; closeModal(); renderAll();
-          }));
-          if (S.waveActive) {
-            const w = document.createElement("div"); w.className = "panel-hint";
-            w.textContent = "Só é possível prestigiar entre turnos.";
-            m.appendChild(w);
-          }
-        } else {
-          const w = document.createElement("div"); w.className = "panel-hint";
-          w.innerHTML = `<b style="color:${PRESTIGE_STAR[PRESTIGE_MAX]}">Prestígio máximo (${PRESTIGE_MAX}/${PRESTIGE_MAX})</b> — uma lenda dourada da muralha.`;
-          m.appendChild(w);
-        }
-      }
-      // Prioridade de mira (config individual da torre)
-      if (!tt.support) {
-        const aimHint = document.createElement("div");
-        aimHint.className = "panel-hint";
-        aimHint.innerHTML = "<b>Prioridade de mira</b> · para quem esta torre atira primeiro:";
-        m.appendChild(aimHint);
-        const aimRow = document.createElement("div");
-        aimRow.className = "tier-row";
-        for (const mode of AIM_ORDER) {
-          const md = AIM_MODES[mode];
-          const cur = (t.aim || "near") === mode;
-          const wrap = document.createElement("div");
-          wrap.className = "tnode-wrap";
-          const circle = document.createElement("button");
-          circle.className = "tnode" + (cur ? " tnode-on" : "");
-          circle.innerHTML = `<span class="tn-icon">${md.icon}</span>`;
-          circle.onclick = () => { t.aim = mode; closeModal(); renderAll(); };
-          const name = document.createElement("div");
-          name.className = "tn-name";
-          name.textContent = md.name;
-          const desc = document.createElement("div");
-          desc.className = "tn-desc";
-          desc.textContent = md.desc;
-          wrap.append(circle, name, desc);
-          aimRow.appendChild(wrap);
-        }
-        m.appendChild(aimRow);
-      }
-      m.append(
-        row("Substituir sem custo (remove a torre atual)", "🔄 Remover", 0, true, () => {
-          S.towers[i] = null;
-          closeModal(); renderAll();
-        }),
-      );
-    });
+    renderTowerPanel(t, i);
   }
 }
 
-// Escolha de variante (bolinhas): 3 opções no Lv1→2, 2 nas demais
-function appendVariantChoice(m, treeKey, lvl, path, cost, cur, onPick) {
-  const opts = vOptions(treeKey, lvl, path);
-  if (!opts) return;
-  const locked = S.waveActive; // em combate: visíveis, mas não compráveis
-  const curIcon = cur === "gold" ? "🪙" : "💎";
-  const wallet = cur === "gold" ? S.gold : S.hearts;
-  const hint = document.createElement("div");
-  hint.className = "panel-hint";
-  hint.textContent = locked
-    ? "⚔ Em combate: melhorias só na fase de planejamento."
-    : lvl === 1
-      ? `Evoluir para Lv2 (${cost} ${curIcon}): escolha um CAMINHO, os outros dois ficam trancados.`
-      : `Evoluir para Lv${lvl + 1} (${cost} ${curIcon}): escolha a especialização.`;
-  m.appendChild(hint);
-  const rowEl = document.createElement("div");
-  rowEl.className = "tier-row";
-  for (const o of opts) {
-    const wrap = document.createElement("div");
-    wrap.className = "tnode-wrap";
-    const circle = document.createElement("button");
-    circle.className = "tnode";
-    circle.disabled = locked || wallet < cost;
-    circle.innerHTML = `<span class="tn-icon">${o.icon || "⬆"}</span><span class="tn-cost">${curIcon}${cost}</span>`;
-    circle.onclick = () => onPick(o.id);
-    const name = document.createElement("div");
-    name.className = "tn-name";
-    name.textContent = o.n;
-    const desc = document.createElement("div");
-    desc.className = "tn-desc";
-    desc.textContent = o.d;
-    wrap.append(circle, name, desc);
-    rowEl.appendChild(wrap);
+// ---------- Painel da torre (repaginado): cabeçalho + suprimento + 3 caminhos + mira ----------
+// Barra de "velocidade recebendo" (a MESMA das fábricas): cicla no ritmo do disparo
+// quando a munição chega, e para (mostra o estoque estático) quando não recebe.
+function supplyInfo(t) {
+  const tt = TOWER_TYPES[t.type];
+  const fireRate = 1 / towerRate(t); // disparos por segundo
+  if (tt.fuel) {
+    const pool = fuelPool(tt.fuel.k), need = tt.fuel.cost;
+    return { label: `Recebendo ${FUEL_ICON[tt.fuel.k]} ${FUEL_LABEL[tt.fuel.k]} · ${Math.floor(pool)} em caixa`,
+             rate: pool >= need ? fireRate : 0, staticFrac: Math.min(1, pool / Math.max(1, need)) };
   }
-  m.appendChild(rowEl);
+  const cap = ammoCap();
+  const parts = tt.ammos.map(a => ({ a, n: ammoOf(t, a), noFab: prodOfType(a) === 0 }));
+  const halted = parts.some(p => p.noFab); // sem a fábrica daquela munição = não recebe
+  const label = `Recebendo · ${parts.map(p => `${AMMO[p.a].icon}${p.noFab ? " ⚠️" : ""}`).join("  ")}`;
+  return { label, rate: halted ? 0 : fireRate, staticFrac: Math.min(...parts.map(p => p.n / cap)) };
+}
+// Prestígio via botão-estrela: valida e aplica (mesmos bônus de antes).
+function onPrestigeClick(t, i) {
+  if (!isTowerMaxed(t)) { toast("Maximize um caminho (tier 3) para prestigiar."); return; }
+  const p = prestigeOf(t);
+  if (p >= PRESTIGE_MAX) { toast(`⭐ Prestígio máximo (${PRESTIGE_MAX}/${PRESTIGE_MAX}).`); return; }
+  if (S.waveActive) { toast("Só é possível prestigiar entre turnos."); return; }
+  const cost = prestigeCost(p);
+  if (S.gold < cost) { toast(`Sem ouro para prestigiar (custa 🪙${cost}).`); return; }
+  S.gold -= cost; t.prestige = p + 1;
+  toast(`⭐ Prestígio ${p + 1}! +60% dano e +10% cadência.`);
+  renderAll(); onTowerClick(i);
+}
+function renderTowerPanel(t, i) {
+  const tt = TOWER_TYPES[t.type];
+  openModal("", (m) => {
+    $("modal").classList.add("tower-modal");
+    const P = towerPathsOf(t), tiers = towerTiers(t);
+    const lvl = 1 + towerTotalTiers(t);
+    const name = towerPathName(t) || tt.name;
+    const lore = TOWER_LORE[t.type] || ARS_LORE[t.type] || towerTrait(tt);
+    const p = prestigeOf(t), maxed = isTowerMaxed(t), canPrest = maxed && p < PRESTIGE_MAX;
+
+    // 1) Cabeçalho: emoji · nome/Lv/posição · fechar
+    const head = document.createElement("div");
+    head.className = "tw-head";
+    head.innerHTML = `
+      <div class="tw-emoji">${tt.icon}</div>
+      <div class="tw-titles">
+        <div class="tw-name">${name} <span class="tw-lv">LV.${lvl}</span><span class="tw-pos"> | Posição ${i + 1}</span></div>
+        <div class="tw-desc">${lore}</div>
+      </div>`;
+    m.appendChild(head);
+
+    // 2) Linha: remover · suprimento · prestígio(estrela)
+    const sup = supplyInfo(t);
+    const prestCost = canPrest ? prestigeCost(p) : 0;
+    const row2 = document.createElement("div");
+    row2.className = "tw-row2";
+    row2.innerHTML = `
+      <button class="tw-round tw-remove" title="Remover torre">🗑</button>
+      <div class="tw-supply">
+        <div class="tw-supply-lbl">${sup.label}</div>
+        ${bdBarHTML("red", sup.rate, sup.staticFrac)}
+      </div>
+      <div class="tw-prest">
+        ${canPrest ? `<div class="tw-prest-cost">🪙 ${prestCost}</div>` : ""}
+        <button class="tw-round tw-sq tw-star${canPrest ? " ready" : ""}" title="Prestígio" style="${p ? `color:${PRESTIGE_STAR[p]};border-color:${PRESTIGE_STAR[p]}` : ""}">
+          <span class="tw-star-ic">★</span>${p ? `<span class="tw-star-n">${p}</span>` : ""}</button>
+      </div>`;
+    m.appendChild(row2);
+    row2.querySelector(".tw-remove").onclick = () => { S.towers[i] = null; closeModal(); renderAll(); };
+    row2.querySelector(".tw-star").onclick = () => onPrestigeClick(t, i);
+
+    // 3) Caminhos (3 linhas)
+    const paths = document.createElement("div");
+    paths.className = "tw-paths";
+    P.paths.forEach((pa, pi) => {
+      const cur = tiers[pi];
+      const locked = towerPathLocked(t, pi);
+      const buyable = towerCanBuy(t, pi);
+      const atCap = cur < 3 && !locked && !buyable;
+      const next = pa.tiers[cur];
+      const cost = towerTierCost(t, pi);
+      const can = buyable && !S.waveActive && S.gold >= cost;
+      const rowEl = document.createElement("div");
+      rowEl.className = "tw-path" + (locked ? " locked" : "") + (cur >= 3 ? " maxed" : "") + (atCap ? " cap" : "");
+      const act = cur >= 3 ? `<div class="tw-act state done"><span class="tw-act-ic">★</span><span class="tw-act-s">MÁX</span></div>`
+        : locked ? `<div class="tw-act state lock"><span class="tw-act-ic">🔒</span></div>`
+        : atCap ? `<div class="tw-act state cap">2/2</div>`
+        : `<button class="tw-act tw-melhorar${can ? "" : " off"}"><span class="tw-mel-t">MELHORAR</span><span class="tw-mel-c">🪙 ${cost} OURO</span></button>`;
+      const title = cur >= 3 ? "Caminho máximo"
+        : locked ? "Caminho trancado"
+        : atCap ? "Secundário no máximo"
+        : `${next.n} <span class="tw-tier">Lv.${cur + 1}</span>`;
+      const desc = cur >= 3 ? "Todos os 3 tiers deste caminho."
+        : locked ? "Só dois caminhos por torre."
+        : atCap ? "O principal já está no tier 3."
+        : next.d;
+      const pips = pa.tiers.map((_, ti) => `<span class="tw-pip${ti < cur ? " on" : ""}"></span>`).join("");
+      rowEl.innerHTML = `
+        <div class="tw-path-mid">
+          <div class="tw-path-tag">${pa.name}</div>
+          <div class="tw-path-name">${title}</div>
+          <div class="tw-path-desc">${desc}</div>
+        </div>
+        ${act}
+        <div class="tw-pips">${pips}</div>`;
+      const buyBtn = rowEl.querySelector("button.tw-melhorar");
+      if (buyBtn) buyBtn.onclick = () => {
+        if (!(towerCanBuy(t, pi) && !S.waveActive && S.gold >= cost)) return;
+        S.gold -= cost; tiers[pi]++; t.lvl = 1 + towerTotalTiers(t);
+        renderAll(); onTowerClick(i);
+      };
+      paths.appendChild(rowEl);
+    });
+    m.appendChild(paths);
+
+    // 4) Prioridade de ataque (seletor com setas) — só torres que atiram
+    if (!tt.support) {
+      const aim = t.aim || "near", idx = AIM_ORDER.indexOf(aim), md = AIM_MODES[aim];
+      const aimEl = document.createElement("div");
+      aimEl.className = "tw-aim";
+      aimEl.innerHTML = `
+        <div class="tw-aim-lbl">PRIORIDADE DE ATAQUE</div>
+        <div class="tw-aim-sel">
+          <button class="tw-aim-arrow" data-d="-1">‹</button>
+          <span class="tw-aim-name">${md.icon} ${md.name}</span>
+          <button class="tw-aim-arrow" data-d="1">›</button>
+        </div>`;
+      m.appendChild(aimEl);
+      aimEl.querySelectorAll(".tw-aim-arrow").forEach(b => b.onclick = () => {
+        t.aim = AIM_ORDER[(idx + (+b.dataset.d) + AIM_ORDER.length) % AIM_ORDER.length];
+        renderAll(); onTowerClick(i);
+      });
+    }
+    if (S.waveActive) {
+      const w = document.createElement("div"); w.className = "tw-note";
+      w.textContent = "⚔ Em combate: melhorias e prestígio só entre os turnos.";
+      m.appendChild(w);
+    }
+    // "clique fora para sair" FORA do modal, sobre o fundo escurecido
+    const modal = $("modal");
+    modal.querySelector(".modal-foot")?.remove();
+    const foot = document.createElement("div");
+    foot.className = "modal-foot";
+    foot.textContent = "CLIQUE FORA PARA SAIR";
+    modal.appendChild(foot);
+  });
 }
 
 // ---------- Portão (P): invocar tropas aliadas ----------
@@ -3382,7 +3800,7 @@ function openGate() {
 
 // ---------- Modal genérico ----------
 function openModal(title, buildFn) {
-  $("modal").classList.remove("dist-modal"); // limpa modificadores de painéis específicos
+  $("modal").classList.remove("dist-modal", "tower-modal"); // limpa modificadores de painéis específicos
   $("modal").querySelector(".modal-foot")?.remove(); // rodapé externo é exclusivo do "Seu Setor"
   $("modal-title").textContent = title;
   const m = $("modal-content");
@@ -3900,9 +4318,12 @@ const TROOP_DMG_MULT = 1.3;
 function towerDmg(t) {
   const fx = towerFx(t);
   const typeDmg = towerTypeFx(t.type, "typeDmg");
+  // Torres novas (3 caminhos): crescimento base LEVE (×1.10/tier); poder vem dos tiers.
+  // Torres antigas: crescimento por nível (×1.22/nível).
+  const base = isNewTower(t) ? Math.pow(1.10, towerTotalTiers(t)) : Math.pow(1.22, t.lvl - 1);
   return TOWER_TYPES[t.type].dmg * TROOP_DMG_MULT * lawTowerMult(t)
-    * (1 + (fx.d || 0)) * (1 + typeDmg) * Math.pow(1.22, t.lvl - 1) * prestigeDmgMult(t)
-    * moraleEffMult() * dm("towerDmg") * facTowerMult(); // leis + moral + evento + facção + prestígio
+    * (1 + (fx.d || 0)) * (1 + typeDmg) * base * prestigeDmgMult(t)
+    * moraleEffMult() * dm("towerDmg") * facTowerMult() * buildingTowerMult(); // leis + moral + evento + facção + prestígio + Bastião
 
 }
 
@@ -4378,26 +4799,32 @@ function update(dt) {
     if (tt.support) {
       consumeTowerAmmo(t, cost, fx);
       t.cd = towerRate(t);
-      if (tt.support === "heal") { const h = 4 + t.lvl; for (const a of S.allies) healAlly(a, h); }
-      else if (tt.support === "buff") { S.towerBuff = { atk: 0.25, t: towerRate(t) + 0.5 }; }
+      // Bônus dos caminhos (3-caminhos): heal, buffAtk, buffT, dispelVuln, charmC/N/Dur
+      const buffT = towerRate(t) + 0.5 + (fx.buffT || 0);
+      if (tt.support === "heal") { const h = 4 + (fx.heal || 0); for (const a of S.allies) healAlly(a, h);
+        if (fx.buffAtk) S.towerBuff = { atk: fx.buffAtk, t: buffT }; }
+      else if (tt.support === "buff") { S.towerBuff = { atk: 0.25 + (fx.buffAtk || 0), t: buffT };
+        if (fx.heal) for (const a of S.allies) healAlly(a, fx.heal); }
       else if (tt.support === "mage") {
         // Escola de Magos: rompe os selos (armadura) dos inimigos perto da muralha
         // e reforça os aliados com uma aura aleatória (ataque OU cura).
         for (const e of S.enemies) {
           if (e.y > 0.6 && e.armor < 1) {
-            e.armor = 1; e.vuln = Math.max(e.vuln || 0, 0.15);
+            e.armor = 1; e.vuln = Math.max(e.vuln || 0, 0.15 + (fx.dispelVuln || 0));
             addFloat(e.lane, e.y - 0.04, "◈ selo rompido", "#c89aff");
           }
         }
-        if (Math.random() < 0.5) { const h = 5 + t.lvl; for (const a of S.allies) healAlly(a, h); }
-        else { S.towerBuff = { atk: 0.2, t: towerRate(t) + 0.5 }; }
+        if (Math.random() < 0.5) { const h = 5 + (fx.heal || 0); for (const a of S.allies) healAlly(a, h); }
+        else { S.towerBuff = { atk: 0.2 + (fx.buffAtk || 0), t: buffT }; }
       }
       else if (tt.support === "charm") {
-        // Máquina de Propaganda: às vezes vira uma tropa inimiga contra os seus.
+        // Máquina de Propaganda: às vezes vira tropas inimigas contra os seus.
         const cands = S.enemies.filter(e => e.hp > 0 && !(e.charm > 0));
-        if (cands.length && Math.random() < 0.6) {
-          const e = cands[Math.floor(Math.random() * cands.length)];
-          e.charm = 4;
+        const chance = Math.min(0.95, 0.6 + (fx.charmC || 0));
+        let n = 1 + (fx.charmN || 0);
+        for (let ci = 0; ci < cands.length && n > 0 && Math.random() < chance; ci++, n--) {
+          const e = cands.splice(Math.floor(Math.random() * cands.length), 1)[0];
+          e.charm = 4 + (fx.charmDur || 0);
           addFloat(e.lane, e.y - 0.04, "📢 convertido!", "#8ac6f0");
         }
       }
@@ -4826,13 +5253,20 @@ function applyRun(d) {
   if (typeof S.helpPool !== "number") { S.helpPool = 0; S.helpKingdom = false; S.capataz = false; }
   if (!Array.isArray(S.laws)) { S.laws = []; S.conjCount = 0; S.freeConjure = false; } // saves antigos (árvores de leis)
   // migração de torres: descarta tipos removidos (bombarda/fornalha/bobina); ammo → ammoBy
+  let towersReset = false;
   S.towers = (S.towers || [null, null, null, null, null]).map(t => {
     if (!t || !TOWER_TYPES[t.type]) return null;
     t.cd = 0;
     if (!t.ammoBy) t.ammoBy = typeof t.ammo === "number" ? { [towerAmmos(t.type)[0]]: t.ammo } : {};
     delete t.ammo;
+    // Torres do novo sistema (3 caminhos): saves antigos sem `tiers` resetam os upgrades.
+    if (TOWER_PATHS[t.type] && !Array.isArray(t.tiers)) {
+      if ((t.lvl || 1) > 1) towersReset = true; // só avisa se realmente havia upgrades
+      t.tiers = [0, 0, 0]; t.lvl = 1; t.path = [];
+    }
     return t;
   });
+  if (towersReset) setTimeout(() => toast("🔧 Sistema de torres renovado: upgrades reiniciados."), 400);
   S.paused = false; S.waveActive = false;
   applyFactionTint();
   buildNextWave();
@@ -5758,6 +6192,7 @@ const ARS_LORE = {
   templo:      "Erguido em lua vermelha; a fé é argamassa.",
   oficina:     "A muralha se recusa a morrer, tijolo a tijolo.",
   refinaria:   "Tritura Corações de Argamato até restar o brilho.",
+  bastiao:     "Do alto do bastião, a artilharia inteira aprende a mirar.",
   // Praças — Distrito do Povo
   praca_publica:    "Feira, fofoca e o censo do que ainda vive.",
   praca_festival:   "Uma noite de música que segura as outras.",
