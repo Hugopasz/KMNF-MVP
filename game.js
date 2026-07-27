@@ -174,7 +174,7 @@ const FACTIONS = {
   red:    { ic: "🔴", name: "Os Vermelhos", tag: "Sacrifício pelo Reino",  flavor: "Guiados pelo Rei.",              color: "#c0392b", desc: "+12% de dano das torres." },
   blue:   { ic: "🔵", name: "Os Azuis",     tag: "Esforço de Guerra",      flavor: "Ciência é Progresso.",          color: "#2f6fd6", desc: "+15% de produção fabril." },
   yellow: { ic: "🟡", name: "Os Amarelos",  tag: "A Igreja do Amanhecer",  flavor: "Culto ao Deus do Sol.",         color: "#e8b93a", desc: "+30% de ganho de moral." },
-  pink:   { ic: "🌸", name: "As Rosas",      tag: "Lealdade pela Rainha",   flavor: "Admiradores da Matrona.",       color: "#d6608f", desc: "+1 hit máximo da muralha." },
+  pink:   { ic: "🌸", name: "As Rosas",      tag: "Lealdade pela Rainha",   flavor: "Admiradores da Matrona.",       color: "#d6608f", desc: "+2 de vida base da muralha." },
   purple: { ic: "🟣", name: "Os Roxos",      tag: "Culto da Lua",           flavor: "Filhos da Magia Negra.",        color: "#a86ae0", desc: "Mortos viram Sombras (10%).", secret: true },
   green:  { ic: "🟢", name: "Os Verdes",      tag: "Povos Mágicos",          flavor: "Refugiados das florestas antigas.", color: "#4cae6a", desc: "Tropas curam por turno.", secret: true, dlc: true },
 };
@@ -406,7 +406,7 @@ function facMoraleGainMult() {
 }
 function facMaxHitsBonus() {
   const f = curFaction(); let b = 0;
-  if (f === "pink") b += 1;
+  if (f === "pink") b += 2;
   if (f === "blue" || isOutcast(f)) b -= 1;
   return b;
 }
@@ -1304,9 +1304,9 @@ const BUILDINGS = {
   laboratorio:    { name: "Laboratório",              icon: "🔬", cost: 45, shape: [[0,0],[0,1]],             zones: ["2","0"],
                     desc: "+8% de produção global por nível", locked: true, medalCost: 25 },
   templo:         { name: "Templo da Fé",             icon: "🛐", cost: 40, shape: [[0,0],[1,0]],             zones: ["1","0"],
-                    desc: "+3 de moral por turno por nível", locked: true, medalCost: 20 },
+                    desc: "+3 de moral por turno por nível" },
   oficina:        { name: "Oficina de Muros",         icon: "🧱", cost: 45, shape: [[0,0],[1,0],[1,1]],       zones: ["1","0"],
-                    desc: "repara +1 hit da muralha por turno por nível", locked: true, medalCost: 30 },
+                    desc: "repara +1 de vida da muralha a cada 30s (acelera por nível)", locked: true, medalCost: 30 },
   refinaria:      { name: "Refinaria de Argamato",    icon: "💎", cost: 50, shape: [[0,0],[0,1]],             zones: ["2","0"],
                     desc: "+1 💎 por turno por nível", locked: true, medalCost: 30 },
 };
@@ -2863,7 +2863,7 @@ const BUILD_FLAVOR = {
   tesouraria:     "Cofres trancados a sete chaves rendem juros de guerra.",
   laboratorio:    "Engrenagens, retortas e ideias perigosas — a produção agradece.",
   templo:         "A fé sobe em cânticos e volta em coragem, turno após turno.",
-  oficina:        "Andaimes permanentes: a muralha se remenda a cada turno.",
+  oficina:        "Andaimes permanentes: a muralha se remenda sem parar.",
   refinaria:      "Prensa o pó de Argamato em cristais que pulsam como corações.",
   // Feudo
   mina:           "Picaretas ecoam no escuro atrás do minério que vira munição.",
@@ -3983,6 +3983,22 @@ function tickSupplyChain(dt) {
   if (supplyTimer <= 0) { dispatchCrates(); supplyTimer = supplyInterval(); }
 }
 
+// Oficina de Muros: repara +1 de vida da muralha a cada 30s (real, acelera com o
+// nível somado das Oficinas — sempre +1 por vez, nunca cura em lote).
+const OFICINA_REPAIR_SEC = 30;
+function tickOficinaRepair(dt) {
+  const lv = groupLvlSum("oficina");
+  if (lv <= 0 || S.hits >= maxHits()) { S.oficinaAcc = 0; return; }
+  S.oficinaAcc = (S.oficinaAcc || 0) + dt;
+  const interval = OFICINA_REPAIR_SEC / lv;
+  if (S.oficinaAcc >= interval) {
+    S.oficinaAcc -= interval;
+    S.hits = Math.min(maxHits(), S.hits + 1);
+    addFloat(2, 0.52, "🧱 Oficina: +1", "#eecd5c");
+    renderHUD();
+  }
+}
+
 // Feudo: a esteira vertical leva os recursos dos extratores até o Centro de Distribuição (topo).
 function sendResourceCrate(icon) {
   const cv = document.createElement("span");
@@ -4231,7 +4247,10 @@ function projectileHit(p) {
 function update(dt) {
   if (S.paused) return; // congelado enquanto o overlay de Configurações/Saída está aberto
   // Cadeia de suprimentos roda no planejamento E no combate (a esteira abastece entre turnos)
-  if ($("menu").classList.contains("hidden")) tickSupplyChain(dt);
+  if ($("menu").classList.contains("hidden")) {
+    tickSupplyChain(dt);
+    tickOficinaRepair(dt);
+  }
   if (S.towerBuff && S.towerBuff.t > 0) S.towerBuff.t -= dt; // Infusor Arcano (buff de tropas)
   for (const fx of S.effects) fx.life -= dt;
   S.effects = S.effects.filter(fx => fx.life > 0);
@@ -4622,7 +4641,7 @@ function endWave() {
   if (S.turnHitsLost === 0) S.hearts += cityFxScan(null, "hNoHit");
   // Motor de Argamato consome 💎; Autômato Reparador conserta a muralha
   S.hearts = Math.max(0, S.hearts - cityFxScan(null, "hUp"));
-  let rep = cityFxScan(null, "repair") + groupLvlSum("oficina") + (law("L23") ? 1 : 0); // Oficina + Requisição de Pedra
+  let rep = cityFxScan(null, "repair") + (law("L23") ? 1 : 0); // Autômato Reparador + Requisição de Pedra (Oficina repara em tempo real)
   if (rep) {
     rep += (law("L27") ? 1 : 0) + (law("L46") ? 1 : 0); // Muros Modulares / Cidadela de Ferro rendem mais
     S.hits = Math.min(maxHits(), S.hits + rep);

@@ -24,7 +24,15 @@
   --display: "Cinzel", Georgia, serif;
 }
 
-* { margin: 0; padding: 0; box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; }
+* {
+  margin: 0; padding: 0; box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none;
+  -webkit-touch-callout: none; /* iOS: sem menu/seleção ao segurar */
+  -webkit-user-drag: none;
+}
+/* deixa campos de texto ainda selecionáveis, caso existam (saves, etc.) */
+input, textarea { -webkit-user-select: text; user-select: text; }
 
 html, body {
   height: 100%;
