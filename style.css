@@ -1670,7 +1670,7 @@ html, body {
 
 /* Botão de juramento: segure 2s */
 .fac-actions .menu-btn.oath-hold {
-  position: relative; overflow: hidden; width: 100%; padding: 13px 16px;
+  position: relative; overflow: hidden; width: 100%; max-width: 300px; padding: 13px 16px;
   font-size: 16px; letter-spacing: 1.5px; touch-action: none; user-select: none;
 }
 .oath-hold .oath-label { position: relative; z-index: 1; }
@@ -2008,11 +2008,11 @@ body.fac-green  #towers { border-top-color: #4cae6a; }
   display: flex; align-items: center; justify-content: center; font-size: 12px;
 }
 .dist-stats { flex: 1; display: flex; flex-direction: column; gap: 3px; }
-.dist-resist { font-family: var(--display); font-weight: 800; letter-spacing: 1px; font-size: 16px; color: #fff; margin-bottom: 2px; }
+.dist-resist { font-family: var(--display); font-weight: 800; letter-spacing: .3px; font-size: 14px; color: #fff; margin-bottom: 2px; white-space: nowrap; }
 .dist-stat { display: flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: .5px; color: #e6ddc7; }
 .ds-dot { width: 11px; height: 11px; border-radius: 50%; border: 2px solid #8a7f63; flex: 0 0 auto; }
 .ds-dot.gold { background: var(--gold-hi, #e8c95c); border-color: var(--gold-hi, #e8c95c); }
-.dist-sector { font-family: var(--display); font-weight: 800; letter-spacing: .8px; font-size: 15px; color: #fff; text-align: left; white-space: nowrap; }
+.dist-sector { font-family: var(--display); font-weight: 800; letter-spacing: .2px; font-size: 13px; color: #fff; text-align: left; white-space: nowrap; }
 .dist-sector b { color: var(--gold-hi, #e8c95c); }
 .dist-div { height: 1px; margin: 12px 0; background: linear-gradient(90deg, transparent, rgba(201,162,39,.55), transparent); }
 .dist-line { font-family: var(--display); font-weight: 700; letter-spacing: 1px; font-size: 16px; margin-top: 8px; }
