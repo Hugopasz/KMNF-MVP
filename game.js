@@ -1105,7 +1105,8 @@ function openDistrict() {
       ${f ? `<div class="dist-sub">${FACTIONS[f].desc}</div>` : ""}
       <div class="dist-line"><span class="dl-k">OPOSIÇÃO:</span> <span class="dl-v" style="color:${opp ? opp.color : "#9b8f77"}">${opp ? opp.name.toUpperCase() : f ? "TODAS" : "—"}</span></div>
       ${f ? `<div class="dist-sub">${opp ? DEBUFF_BY_CHOICE[f] : "sofre todas as penalidades"}</div>` : ""}
-      <div class="dist-line"><span class="dl-k">TÁVOLA:</span> <span class="dl-v gold">${cc ? cc.name.toUpperCase() : "NENHUM"}</span>${cc ? ` <span class="dl-cost">💎${councilCost(cid)} Cristais</span>` : ""}</div>
+      <div class="dist-line"><span class="dl-k">TÁVOLA:</span> <span class="dl-v gold">${cc ? cc.name.toUpperCase() : "NENHUM"}</span></div>
+      ${cc ? `<div class="dl-cost">💎 ${councilCost(cid)} Cristais por uso</div>` : ""}
       ${cc ? `<div class="dist-sub">${cc.desc}</div>` : `<div class="dist-sub">Jure um Lorde na Távola (menu inicial).</div>`}
       <div class="dist-div"></div>
       <div class="dist-chron-h">Crônicas do Setor</div>
