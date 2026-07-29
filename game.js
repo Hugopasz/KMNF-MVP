@@ -1151,7 +1151,7 @@ const AMMO = {
 // ---------- Assets do campo (astro dia/noite) ----------
 const ASTRO_IMG = { day: new Image(), night: new Image() };
 ASTRO_IMG.day.src = "ICONE-DIA.png?v=1";
-ASTRO_IMG.night.src = "ICONE-NOITE.png?v=1";
+ASTRO_IMG.night.src = "ICONE-NOITE.png?v=2";
 
 // ---------- Torres — 3 categorias (Básicas 1 munição / Avançadas 2 / Icônicas 3) ----------
 // Cada torre exige TODAS as munições de `ammos` (estoque por tipo). Força ∝ categoria; custo em ouro 1×/2×/3×.
@@ -1187,6 +1187,7 @@ const TOWER_TYPES = {
   infusor:     { name: "Infusor Arcano",     tier: "legend", icon: "🧿", cost: 90,  dmg: 0,  rate: 2.5, range: 999, aoe: 0,   ptime: 0.4, ammos: ["essencia", "pedras", "condutores"], support: "buff", locked: true, medalCost: 40 },
 };
 const TIER_META = { basic: "Básicas", adv: "Avançadas", legend: "Icônicas" };
+const TIER_LABEL = { basic: "Básica", adv: "Avançada", legend: "Icônica" }; // singular (painel da torre)
 // Lore mais longa (≈2 linhas) para o painel da torre. A ARS_LORE curta segue nos cards do Arsenal.
 const TOWER_LORE = {
   besta:       "A primeira arma erguida nas ameias de Karzstak. Cada virote leva gravado o nome de um vigia que tombou na muralha.",
@@ -3592,7 +3593,7 @@ function renderTowerPanel(t, i) {
     head.innerHTML = `
       <div class="tw-emoji">${tt.icon}</div>
       <div class="tw-titles">
-        <div class="tw-name">${name} <span class="tw-lv">LV.${lvl}</span><span class="tw-pos"> | Posição ${i + 1}</span></div>
+        <div class="tw-name">${name} <span class="tw-lv">LV.${lvl}</span><span class="tw-pos">Posição ${i + 1} | ${TIER_LABEL[tt.tier]}</span></div>
         <div class="tw-desc">${lore}</div>
       </div>`;
     m.appendChild(head);
@@ -3633,7 +3634,7 @@ function renderTowerPanel(t, i) {
       const act = cur >= 3 ? `<div class="tw-act state done"><span class="tw-act-ic">★</span><span class="tw-act-s">MÁX</span></div>`
         : locked ? `<div class="tw-act state lock"><span class="tw-act-ic">🔒</span></div>`
         : atCap ? `<div class="tw-act state cap">2/2</div>`
-        : `<button class="tw-act tw-melhorar${can ? "" : " off"}"><span class="tw-mel-t">MELHORAR</span><span class="tw-mel-c">🪙 ${cost} OURO</span></button>`;
+        : `<button class="tw-act tw-melhorar${can ? "" : " off"}"><span class="tw-mel-t">MELHORAR</span><span class="tw-mel-c">🪙 ${cost}</span></button>`;
       const title = cur >= 3 ? "Caminho máximo"
         : locked ? "Caminho trancado"
         : atCap ? "Secundário no máximo"
@@ -4125,6 +4126,56 @@ $("pause-save").onclick = promptSaveName;
 $("pause-load").onclick = () => openSavesList(() => { renderAll(); closePause(); });
 $("pause").onclick = (e) => { if (e.target === $("pause")) closePause(); };
 
+// ---------- Mensagens de combate (estilo PvZ, surgem/somem junto com o astro) ----------
+// "|" marca a quebra de linha (mensagem sempre em duas linhas)
+const COMBAT_MSGS = {
+  start: [
+    "Eles estão vindo.|Resista.",
+    "A horda avança.|Segurem a muralha.",
+    "Que venham.|Karzstak não deve cair.",
+  ],
+  half: [
+    "A horda|está diminuindo.",
+    "Estão caindo.|Não recuem!",
+    "A maré vira.|Aguentem firme.",
+  ],
+  // Sol Negro = loucura
+  blacksun: [
+    "Há. Há. Há.|Estamos perdidos.",
+    "O sol morreu|e ninguém percebeu. Ha!",
+    "Ria comigo —|é tudo o que resta.",
+  ],
+  // Lua Sangrenta = depressão
+  bloodmoon: [
+    "Não vamos|conseguir.",
+    "Para que resistir?|Eles nunca param.",
+    "A muralha vai cair.|Como sempre foi.",
+  ],
+};
+function pickMsg(pool) { const a = COMBAT_MSGS[pool]; return a[Math.floor(Math.random() * a.length)]; }
+// exibe a mensagem com fade-in/hold/fade-out (o CSS cuida da transição)
+let combatMsgT = null;
+function showCombatMsg(text, theme) {
+  const el = $("combat-msg");
+  if (!el) return;
+  el.innerHTML = text.replace("|", "<br>"); // "|" vira quebra de linha
+  el.className = "cm-show" + (theme ? " cm-" + theme : "");
+  clearTimeout(combatMsgT);
+  combatMsgT = setTimeout(() => { el.className = el.className.replace("cm-show", "").trim(); }, 3800);
+}
+// mensagem do INÍCIO do combate, conforme o evento celeste
+function combatStartMsg() {
+  if (bloodMoon()) showCombatMsg(pickMsg("bloodmoon"), "blood");
+  else if (blackSun()) showCombatMsg(pickMsg("blacksun"), "dark");
+  else showCombatMsg(pickMsg("start"));
+}
+// mensagem da METADE da horda
+function combatHalfMsg() {
+  if (bloodMoon()) showCombatMsg(pickMsg("bloodmoon"), "blood");
+  else if (blackSun()) showCombatMsg(pickMsg("blacksun"), "dark");
+  else showCombatMsg(pickMsg("half"));
+}
+
 // ---------- Horda / eventos celestes ----------
 function moonPhase() { return S.day % 4 === 0; }
 // Lua Sangrenta: a cada 10 dias, na madrugada, horda mais forte e populosa
@@ -4243,6 +4294,9 @@ function renderAll() { renderHUD(); renderTowers(); renderCity(); renderSupplyRa
 
 // ---------- Onda / combate ----------
 let spawnQueue = [], spawnTimer = 0, supplyTimer = 0, lastT = 0;
+let waveTotal = 0, waveHalfShown = false; // total da horda e flag da mensagem "metade"
+// Fade in/out do astro (lua/sol): some no combate, reaparece no planejamento.
+let astroFade = 1, astroFadeT = 0;
 let qCd = {};        // cooldown dos quartéis de arqueiros
 let blockPool = 0;   // bloqueios de guarnição disponíveis no turno
 let gateCd = 0;      // cooldown do preenchimento automático do Portão
@@ -4260,6 +4314,8 @@ function startWave() {
   S.turnHitsLost = 0;
   qCd = {};
   blockPool = cityFxScan(c => c.built === "quartel", "block");
+  waveTotal = S.nextWave.length; waveHalfShown = false; // rastreio da metade da horda
+  combatStartMsg();
   renderAll();
 }
 
@@ -4957,6 +5013,11 @@ function update(dt) {
   }
   const dead = S.enemies.filter(e => e.hp <= 0 && e.hp > -900);
   S.kills += dead.length;
+  // mensagem da "metade da horda": ao abater ≥ 50% do total do turno
+  if (waveTotal >= 4 && !waveHalfShown) {
+    const alive = spawnQueue.length + S.warnings.length + (S.enemies.length - dead.length);
+    if (waveTotal - alive >= waveTotal / 2) { waveHalfShown = true; combatHalfMsg(); }
+  }
   for (const e of dead) {
     // Roxo (Magia negra): chance do morto ressurgir como Sombra aliada temporária
     const spChance = facSpectralChance();
@@ -5456,6 +5517,12 @@ function draw() {
   const laneW = w / LANES;
   const fullMoon = S.isNight && moonPhase();
 
+  // fade do astro: alvo 0 durante o combate, 1 no planejamento (lento, ≈1.4s — sincroniza com a mensagem)
+  const nowT = performance.now();
+  const dtF = Math.min(0.05, (nowT - (astroFadeT || nowT)) / 1000); astroFadeT = nowT;
+  const astroTarget = S.waveActive ? 0 : 1;
+  astroFade += Math.sign(astroTarget - astroFade) * Math.min(Math.abs(astroTarget - astroFade), 0.72 * dtF);
+
   const ground = ctx.createLinearGradient(0, 0, 0, h);
   ground.addColorStop(0, "#4a3826");
   ground.addColorStop(1, "#382a19");
@@ -5482,9 +5549,11 @@ function draw() {
     ctx.beginPath(); ctx.arc(p.x * w, p.y * h, p.r, 0, 7); ctx.fill();
   }
 
-  // Astro no topo da lane central; some durante o ataque inimigo.
+  // Astro no topo da lane central; faz fade-out no ataque e fade-in no planejamento.
   const drawAstro = () => {
-  if (S.waveActive) return;
+  if (astroFade <= 0.01) return;
+  ctx.save();
+  ctx.globalAlpha = astroFade;
   const ax = w / 2, ay = 34;
   // número do dia sobre o astro (badge escuro no centro)
   const drawDayBadge = () => {
@@ -5517,9 +5586,9 @@ function draw() {
     const img = ASTRO_IMG.night;
     if (img.complete && img.naturalWidth) {
       if (fullMoon) { ctx.shadowColor = "#e0a080"; ctx.shadowBlur = 18; }
-      ctx.globalAlpha = 0.45;                         // lua mais transparente
+      ctx.globalAlpha = 0.45 * astroFade;             // lua mais transparente
       ctx.drawImage(img, ax - 20, ay - 20, 40, 40);   // arte da lua menor (60→40px)
-      ctx.globalAlpha = 1;
+      ctx.globalAlpha = astroFade;
       ctx.shadowBlur = 0;
     } else {
       ctx.fillStyle = "#e6dcc8";
@@ -5535,6 +5604,7 @@ function draw() {
     }
   }
   drawDayBadge();
+  ctx.restore();
   };
 
   ctx.fillStyle = "#52422e";
