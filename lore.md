@@ -4,7 +4,7 @@
 
 ## Introdução
 
-Há cem anos, o mundo mudou para sempre.
+Há cento e vinte anos, o mundo mudou para sempre.
 
 Sem qualquer explicação, hordas intermináveis de mortos-vivos começaram a surgir. Ninguém conhece sua verdadeira origem. Alguns acreditam que sejam uma punição divina; outros culpam um antigo ritual proibido. A lenda mais aceita conta que um grupo de aventureiros invadiu a tumba errada: o descanso eterno de um rei necromante. Ao profanarem seu túmulo, libertaram uma maldição que condenou toda a humanidade. Desde então, os mortos jamais deixaram de marchar.
 
@@ -24,12 +24,12 @@ Como novo comandante, você recebeu das mãos do rei o **Cetro Real**, uma arma 
 
 Cada morto-vivo abatido deixa para trás um **Coração de Argamato**, um núcleo cristalino mágico do tamanho de uma maçã, formado durante o processo de reanimação realizado pelo antigo mago sombrio. Esses cristais são a principal fonte de energia e magia de Karzstak, alimentando armas, máquinas, fortificações e pesquisas. Quanto maior a batalha, maiores as chances de a cidade continuar viva.
 
-Karzstak resiste há um século. Agora, a próxima batalha depende de você.
+Karzstak resiste há cento e vinte anos. Agora, a próxima batalha depende de você.
 
 ## Cânone (perguntas & respostas)
 
 - **De onde vêm tantos mortos-vivos?** Além dos humanos mortos reanimados (bilhões que se aglomeram naturalmente), as criaturas mágicas do mundo também foram afetadas, aumentando ainda mais a horda.
-- **São criados continuamente ou já existiam bilhões?** Começou com um único paciente zero. Cem anos depois, existem bilhões.
+- **São criados continuamente ou já existiam bilhões?** Começou com um único paciente zero. Cento e vinte anos depois, existem bilhões.
 - **Precisam comer ou apenas marcham?** Apenas marcham. Têm um instinto natural de atacar acúmulos de magia e pessoas.
 - **Atacam com estratégia ou por instinto?** Por instinto.
 - **Existem mortos-vivos inteligentes comandando as hordas?** Sim. O **rei negativo** (o rei necromante) pune a humanidade por atrapalhar seu sono eterno após eons de existência imortal. Ele só descansará quando o planeta for um plano sem vida e sem magia. A grande maioria da horda, porém, são animais e humanos reanimados agindo por puro instinto.

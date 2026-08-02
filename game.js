@@ -1063,6 +1063,14 @@ function formatSectorId(n) { return String(n || 0).replace(/\B(?=(\d{3})+(?!\d))
 const SECTOR_DIRS = ["Norte", "Nordeste", "Leste", "Sudeste", "Sul", "Sudoeste", "Oeste"];
 function randomSectorDir() { return SECTOR_DIRS[Math.floor(Math.random() * SECTOR_DIRS.length)]; }
 
+// Resumo de recursos dos dois campos, em uma linha: Cidade (🪙💎✋) + Feudo (recursos brutos).
+// Fica fora do openDistrict porque o loop reusa isso para manter a linha ao vivo.
+function distResHTML() {
+  const cidade = `🪙 ${Math.floor(S.gold)}&nbsp;💎 ${Math.floor(S.hearts)}&nbsp;✋ ${Math.floor(S.maos)}/${maosCap()}`;
+  const feudo = Object.entries(RESOURCES).map(([k, r]) => `${r.icon}&nbsp;${Math.floor(S.res[k] || 0)}`).join("&nbsp;");
+  return `${cidade}&nbsp;&nbsp;${feudo}`;
+}
+
 function openDistrict() {
   openModal("", (m) => {
     $("modal").classList.add("dist-modal");
@@ -1075,10 +1083,6 @@ function openDistrict() {
     const turns = Math.max(0, (S.day - 1) * 2 + (S.isNight ? 1 : 0));
     const br = getBrasao();
     const pos = Math.max(0, Math.min(100, Math.round((S.morale + 150) / 3)));
-    // Resumo de recursos dos dois campos, em uma linha: Cidade (🪙💎✋) + Feudo (recursos brutos)
-    const cidadeRes = `🪙 ${Math.floor(S.gold)}&nbsp;💎 ${Math.floor(S.hearts)}&nbsp;✋ ${Math.floor(S.maos)}/${maosCap()}`;
-    const feudoRes = Object.entries(RESOURCES).map(([k, r]) => `${r.icon}&nbsp;${Math.floor(S.res[k] || 0)}`).join("&nbsp;");
-    const resSummary = `${cidadeRes}&nbsp;&nbsp;${feudoRes}`;
     const wrap = document.createElement("div");
     wrap.className = "dist";
     wrap.innerHTML = `
@@ -1112,7 +1116,7 @@ function openDistrict() {
       <div class="dist-chron-h">Crônicas do Setor</div>
       <div class="dist-chron"></div>
       <div class="dist-div"></div>
-      <div class="dist-line dist-res"><span class="dl-v dr-line">${resSummary}</span></div>`;
+      <div class="dist-line dist-res"><span class="dl-v dr-line">${distResHTML()}</span></div>`;
     m.appendChild(wrap);
     // "clique fora para sair" fica FORA do modal, sobre o fundo escurecido
     const modal = $("modal");
@@ -1260,6 +1264,8 @@ function consumeTowerAmmo(t, cost, fx) {
 }
 
 // ---------- Inimigos ----------
+// Ritmo global de marcha (estilo PvZ): <1 deixa a horda mais lenta, turnos mais longos.
+const ENEMY_MARCH = 0.82;
 const ENEMY_TYPES = {
   rastejante: { name: "Rastejante",  icon: "🧟", hp: 14, spd: 0.040, armor: 1,  gold: 2, heart: .25, period: "day",   minDay: 1 },
   corredor:   { name: "Corredor",    icon: "🏃", hp: 8,  spd: 0.105, armor: 1,  gold: 2, heart: .20, period: "day",   minDay: 2 },
@@ -1684,6 +1690,12 @@ function lawIncomeMult() { return law("L4") ? 0.95 : 1; }
 // passado o dia 10, chegam os mortos ANTIGOS, já saqueados (metade do ouro por criatura).
 const ELDERS_DAY = 10, ELDERS_LOOT_MULT = 0.5;
 function killGoldMult() { return (S.day > ELDERS_DAY ? ELDERS_LOOT_MULT : 1) * (law("L6") ? 1.1 : 1); }
+// Saque incerto: nem todo morto larga ouro, e a chance MINGUA a cada dia. É o freio
+// da economia agora que a horda triplicou — mais abates, menos moedas por abate.
+const GOLD_DROP_BASE = 0.50, GOLD_DROP_MIN = 0.15, GOLD_DROP_DECAY = 0.012;
+function goldDropChance() {
+  return Math.max(GOLD_DROP_MIN, GOLD_DROP_BASE - Math.max(0, S.day - 1) * GOLD_DROP_DECAY);
+}
 function heartsPerTurn() { return (law("L13") ? 1 : 0) + groupLvlSum("refinaria") + groupLvlSum("praca_cerimonial"); }
 
 // ---------- Variantes de CONSTRUÇÕES (Lv1→5) ----------
@@ -2711,12 +2723,14 @@ function resizeCanvas() {
   const w0 = canvas.clientWidth || canvas.parentElement.clientWidth;
   const h0 = canvas.clientHeight || canvas.parentElement.clientHeight;
   const bw = Math.round(w0 * devicePixelRatio), bh = Math.round(h0 * devicePixelRatio);
+  if (!bw || !bh) return;                                 // campo oculto: preserva o backing store
   if (canvas.width === bw && canvas.height === bh) return; // já sincronizado
   canvas.width = bw;
   canvas.height = bh;
   ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
 }
-addEventListener("resize", resizeCanvas);
+addEventListener("resize", resizeCanvas);      // cobre também mudança de zoom (devicePixelRatio)
+new ResizeObserver(resizeCanvas).observe(canvas); // no lugar de medir o canvas a cada frame
 
 // ---------- Cidade ----------
 function initCity() {
@@ -3113,6 +3127,29 @@ function renderResBar() {
     item("✋", `${Math.floor(S.maos)}/${maosCap()}`, "res-maos");
     tog("Ativar Capataz", "capataz", "Acelera toda a produção da cidade, mas o povo perde moral a cada turno");
   }
+}
+
+// Números de recurso ao vivo. A barra e o resumo de "Seu Setor" leem o MESMO estado a
+// cada frame — a produção corre continuamente, então esperar por um renderHUD deixava
+// os dois defasados. Só encosta no DOM quando o texto muda de fato.
+function setText(el, txt) { if (el && el.textContent !== txt) el.textContent = txt; }
+function syncLiveRes() {
+  const bar = $("res-bar");
+  if (bar) {
+    if (S.field === "feud") {
+      const ns = bar.querySelectorAll(".fres-mid .fres-n");
+      Object.keys(RESOURCES).forEach((k, i) => setText(ns[i], String(Math.floor(S.res[k] || 0))));
+    } else {
+      setText($("res-gold"), String(Math.floor(S.gold)));
+      setText($("res-hearts"), String(Math.floor(S.hearts)));
+      setText($("res-maos"), `${Math.floor(S.maos)}/${maosCap()}`);
+    }
+  }
+  if ($("modal").classList.contains("hidden")) return;
+  const line = $("modal").querySelector(".dist-res .dr-line");
+  if (!line) return;
+  const html = distResHTML();
+  if (line.innerHTML !== html) line.innerHTML = html;
 }
 
 function openFeudDist() {
@@ -4185,6 +4222,14 @@ function bloodMoon() { return S.isNight && S.day % 10 === 0; }
 function blackSun() { return !S.isNight && S.day % 10 === 5; }
 function cityEff() { return blackSun() ? 0.5 : 1; }
 
+// Volume da horda: rampa de 2× (dia 1) a 3× (dia 8) sobre a curva antiga. A abertura
+// continua jogável com uma torre só, e do meio pro fim a pressão é de QUANTIDADE.
+const HORDE_MULT_MIN = 2, HORDE_MULT_MAX = 3, HORDE_MULT_DAY = 8;
+function hordeMult() {
+  const t = Math.min(1, Math.max(0, S.day - 1) / (HORDE_MULT_DAY - 1));
+  return HORDE_MULT_MIN + (HORDE_MULT_MAX - HORDE_MULT_MIN) * t;
+}
+const WAVE_CAP = 600; // teto de segurança (performance / evitar slog)
 function waveSize() {
   const fullMoon = S.isNight && moonPhase();
   // Base cresce ~linear com o dia; o pico de tensão vem da escalada por QUANTIDADE no mid-end.
@@ -4192,7 +4237,7 @@ function waveSize() {
   if (bloodMoon()) n = Math.round(n * 1.6);
   // Acelerador de mid-end (Ato 2): escalada por QUANTIDADE a partir do dia 10, mais forte.
   n += Math.round(Math.pow(Math.max(0, S.day - 10), 1.55) * 1.1);
-  return Math.round(Math.min(240, n)); // teto de segurança (performance / evitar slog)
+  return Math.round(Math.min(WAVE_CAP, n * hordeMult()));
 }
 
 function eligibleTypes() {
@@ -4263,6 +4308,12 @@ $("astro-btn").onclick = () => {
       d.innerHTML = `<span class="wicon">${t.icon}</span><span class="wname">${t.name}${t.armor < 1 ? " (resistente)" : ""}${t.spd > 0.08 ? " (veloz)" : ""}</span><span class="wcount">×${n}</span>`;
       m.appendChild(d);
     }
+    // O saque mingua a cada dia: o jogador precisa ver isso para planejar os gastos.
+    const loot = document.createElement("div");
+    loot.className = "panel-hint";
+    loot.innerHTML = `🪙 <b>Saque:</b> ${Math.round(goldDropChance() * 100)}% dos corpos ainda carregam moedas`
+      + (S.day > ELDERS_DAY ? ` · <b>Os Mortos Antigos</b> levam metade do que sobra` : "");
+    m.appendChild(loot);
   });
 };
 
@@ -4273,10 +4324,7 @@ function renderHUD() {
   if (mk) mk.style.left = (50 + S.morale / 3) + "%";
   renderHudBrasao();
   $("hud-hp").innerHTML = `<span class="hp-d">◆</span> ${Math.max(0, S.hits)}/${maxHits()} HP`;
-  // moedas globais vivem na barra de recursos da Cidade (só atualiza os números se presentes)
-  const rg = $("res-gold"); if (rg) rg.textContent = S.gold;
-  const rh = $("res-hearts"); if (rh) rh.textContent = S.hearts;
-  const rm = $("res-maos"); if (rm) rm.textContent = `${Math.floor(S.maos)}/${maosCap()}`;
+  syncLiveRes(); // moedas globais vivem na barra de recursos (e no resumo de "Seu Setor")
   $("btn-wave").disabled = S.waveActive;
   const phaseFull = `${S.isNight ? "Noite" : "Dia"} ${S.day}`;
   const phaseShort = `${S.isNight ? "N" : "D"}${S.day}`;
@@ -4329,7 +4377,7 @@ function spawnEnemy(lane, type) {
   S.enemies.push({
     lane, y: -0.05, type,
     hp, maxHp: hp,
-    speed: t.spd * slowFactor() * moraleEnemySpdMult() * dm("enemySpd"),
+    speed: t.spd * ENEMY_MARCH * slowFactor() * moraleEnemySpdMult() * dm("enemySpd"),
     armor: dm("allArmored", 0) ? Math.min(t.armor, 0.6) : t.armor, // evento "Marcha Blindada"
     burn: 0,
     aura: Math.random() < 0.2 ? SHAPE_KEYS[Math.floor(Math.random() * 3)] : null, // 1/5 nasce com aura (ameaça)
@@ -4806,18 +4854,20 @@ function update(dt) {
   // pressão simultânea ("overwhelmed"), mas sempre telegrafada.
   spawnTimer -= dt;
   if (spawnQueue.length > 0 && spawnTimer <= 0) {
-    let burst = 2 + Math.floor(S.day / 3.0) + (bloodMoon() ? 2 : 0);
-    // Onda de aglomeração: de vez em quando uma leva bem maior desaba de uma vez (pico de tensão).
-    const surge = Math.random() < 0.22 + Math.min(0.18, Math.max(0, S.day - 8) * 0.015);
-    if (surge) burst = Math.round(burst * 1.9);
+    // Ritmo PvZ: a horda "pinga" em levas espaçadas. As levas cresceram junto com o
+    // volume — o turno fica ~1,8× mais longo, não 3×, então é mais DENSO e não mais lento.
+    let burst = 3 + Math.floor(S.day / 3.0) + (bloodMoon() ? 3 : 0);
+    // Aglomeração: de vez em quando uma parede de mortos desaba de uma vez (pico de tensão).
+    const surge = Math.random() < 0.24 + Math.min(0.20, Math.max(0, S.day - 6) * 0.014);
+    if (surge) burst = Math.round(burst * 2.2);
     burst = Math.min(spawnQueue.length, burst);
     const lanes = [0, 1, 2, 3, 4].sort(() => Math.random() - 0.5);
     for (let b = 0; b < burst; b++) {
       const _wt = warnTime();
       S.warnings.push({ lane: lanes[b % LANES], t: _wt, tMax: _wt, type: spawnQueue.shift() });
     }
-    // Levas chegam mais rápido no mid-end; após uma aglomeração, um respiro maior antes da próxima.
-    spawnTimer = Math.max(1.9, 2.9 - Math.max(0, S.day - 10) * 0.05) + (surge ? 2.4 : 0);
+    // Depois de uma aglomeração, um respiro maior: é o vazio que faz a parede assustar.
+    spawnTimer = Math.max(2.0, 3.4 - Math.max(0, S.day - 10) * 0.05) + (surge ? 2.6 : 0);
   }
   for (const wn of S.warnings) {
     wn.t -= dt;
@@ -5029,9 +5079,14 @@ function update(dt) {
       addFloat(e.lane, e.y - 0.05, "👻 Sombra!", "#c89aff");
     }
     const t = ENEMY_TYPES[e.type];
-    const g = Math.round(t.gold * killGoldMult()) + (e.bountyG || 0);
-    earnGold(g);
-    addFloat(e.lane, e.y, `+${g} 🪙`, "#eecd5c");
+    // O saque do corpo é sorteado; a recompensa de torre (bountyG) sempre paga —
+    // o jogador comprou aquele upgrade, não faria sentido o dado engoli-lo.
+    const loot = Math.random() < goldDropChance() ? Math.round(t.gold * killGoldMult()) : 0;
+    const g = loot + (e.bountyG || 0);
+    if (g > 0) {
+      earnGold(g);
+      addFloat(e.lane, e.y, `+${g} 🪙`, "#eecd5c");
+    }
     if (Math.random() < (t.heart + mioloHeartBonus() + (e.bountyH || 0)) * heartChanceMult()) {
       S.hearts++;
       addFloat(e.lane, e.y - 0.06, "+1 💎", "#8ac6f0");
@@ -5120,7 +5175,7 @@ function endWave() {
   $("conveyor").classList.remove("running");
   $("conveyor-v").classList.remove("running");
   S.projectiles = []; S.eshots = []; S.effects = []; S.floats = []; S.groundFires = [];
-  let income = Math.round((90 + S.day * 3 + pracaPublicaGold() + incomeBonus()) * globalIncM() * moraleEffMult() * dm("income") * facIncomeMult() * mioloIncomeMult() * lawIncomeMult());
+  let income = Math.round((60 + S.day * 2 + pracaPublicaGold() + incomeBonus()) * globalIncM() * moraleEffMult() * dm("income") * facIncomeMult() * mioloIncomeMult() * lawIncomeMult());
   income += 8 * groupLvlSum("tesouraria"); // Tesouraria
   income += 5 * groupLvlSum("praca_chique") + 4 * groupLvlSum("praca_abandonada"); // Praça Chique / Abandonada
   income -= cityFxScan(c => c.built === "quartel", "gUp"); // soldo da Guarda Real
@@ -5294,8 +5349,9 @@ const SAVE_KEY = "mds-save6"; // slot de RETOMADA (Continuar): sempre sobrescrit
 
 // Empacota o estado da run atual (mesmos campos de sempre).
 function runPayload() {
-  const { day, isNight, hits, gold, hearts, won, kills, goldEarned, redMoons, blackSuns, mvpNotice, morale, moraleLocked, dayMods, lastEvent, eventLog, fav, sector, sectorId, sectorDir, factions, purpleThisRun, darkChain, towers, city, feud, field, res, maos, nextGid, laws, conjCount, freeConjure, allies, gateAuto, gateMode, gatePref, gateFac, seals, helpKingdom, capataz, helpPool, feudAid, feudOverdrive } = S;
-  return { day, isNight, hits, gold, hearts, won, kills, goldEarned, redMoons, blackSuns, mvpNotice, morale, moraleLocked, dayMods, lastEvent, eventLog, fav, sector, sectorId, sectorDir, factions, purpleThisRun, darkChain, towers, city, feud, field, res, maos, nextGid, laws, conjCount, freeConjure, allies, gateAuto, gateMode, gatePref, gateFac, seals, helpKingdom, capataz, helpPool, feudAid, feudOverdrive };
+  const { day, isNight, hits, gold, hearts, won, kills, goldEarned, redMoons, blackSuns, mvpNotice, morale, moraleLocked, dayMods, lastEvent, eventLog, fav, sector, sectorId, sectorDir, factions, purpleThisRun, darkChain, towers, city, feud, field, res, maos, nextGid, laws, conjCount, freeConjure, allies, gateAuto, gateMode, gatePref, gateFac, seals, helpKingdom, capataz, helpPool, feudAid, feudOverdrive, autoTurn } = S;
+  // `speed` viaja solto: o resto de S.debug (god) nunca é persistido.
+  return { day, isNight, hits, gold, hearts, won, kills, goldEarned, redMoons, blackSuns, mvpNotice, morale, moraleLocked, dayMods, lastEvent, eventLog, fav, sector, sectorId, sectorDir, factions, purpleThisRun, darkChain, towers, city, feud, field, res, maos, nextGid, laws, conjCount, freeConjure, allies, gateAuto, gateMode, gatePref, gateFac, seals, helpKingdom, capataz, helpPool, feudAid, feudOverdrive, autoTurn, speed: S.debug.speed };
 }
 // Aplica um payload de run ao estado (com todas as migrações de saves antigos).
 function applyRun(d) {
@@ -5329,6 +5385,9 @@ function applyRun(d) {
     return t;
   });
   if (towersReset) setTimeout(() => toast("🔧 Sistema de torres renovado: upgrades reiniciados."), 400);
+  if (typeof S.autoTurn !== "boolean") S.autoTurn = false;          // saves antigos
+  S.debug = { god: false, speed: SPEEDS.includes(S.speed) ? S.speed : 1 }; // god nunca volta de um save
+  delete S.speed;
   S.paused = false; S.waveActive = false;
   applyFactionTint();
   buildNextWave();
@@ -5395,6 +5454,7 @@ function resetGame() {
     seals: [1, 1, 1, 1, 1], sweeps: [],
     helpKingdom: false, capataz: false, helpPool: 0, feudAid: false, feudOverdrive: false,
     placing: null, laws: [], conjCount: 0, freeConjure: false, paused: false,
+    autoTurn: false, towerBuff: null,   // não vazam da run anterior
     towers: [null, null, null, null, null],
     res: (function () { const b = MIOLO.celeiros.per * mioloLvl("celeiros"); return { minerio: 30 + b, combustivel: 30 + b, bens: 30 + b, comida: 30 + b }; })(),
     maos: Math.min(MAOS_CAP_MAX, MAOS_CAP_BASE + MIOLO.guilda.per * mioloLvl("guilda")), feedEff: {},
@@ -5407,16 +5467,38 @@ function resetGame() {
 
 // ---------- Overlay ----------
 let overlayCb = null;
+let overlaySkipCb = null;
 function showOverlay(title, text, cb) {
   $("overlay-title").textContent = title;
   $("overlay-text").textContent = text;
   overlayCb = cb || null;
+  overlaySkipCb = null;                          // só sequências (re)armam o "Pular"
+  $("overlay-skip").classList.add("hidden");
+  $("overlay-box").scrollTop = 0;                // texto longo sempre começa do topo
   $("overlay").classList.remove("hidden");
 }
 $("overlay-btn").onclick = () => {
   $("overlay").classList.add("hidden");
   if (overlayCb) { const f = overlayCb; overlayCb = null; f(); }
 };
+$("overlay-skip").onclick = () => {
+  $("overlay").classList.add("hidden");
+  overlayCb = null;
+  if (overlaySkipCb) { const f = overlaySkipCb; overlaySkipCb = null; f(); }
+};
+
+// Sequência de telas [titulo, texto]: "Continuar" avança uma a uma, "Pular" salta direto para done().
+function showOverlaySeq(screens, done) {
+  let i = 0;
+  const step = () => {
+    if (i >= screens.length) { done && done(); return; }
+    const [title, text] = screens[i++];
+    showOverlay(title, text, step);
+    overlaySkipCb = () => { i = screens.length; done && done(); };
+    $("overlay-skip").classList.remove("hidden");
+  };
+  step();
+}
 
 // ---------- Pontuação ----------
 // Ganho de ouro que também soma no total da partida (para o resumo final). Gastos NÃO descontam.
@@ -5512,7 +5594,7 @@ const PATCHES = Array.from({ length: 12 }, () => ({
 }));
 
 function draw() {
-  resizeCanvas(); // mantém o backing store alinhado ao tamanho exibido (astro sempre circular)
+  // o backing store é sincronizado pelo ResizeObserver, não a cada frame
   const w = canvas.width / devicePixelRatio, h = canvas.height / devicePixelRatio;
   ctx.clearRect(0, 0, w, h);
   const laneW = w / LANES;
@@ -5992,15 +6074,21 @@ function draw() {
 }
 
 // ---------- Loop ----------
-function tick() {
-  const now = performance.now();
+// Simulação e desenho no MESMO requestAnimationFrame: antes o update rodava a 20 Hz
+// (setInterval 50ms) contra um draw a 60 Hz, e o movimento saía em degraus.
+// Toda a lógica já é escalada por dt em segundos, então o balanceamento não muda.
+// Menu inicial e escolha de facção cobrem a tela toda: não há campo visível embaixo deles.
+function menusOpen() {
+  return !$("menu").classList.contains("hidden") || !$("factions").classList.contains("hidden");
+}
+function frame(now) {
+  requestAnimationFrame(frame);
   const dt = Math.min(0.1, (now - lastT) / 1000) * S.debug.speed;
   lastT = now;
   update(dt);
-}
-function frame() {
+  if (menusOpen()) return;
+  syncLiveRes();
   draw();
-  requestAnimationFrame(frame);
 }
 
 // Passar o turno com a visita do dia pendente: confirma antes, avisando do custo.
@@ -6046,8 +6134,30 @@ $("btn-speed").onclick = () => {
 };
 
 // ---------- Menu inicial ----------
+// Abertura em três telas: o decreto → o mundo que sobrou → você. Depois vêm as regras.
+const LORE_DECREE =
+  "Dois bilhões de anos atrás, o rei negativo cansou-se deste planeta. De cada prece, de cada pedido, de cada guerra travada em seu nome.\n\n"
+  + "Então fechou os olhos e dormiu.\n\n"
+  + "Cento e vinte anos atrás, um bando de aventureiros irresponsáveis abriu a tumba errada.\n\n"
+  + "Ele acordou num mundo vibrante. Criaturas, reinos, lendas, canções. Vivo.\n\nE insuportavelmente barulhento.\n\n"
+  + "Seu decreto coube numa linha:\n\n«Se eu não vou dormir, então ninguém vai.»";
+
+const LORE_WORLD =
+  "Os mortos se levantaram. A peste fez o resto, e mudou TUDO em questão de estações.\n\n"
+  + "Desde então a humanidade se encolheu em punhados de metrópoles muradas, espalhadas pelo globo como brasas num campo queimado. Lá fora marcham os restos: homens, animais e criaturas mágicas corrompidas pela vontade do inimigo, que só quer silêncio.\n\n"
+  + "Eles nunca param de chegar.\n\n"
+  + "De todas essas cidades, nenhuma importa mais que Karzstak. Ela resiste há cento e vinte anos.\n\n"
+  + "Hoje, finalmente, escolheram você.";
+
+const LORE_COMMAND =
+  "Vinte anos treinando para comandante-arquimago. Vinte anos para chegar a esta manhã.\n\n"
+  + "Seu setor acaba de ser reerguido, reconquistado pedra por pedra depois que o comandante anterior tombou. Muitas vidas pagaram por este chão, e seus superiores esperam que o investimento renda.\n\n"
+  + "Da mão do rei você recebeu o Cetro Real, forjado direto na torrente do Turbilhão Nexus. Não desperdice.\n\n"
+  + "Proteja seu setor. Atravesse a noite. Talhe seu nome nos tijolos das muralhas da realeza.\n\n"
+  + "Nosso lema é um só: Karzstak NÃO deve cair. Não importa o custo.";
+
 const TUTORIAL_TEXT =
-  "Há cem anos os mortos marcham, e Karzstak não pode cair. A Muralha Oeste é sua, o rei te confiou o Cetro Real.\n\nComandante, o muro é seu agora. O anterior... falhou.\n\n1. Construa uma Fábrica de Virotes 🏹 no distrito de baixo.\n2. Construa uma Besta 🏹 num portão, cada torre usa a munição da SUA fábrica.\n3. A esteira abastece por proximidade: torre 5 primeiro, depois 4, 3... e só passa adiante quando a da vez está cheia.\n4. A muralha aguenta 5 HITS. Aperte ▶ Turno e sobreviva.\n\n✍ Desenhe formas no campo: círculo, triângulo ou quadrado sobre suas tropas dá auras (vida, ataque, defesa); a forma exigida sobre um inimigo com aura o dispela. Cada conjuração custa 1 💎.";
+  "1. Construa uma Fábrica de Virotes 🏹 no distrito de baixo.\n2. Construa uma Besta 🏹 num portão, cada torre usa a munição da SUA fábrica.\n3. A esteira abastece por proximidade: torre 5 primeiro, depois 4, 3... e só passa adiante quando a da vez está cheia.\n4. A muralha aguenta 5 HITS. Aperte ▶ Turno e sobreviva.\n\n✍ Desenhe formas no campo: círculo, triângulo ou quadrado sobre suas tropas dá auras (vida, ataque, defesa); a forma exigida sobre um inimigo com aura o dispela. Cada conjuração custa 1 💎.";
 
 function setupMenu() {
   const hasSave = !!localStorage.getItem(SAVE_KEY);
@@ -6573,7 +6683,13 @@ $("btn-infinito").onclick = () => {
     applyDailyEvent(DAY1_EVENT);
     S.moraleLocked = moraleTier(S.morale);
     renderAll();
-    showOverlay("Muralha Oeste de Karzstak", TUTORIAL_TEXT, () => {
+    showOverlaySeq([
+      ["O Decreto", LORE_DECREE],
+      ["O que Sobrou do Mundo", LORE_WORLD],
+      [`Setor ${formatSectorId(S.sectorId)} · Muralha ${S.sectorDir}`, LORE_COMMAND],
+      ["Suas Ordens", TUTORIAL_TEXT],
+    ], () => {
+      // O evento do dia 1 nunca é pulado: ele explica o modificador já aplicado.
       showOverlay(`${DAY1_EVENT.ic} Dia 1: ${DAY1_EVENT.t}`, `${DAY1_EVENT.s}\n\n${effectText(DAY1_EVENT)}`);
     });
   });
@@ -6589,12 +6705,41 @@ $("btn-load").onclick = () => {
 $("menu-help").onclick = () => {
   openModal("Karzstak Must Not Fall", (m) => {
     const d = document.createElement("div"); d.className = "panel-hint";
-    d.innerHTML = "Há cem anos os mortos marcham, e <b>Karzstak não pode cair</b>. Você é o novo comandante da Muralha Oeste: o rei lhe confiou o Cetro Real.<br><br>"
+    d.innerHTML = "Há cento e vinte anos os mortos marcham, e <b>Karzstak não pode cair</b>. Você é o novo comandante de um dos setores da muralha: o rei lhe confiou o <b>Cetro Real</b>.<br><br>"
       + "<b>Como jogar:</b> aperte <b>▶ Turno</b> e sobreviva à horda. Construa <b>fábricas</b> no distrito para abastecer as <b>torres</b> nos portões; erga <b>edifícios</b> para fortalecer a cidade. A muralha aguenta alguns <b>hits</b> — se zerar, a run acaba.<br><br>"
       + "<b>Infinito</b> = sobreviva o máximo que puder. <b>História</b> = campanhas (em breve). <b>Miolo / Conselho / Arsenal</b> = progressão persistente entre runs.";
     m.appendChild(d);
   });
 };
+
+// ---------- Atalhos de teclado (desktop) ----------
+// Espaço = passar turno · 1–5 = portão · Esc = fecha o que estiver aberto (ou abre Configurações).
+function isTyping(el) {
+  return !!el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable);
+}
+addEventListener("keydown", (e) => {
+  if (e.ctrlKey || e.metaKey || e.altKey || isTyping(e.target)) return;
+  const modal   = !$("modal").classList.contains("hidden");
+  const overlay = !$("overlay").classList.contains("hidden");
+  const paused  = !$("pause").classList.contains("hidden");
+
+  if (e.key === "Escape") {
+    e.preventDefault();
+    if (overlay) return;                     // a abertura e os eventos do dia se leem até o fim
+    if (modal) { closeModal(); return; }
+    if (paused) { closePause(); return; }
+    if (!menusOpen()) openPause();
+    return;
+  }
+  if (modal || overlay || paused || menusOpen()) return; // resto só vale com o campo à mostra
+
+  if (e.code === "Space") {
+    e.preventDefault();                      // senão a barra rola a página
+    if (!$("btn-wave").disabled) $("btn-wave").click();
+    return;
+  }
+  if (e.key >= "1" && e.key <= String(LANES)) onTowerClick(+e.key - 1);
+});
 
 // ---------- Início ----------
 initCity();
@@ -6603,6 +6748,7 @@ resizeCanvas();
 renderAll();
 setupMenu();
 lastT = performance.now();
-setInterval(tick, 50);
 setInterval(feudBeltTick, 750); // fluxo cosmético de recursos até o Centro de Distribuição do Feudo
 requestAnimationFrame(frame);
+// Voltando de uma aba oculta o rAF fica parado: rebase o relógio p/ não engolir um dt gigante.
+addEventListener("visibilitychange", () => { if (!document.hidden) lastT = performance.now(); });
