@@ -584,6 +584,8 @@ html, body {
   transition: background .15s, box-shadow .15s;
 }
 .fres-toggle.on { border-color: var(--gold); color: var(--gold-hi); }
+/* travado pelo piso de recursos: ainda clicável, mas só para explicar o porquê */
+.fres-toggle.tg-blocked { opacity: .45; border-style: dashed; }
 .fres-toggle.on .tg-dot {
   background: linear-gradient(135deg, var(--gold-hi), var(--gold));
   border-color: var(--gold-hi); box-shadow: 0 0 6px rgba(201,162,39,.6);
@@ -1994,6 +1996,13 @@ body.fac-green  #towers { border-top-color: #4cae6a; }
 .bd-locknote { text-align: center; font-size: 12px; color: #ff9d8a; border: 1px solid rgba(224,95,95,.4); border-radius: 8px; padding: 5px 8px; background: rgba(90,20,20,.25); }
 /* célula desligada nos grids */
 .cell.off { opacity: .45; filter: grayscale(.6); }
+/* extrator que bateu o teto do turno: parado, mas não desligado — azulado, não cinza */
+.cell.maint { opacity: .6; filter: saturate(.5); border-color: rgba(120,170,220,.7) !important; }
+.bd-maint {
+  text-align: center; font-size: 12px; color: #9fc8ea;
+  border: 1px solid rgba(120,170,220,.45); border-radius: 8px;
+  padding: 5px 8px; background: rgba(20,45,70,.3);
+}
 
 /* ---------- SEU DISTRITO (repaginado) ---------- */
 #modal.dist-modal #modal-head { display: none; }

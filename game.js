@@ -51,6 +51,7 @@ const S = {
   feud: [],               // O Feudo: 2º grid (retaguarda de extração)
   field: "city",          // view ativa do grid de baixo: "city" | "feud"
   res: { minerio: 0, combustivel: 0, bens: 0, comida: 0 }, // recursos do Feudo (só acumulam por ora)
+  feudOut: {},            // gid -> quanto o extrator já arrancou NESTE turno (teto: maintCap)
   maos: 10,               // ✋ Mãos: moeda de trabalho (como 🪙/💎); custo p/ erguer fábricas
   nextGid: 1,
   placing: null,
@@ -465,7 +466,7 @@ function saveFavMeta() { localStorage.setItem(FAV_KEY, JSON.stringify(FAVMETA));
 // RECEBER VISITA (um visitante fixo aparece sozinho e cobra atenção): só a partir
 // deste dia. De qualquer forma, é 1 interação por dia.
 const FAV_VISIT_MIN_DAY = 7;
-function favDefault() { return { rel: { rei: 50, rainha: 50, conde: 50, povo: 50 }, used: false, last: {}, bag: {}, visitor: null }; }
+function favDefault() { return { rel: { rei: 50, rainha: 50, conde: 50, povo: 50 }, used: false, last: {}, bag: {}, visitor: null, open: {} }; }
 
 function favTier(v, k) {
   if (v === 50) return k === "rainha" ? "NEUTRA" : k === "povo" ? "NEUTROS" : "NEUTRO"; // ponto de partida da run
@@ -791,6 +792,35 @@ function favDrawEvent(k) {
 
 let favFreeVisits = false; // debug: visitas infinitas (botão discreto no "?")
 function favBusyChance(k) { return 0.3 * (1 - favRel(k) / 100); }
+
+// ---------- Disponibilidade por turno ----------
+// Cada figura tem sua própria rotina: o Rei nunca dorme, a Rainha só recebe de dia, o
+// Conde dos Ratos só sai à noite, e o Povo depende da jornada de trabalho. A sorte do
+// Povo é sorteada UMA vez por turno e guardada em S.fav.open — se fosse rolada no clique,
+// bastaria insistir até dar certo.
+const FAV_AVAIL = {
+  rei:    { day: 1,   night: 1,   note: "Atende de dia e de noite." },
+  rainha: { day: 1,   night: 0,   note: "Só recebe durante o DIA." },
+  conde:  { day: 0,   night: 1,   note: "Só sai da toca à NOITE." },
+  povo:   { day: 0.7, night: 0.3, note: "70% de chance de dia, 30% à noite." },
+};
+function favRollOpen() {
+  const out = {};
+  for (const k of FAV_ORDER) out[k] = Math.random() < FAV_AVAIL[k][S.isNight ? "night" : "day"];
+  return out;
+}
+// Quem VEIO até você está, por definição, presente — mesmo fora do horário dele.
+function favOpen(k) {
+  if (favFreeVisits || (S.fav && S.fav.visitor === k)) return true;
+  return !!(S.fav && S.fav.open && S.fav.open[k]);
+}
+function favClosedNote(k) {
+  const a = FAV_AVAIL[k];
+  if (a[S.isNight ? "night" : "day"] === 0) return a.note;
+  return `Ninguém atendeu. ${a.note}`; // Povo: tinha chance, mas não deu hoje
+}
+function favNewTurn() { S.fav.open = favRollOpen(); }
+
 function favTryAction(k, mode) {
   // 1 interação por dia — visitar qualquer aliança já é permitido desde o dia 1.
   if (S.fav.used && !favFreeVisits) { toast("Você já tratou com uma aliança hoje. Volte amanhã."); return; }
@@ -799,9 +829,12 @@ function favTryAction(k, mode) {
     toast(`Hoje ${FAV_CHARS[S.fav.visitor].name.split(" ")[0]} veio até você — só com ${FAV_CHARS[S.fav.visitor].name.split(" ")[0]} dá pra tratar hoje.`);
     return;
   }
+  // Fora do horário: não é interação nenhuma, então não gasta a visita do dia.
+  if (!favOpen(k)) { toast(`${FAV_CHARS[k].punIc} ${favClosedNote(k)}`); return; }
   if (mode === "talk") {
-    // só a CONVERSA arrisca encontrar o personagem ocupado (e perder a visita)
-    if (Math.random() < favBusyChance(k)) {
+    // Só a CONVERSA arrisca encontrar o personagem ocupado (e perder a visita) — e quem
+    // veio até você NUNCA está ocupado: ele está literalmente na sua porta.
+    if (S.fav.visitor !== k && Math.random() < favBusyChance(k)) {
       if (!favFreeVisits) { S.fav.used = true; saveGame(); }
       favView = { mode: "busy", chr: k };
       renderFavScr();
@@ -861,23 +894,24 @@ function renderFavHub(scr) {
   // Mas se alguém VEIO até você (dia 7+), essa visita tem prioridade e trava as demais.
   const visitor = S.fav.visitor;
   const isVisitor = visitor === k;
-  const interactable = favFreeVisits || (!S.fav.used && (!visitor || isVisitor));
+  const open = favOpen(k);
+  const interactable = favFreeVisits || (open && !S.fav.used && (!visitor || isVisitor));
   const actDisabled = interactable ? "" : "disabled";
   const actNote = favFreeVisits ? ""
     : S.fav.used ? `<div class="fav-used-note">Você já tratou com uma aliança hoje. Volte amanhã.</div>`
     : visitor && !isVisitor ? `<div class="fav-used-note">Hoje ${FAV_CHARS[visitor].punIc} ${FAV_CHARS[visitor].name.split(" ")[0]} veio até você — só com ${FAV_CHARS[visitor].name.split(" ")[0]} dá pra tratar hoje.</div>`
+    : !open ? `<div class="fav-used-note">${favClosedNote(k)}</div>`
     : "";
   scr.innerHTML = `
     <div class="laws-top"><button class="tavola-round tavola-back" id="fav-back">‹</button><button class="tavola-round" id="fav-help-btn">?</button></div>
     <h2 class="tavola-title fav-title"><span class="tt-a">— AS —</span><span class="tt-main">ALIANÇAS</span></h2>
-    <div id="fav-help" class="hidden"><b>As Alianças</b><p>Quatro figuras de Karzstak podem ajudar (ou atrapalhar) sua muralha. Você pode <b>visitar</b> qualquer uma delas <b>desde o dia 1</b> — converse, peça algo ou presenteie, <b>1 vez por dia</b>, entre os turnos. A partir do <b>dia ${FAV_VISIT_MIN_DAY}</b>, uma delas também pode <b>vir até você</b>: ignorar quem veio custa relação com todos.</p><p>Cada escolha muda a <b>relação</b> (0–100%). Relação no chão = <b>punição ativa</b>; relação no máximo = <b>bênção ativa</b>. O que você descobre nas conversas fica lembrado para sempre, entre todas as partidas.</p><button id="fav-dbg">debug: visitas infinitas ${favFreeVisits ? "✅" : "❌"}</button></div>
+    <div id="fav-help" class="hidden"><b>As Alianças</b><p>Quatro figuras de Karzstak podem ajudar (ou atrapalhar) sua muralha. Você pode <b>visitar</b> qualquer uma delas <b>desde o dia 1</b> — converse, peça algo ou presenteie, <b>1 vez por dia</b>, entre os turnos. A partir do <b>dia ${FAV_VISIT_MIN_DAY}</b>, uma delas também pode <b>vir até você</b>: ignorar quem veio custa relação com todos — e quem veio está sempre disponível, fora de horário ou não.</p><p><b>Expediente:</b> o Rei atende dia e noite · a Rainha só de <b>dia</b> · o Conde só à <b>noite</b> · o Povo tem <b>70%</b> de dia e <b>30%</b> à noite. Tentar fora de horário não gasta sua visita.</p><p>Cada escolha muda a <b>relação</b> (0–100%). Relação no chão = <b>punição ativa</b>; relação no máximo = <b>bênção ativa</b>. O que você descobre nas conversas fica lembrado para sempre, entre todas as partidas.</p><button id="fav-dbg">debug: visitas infinitas ${favFreeVisits ? "✅" : "❌"}</button></div>
     <div class="fav-carousel">
       <button class="fav-card fav-side left" data-k="${prev}"><img src="${FAV_CHARS[prev].img}?v=1" alt=""><div class="fav-card-t">-${FAV_CHARS[prev].art}-<br>${FAV_CHARS[prev].name}</div></button>
       <div class="fav-card fav-main"><img src="${c.img}?v=1" alt=""><div class="fav-card-t">-${c.art}-<br><b>${c.name}</b><span>${c.sub}</span></div></div>
       <button class="fav-card fav-side right" data-k="${next}"><img src="${FAV_CHARS[next].img}?v=1" alt=""><div class="fav-card-t">-${FAV_CHARS[next].art}-<br>${FAV_CHARS[next].name}</div></button>
     </div>
     <div class="fav-tier-row"><button id="fav-prev" class="fav-tarrow">‹</button><span class="fav-tier">${favTier(favRel(k), k)} (${favRel(k)}%)</span><button id="fav-next" class="fav-tarrow">›</button></div>
-    ${isVisitor && !S.fav.used && !favFreeVisits ? `<div class="fav-visit-banner">🔔 Está te visitando hoje</div>` : ""}
     ${favPun(k) ? `<div class="fav-punish">${c.punIc} PUNIÇÃO ATIVA — ${c.punDesc}</div>` : favBless(k) ? `<div class="fav-bless">${c.punIc} BÊNÇÃO ATIVA — ${c.blessDesc}</div>` : ""}
     <div class="fav-actions${(!interactable) && !favFreeVisits ? " fav-used" : ""}">
       <button class="fav-abtn wide" data-act="talk" ${actDisabled}>🗣 CONVERSAR</button>
@@ -888,6 +922,7 @@ function renderFavHub(scr) {
       ${actNote}
     </div>
     <div class="fav-count">EVENTOS REALIZADOS: ${Math.min(FAVMETA.evCount, FAV_EV_GOAL)}/${FAV_EV_GOAL}</div>
+    ${isVisitor && !S.fav.used && !favFreeVisits ? `<div class="fav-visit-banner">🔔 Está te visitando hoje</div>` : ""}
     ${punWarn && !favPun(k) ? `<div class="fav-pun-mini">${punWarn}</div>` : ""}`;
   $("fav-back").onclick = closeFavores;
   $("fav-help-btn").onclick = () => $("fav-help").classList.toggle("hidden");
@@ -1266,6 +1301,10 @@ function consumeTowerAmmo(t, cost, fx) {
 // ---------- Inimigos ----------
 // Ritmo global de marcha (estilo PvZ): <1 deixa a horda mais lenta, turnos mais longos.
 const ENEMY_MARCH = 0.82;
+// Resistência global: +50% de vida em TODOS os tipos. É um multiplicador de spawn, não
+// uma edição dos `hp` abaixo — assim os números de ENEMY_TYPES seguem sendo o design base
+// (e os cortes de peso do pickWave, como `hp >= 40`, continuam valendo o que valiam).
+const ENEMY_TOUGHNESS = 1.5;
 const ENEMY_TYPES = {
   rastejante: { name: "Rastejante",  icon: "🧟", hp: 14, spd: 0.040, armor: 1,  gold: 2, heart: .25, period: "day",   minDay: 1 },
   corredor:   { name: "Corredor",    icon: "🏃", hp: 8,  spd: 0.105, armor: 1,  gold: 2, heart: .20, period: "day",   minDay: 2 },
@@ -1363,6 +1402,8 @@ const RESOURCES = {
 };
 const MAOS = { name: "Mãos", icon: "✋" };
 function resMeta(k) { return k === "maos" ? MAOS : RESOURCES[k]; }
+// Quanto o setor tem de um recurso ("maos" vive na moeda de topo, o resto no Feudo).
+function resAmount(k) { return k === "maos" ? S.maos : (k === "gold" ? S.gold : S.res[k] || 0); }
 // roteia produção: "maos" vai pra moeda de topo; o resto pro estoque do Feudo
 // Clampa ao teto SÓ ao ganhar, nunca reduz estoque já acima do limite (compat. com saves antigos).
 function addResource(k, amt) {
@@ -1428,6 +1469,23 @@ function cellGated(c) { return c.lvl === 1 ? FEED_FREE : c.lvl; }
 // estrutura desligada (⏻): o grupo inteiro pausa produção, consumo e efeitos
 function cellOff(c) { return !!c.off; }
 
+// ---------- EM MANUTENÇÃO: teto de extração por turno ----------
+// Cada extrator arranca no máximo MAINT_CAP_BASE de recurso por turno. Batido o teto,
+// o poço entra "Em Manutenção" e para até o próximo turno — é o que impede farmar recurso
+// infinito só ficando parado entre as hordas. O teto sobe com as leis de indústria e
+// logística do Foral, e com a linha Tech + Inovação + Motor Perpétuo completas chega a
+// MAINT_CAP_MAX, que é o próprio RES_CAP: aí a manutenção deixa de ser gargalo.
+const MAINT_CAP_BASE = 50, MAINT_CAP_MAX = RES_CAP;
+const MAINT_CAP_LAWS = { L31: 30, L32: 40, L33: 50, L34: 60, L35: 80, L39: 90, L47: 100 };
+function maintCap() {
+  let cap = MAINT_CAP_BASE;
+  for (const id in MAINT_CAP_LAWS) if (law(id)) cap += MAINT_CAP_LAWS[id];
+  return Math.min(MAINT_CAP_MAX, cap);
+}
+function maintOut(gid) { return (S.feudOut && S.feudOut[gid]) || 0; }
+function maintLeft(gid) { return Math.max(0, maintCap() - maintOut(gid)); }
+function maintDone(gid) { return maintLeft(gid) <= 0; }
+
 // ---------- Estoque de recurso por fábrica (Fase: cadeia contínua) ----------
 // Cada GRUPO de fábrica tem um estoque do seu recurso de entrada, guardado na
 // célula-líder (cells[0].stock). A fábrica puxa recurso do Feudo para o estoque
@@ -1454,6 +1512,21 @@ function ammoDemand(type) {
 // Produção travada: torres sem espaço (ou nenhuma torre usa o tipo) e o excedente
 // não tem para onde ir. Com "Ajudar o Reino" ligado nunca trava — vira Medalha.
 function ammoBlocked(type) { return !S.helpKingdom && ammoDemand(type) <= 0; }
+
+// ---------- Ajudar o Reino: piso de segurança ----------
+// Com a chave ligada as fábricas produzem ALÉM da demanda das torres, e isso consome
+// recurso bruto do Feudo sem parar. Esquecer a chave ligada zerava o estoque. Agora há um
+// piso: se QUALQUER recurso do Feudo cair abaixo de HELP_MIN_RES, a chave cai sozinha e
+// não pode ser religada até o setor se recompor.
+const HELP_MIN_RES = 50;
+function helpResFloor() { return Math.min(...Object.keys(RESOURCES).map(k => S.res[k] || 0)); }
+function helpKingdomBlocked() { return helpResFloor() < HELP_MIN_RES; }
+function helpKingdomGuard() {
+  if (!S.helpKingdom || !helpKingdomBlocked()) return;
+  S.helpKingdom = false;
+  toast(`🎖️ Ajudar o Reino desligado: recurso do Feudo abaixo de ${HELP_MIN_RES}. O setor vem primeiro.`);
+  saveGame(); renderResBar(); renderHUD();
+}
 // cobertura instantânea: 1 se o estoque tem recurso (ou a fábrica não consome), senão 0
 function feedCoverage(key, gid) {
   const feed = BUILDINGS[key] && BUILDINGS[key].feed;
@@ -1600,16 +1673,16 @@ const LAWS = {
   L29: { line: "resistencia", pos: 4, name: "Racionamento de Guerra", desc: "Produção +10%, mesas vazias.",                        cost: 180, moral: -3 },
   L30: { line: "resistencia", pos: 5, name: "Última Trincheira",      desc: "Com 1 hit restante, tropas e torres +25% de dano.",   cost: 260, moral: 2 },
   // TECH — indústria a vapor
-  L31: { line: "tech", pos: 1, name: "Linhas de Montagem",  desc: "Produção +8%.",                                cost: 30,  moral: 0 },
-  L32: { line: "tech", pos: 2, name: "Turno da Madrugada",  desc: "Produção +12%; as chaminés nunca dormem.",     cost: 60,  moral: -2 },
-  L33: { line: "tech", pos: 3, name: "Prensas a Vapor",     desc: "Fábricas de 🏹 e 🪨 +20%.",                     cost: 100, moral: 0 },
-  L34: { line: "tech", pos: 4, name: "Guilda dos Fumos",    desc: "Produção +18%; fuligem cobre o céu.",          cost: 150, moral: -3 },
-  L35: { line: "tech", pos: 5, name: "Cidade-Máquina",      desc: "Produção +25%.",                               cost: 220, moral: -2 },
+  L31: { line: "tech", pos: 1, name: "Linhas de Montagem",  desc: "Produção +8%; 🔧 manutenção +30.",             cost: 30,  moral: 0 },
+  L32: { line: "tech", pos: 2, name: "Turno da Madrugada",  desc: "Produção +12%; 🔧 manutenção +40.",            cost: 60,  moral: -2 },
+  L33: { line: "tech", pos: 3, name: "Prensas a Vapor",     desc: "Fábricas de 🏹 e 🪨 +20%; 🔧 manutenção +50.",   cost: 100, moral: 0 },
+  L34: { line: "tech", pos: 4, name: "Guilda dos Fumos",    desc: "Produção +18%; 🔧 manutenção +60.",            cost: 150, moral: -3 },
+  L35: { line: "tech", pos: 5, name: "Cidade-Máquina",      desc: "Produção +25%; 🔧 manutenção +80.",            cost: 220, moral: -2 },
   // INOVAÇÃO — progresso para todos
   L36: { line: "inovacao", pos: 1, name: "Escolas Politécnicas", desc: "Produção +5% (eficiência para todos).",   cost: 40,  moral: 1 },
   L37: { line: "inovacao", pos: 2, name: "Lampiões de Argamato", desc: "Perdas de moral à noite -25%.",           cost: 80,  moral: 1 },
   L38: { line: "inovacao", pos: 3, name: "Medicina Moderna",     desc: "Tropas curam +3 por turno.",              cost: 125, moral: 2 },
-  L39: { line: "inovacao", pos: 4, name: "Elevadores de Carga",  desc: "Caixas entregam +1 munição.",             cost: 180, moral: 0 },
+  L39: { line: "inovacao", pos: 4, name: "Elevadores de Carga",  desc: "Caixas entregam +1 munição; 🔧 manutenção +90.", cost: 180, moral: 0 },
   L40: { line: "inovacao", pos: 5, name: "Renda do Progresso",   desc: "+8 🪙 por turno.",                        cost: 260, moral: 1 },
   // LENDÁRIAS — exigem as duas linhas vizinhas completas
   L41: { legend: ["moral", "profano"],       color: "#8b2fc9", name: "Vox Umbra",         desc: "O povo canta no escuro: 💎 por abate +50%.",              cost: 750, moral: -3 },
@@ -1618,7 +1691,7 @@ const LAWS = {
   L44: { legend: ["cajado", "muralha"],      color: "#8b2fc9", name: "Lex Arcanum",       desc: "Auras sobre tropas dão +1 escudo (absorve 1 golpe).",     cost: 750, gem: 20, moral: 1 },
   L45: { legend: ["muralha", "resistencia"], color: "#2f6fd6", name: "Muralha Viva",      desc: "A pedra respira: regenera +1 hit todo amanhecer.",        cost: 750, moral: 2 },
   L46: { legend: ["resistencia", "tech"],    color: "#e0a92f", name: "Cidadela de Ferro", desc: "+2 hits máximos e reparos +1.",                           cost: 750, moral: -2 },
-  L47: { legend: ["tech", "inovacao"],       color: "#c0392b", name: "Motor Perpétuo",    desc: "Produção +20% e o Capataz não reduz mais a moral.",       cost: 750, moral: -1 },
+  L47: { legend: ["tech", "inovacao"],       color: "#c0392b", name: "Motor Perpétuo",    desc: "Produção +20%, 🔧 manutenção +100 e o Capataz não reduz mais a moral.", cost: 750, moral: -1 },
   L48: { legend: ["inovacao", "moral"],      color: "#2f6fd6", name: "Carta do Povo",     desc: "Toda lei negativa pesa 1 a menos na moral.",              cost: 750, moral: 3 },
 };
 function law(id) { return S.laws && S.laws.includes(id); }
@@ -3056,6 +3129,11 @@ function renderFeud(el) {
           const t = document.createElement("span");
           t.className = "tag"; t.textContent = "⏸";
           d.appendChild(t);
+        } else if (maintDone(c.gid)) {
+          d.classList.add("maint"); // bateu o teto do turno: parado até o próximo
+          const t = document.createElement("span");
+          t.className = "tag"; t.textContent = "🔧";
+          d.appendChild(t);
         } else {
           if ((c.life || 0) <= 2) d.classList.add("depleting"); // avisa que vai esgotar
           const t = document.createElement("span");
@@ -3098,11 +3176,16 @@ function renderResBar() {
     feudOverdrive: ["⚙️ Sobrecarga: os extratores rendem +50%, mas o povo perde muita moral por turno.", "Os extratores voltaram ao ritmo normal."],
   };
   const tog = (label, key, title) => {
+    const blocked = key === "helpKingdom" && !S.helpKingdom && helpKingdomBlocked();
     const b = document.createElement("button");
-    b.className = "fres-toggle" + (S[key] ? " on" : "");
-    b.title = title;
+    b.className = "fres-toggle" + (S[key] ? " on" : "") + (blocked ? " tg-blocked" : "");
+    b.title = blocked ? `Travado: precisa de ${HELP_MIN_RES} de cada recurso do Feudo (menor agora: ${Math.floor(helpResFloor())})` : title;
     b.innerHTML = `<span class="tg-l">${label}</span><span class="tg-dot"></span>`;
     b.onclick = () => {
+      if (blocked) {
+        toast(`🎖️ Para ajudar o Reino, cada recurso do Feudo precisa de pelo menos ${HELP_MIN_RES} (o menor está em ${Math.floor(helpResFloor())}).`);
+        return;
+      }
       S[key] = !S[key];
       toast(TOG_MSG[key][S[key] ? 0 : 1]);
       saveGame(); renderResBar(); renderHUD();
@@ -3178,7 +3261,7 @@ function openExtractorPanel(i) {
   openModal("", (m) => {
     const wrap = document.createElement("div");
     wrap.className = "bd";
-    let desc, fx;
+    let desc, fx, maint = ""; // estruturas não extraem: não têm cota de manutenção
     if (b.struct) {
       desc = b.role === "feitor"
         ? "Reconstrói automaticamente os extratores adjacentes que esgotarem, pagando o ouro de construção. Sem ouro, o extrator some."
@@ -3190,14 +3273,15 @@ function openExtractorPanel(i) {
       const r = resMeta(b.res);
       desc = `Arranca ${r.name.toLowerCase()} da terra para sustentar as fábricas da Cidade.`;
       fx = `◆ Extrai ${r.icon} ${r.name}: +${(b.yield * cells.length / FEED_TURN_SECONDS).toFixed(2)}/s · ${cells.length} bloco(s) · ⏳ esgota em ${c.life} turno(s)`;
+      maint = `🔧 Manutenção: <b>${Math.floor(maintOut(c.gid))}/${maintCap()}</b> extraídos neste turno`;
     }
     wrap.innerHTML = `<div class="bd-art"><span class="bd-art-ic">${b.icon}</span></div>
       <div class="bd-title">${b.name.toUpperCase()}</div>
       ${BUILD_FLAVOR[c.built] ? `<div class="bd-flavor">${BUILD_FLAVOR[c.built]}</div>` : ""}
       <div class="bd-desc">${desc}</div>
       <div class="bd-fx">${fx}</div>
-      ${bdSectionHTML(off, !!b.struct)}
-      <div class="bd-ups"><div class="bd-max">Sem melhorias disponíveis.</div></div>`;
+      ${maint ? `<div class="bd-maint">${maint}${maintDone(c.gid) ? " — <b>EM MANUTENÇÃO</b>, volta no próximo turno." : ""}</div>` : ""}
+      ${bdSectionHTML(off, !!b.struct, "")}`;
     m.appendChild(wrap);
     bdWireCommon(wrap, off, cells, null, () => openExtractorPanel(i));
   });
@@ -3318,10 +3402,11 @@ function bdBarsHTML(recLabel, recRate, sendLabel, sendRate, recStatic, sendStati
     ${bdBarHTML("gold", sendRate, sendStatic)}
   </div>`;
 }
-function bdSectionHTML(off, noPow) {
+// `label` = título da faixa; passe "" no Feudo, onde não há melhorias a oferecer.
+function bdSectionHTML(off, noPow, label = "-MELHORIAS-") {
   return `<div class="bd-sec">
     <button class="bd-round" id="bd-del" title="Demolir (sem reembolso)">🗑</button>
-    <span class="bd-sec-t">-MELHORIAS-</span>
+    <span class="bd-sec-t">${label}</span>
     ${noPow ? `<span class="bd-round bd-ghost"></span>` : `<button class="bd-round${off ? " bd-off" : ""}" id="bd-pow" title="${off ? "Religar estrutura" : "Desativar estrutura"}">⏻</button>`}
   </div>${off ? `<div class="bd-off-note">⏸ ESTRUTURA DESATIVADA — efeitos e consumo pausados.</div>` : ""}`;
 }
@@ -4373,7 +4458,7 @@ function spawnEnemy(lane, type) {
   // REGRA: inimigos NÃO escalam HP com o dia. HP base é fixo por tipo; a escalada vem de
   // QUANTIDADE (waveSize) e de NOVOS TIPOS (minDay). Só modificadores EXTERNOS mexem no HP:
   // lua sangrenta (evento celeste), Medo (moral) e dayMods (eventos diários).
-  const hp = Math.round(t.hp * (bloodMoon() ? 1.5 : 1) * moraleEnemyHpMult() * dm("enemyHp"));
+  const hp = Math.round(t.hp * ENEMY_TOUGHNESS * (bloodMoon() ? 1.5 : 1) * moraleEnemyHpMult() * dm("enemyHp"));
   S.enemies.push({
     lane, y: -0.05, type,
     hp, maxHp: hp,
@@ -4498,10 +4583,22 @@ function tickExtractProd(dt) {
   });
   for (const gid in groups) {
     const { key, idxs } = groups[gid], b = EXTRACTORS[key];
-    addResource(b.res, b.yield * idxs.length * mioloYieldMult() * feudOverdriveMult() * dt / FEED_TURN_SECONDS);
+    const left = maintLeft(gid);
+    if (left <= 0) continue; // Em Manutenção: já bateu o teto deste turno
+    const want = b.yield * idxs.length * mioloYieldMult() * feudOverdriveMult() * dt / FEED_TURN_SECONDS;
+    // Conta na cota só o que REALMENTE entrou: com o estoque no RES_CAP o extrator não
+    // queima a manutenção do turno à toa.
+    const before = resAmount(b.res);
+    addResource(b.res, Math.min(want, left));
+    S.feudOut[gid] = maintOut(gid) + (resAmount(b.res) - before);
+    if (maintDone(gid)) {
+      toast(`🔧 ${b.icon} ${b.name}: teto de ${maintCap()} atingido — em manutenção até o próximo turno.`);
+      renderCity(); // pinta a chave inglesa na célula na hora
+    }
   }
 }
 function tickSupplyChain(dt) {
+  helpKingdomGuard(); // derruba o "Ajudar o Reino" antes que ele zere o Feudo
   tickExtractProd(dt);
   tickTanks(dt);
   tickProduction(dt);
@@ -5127,6 +5224,7 @@ function pracaPublicaGold() {
 // O Feudo: extratores ESGOTAM por turno (somem ao fim da vida). A PRODUÇÃO de recursos
 // agora é POR SEGUNDO, em tempo real (ver tickExtractProd) — este passo só cuida do desgaste.
 function tickExtractors() {
+  S.feudOut = {}; // novo turno: a manutenção termina e todo poço volta a produzir
   const groups = {}; // gid -> { key, idxs } — só extratores produtores (estruturas são puladas)
   S.feud.forEach((c, i) => {
     if (!c.built || !isProducerExtractor(c.built) || cellOff(c)) return; // desligado: não produz nem desgasta
@@ -5243,6 +5341,7 @@ function endWave() {
   if (wasNight && bloodMoon()) S.redMoons++; // sobreviveu a uma lua vermelha
   if (wasNight && S.day % 10 === 5) S.blackSuns++; // sobreviveu ao dia de Sol Negro
   if (S.isNight) { S.isNight = false; S.day++; } else { S.isNight = true; }
+  favNewTurn(); // cada turno tem seu próprio expediente nas Alianças
   buildNextWave();
 
   // Teto do modo infinito: o MVP acaba no dia 100.
@@ -5349,9 +5448,9 @@ const SAVE_KEY = "mds-save6"; // slot de RETOMADA (Continuar): sempre sobrescrit
 
 // Empacota o estado da run atual (mesmos campos de sempre).
 function runPayload() {
-  const { day, isNight, hits, gold, hearts, won, kills, goldEarned, redMoons, blackSuns, mvpNotice, morale, moraleLocked, dayMods, lastEvent, eventLog, fav, sector, sectorId, sectorDir, factions, purpleThisRun, darkChain, towers, city, feud, field, res, maos, nextGid, laws, conjCount, freeConjure, allies, gateAuto, gateMode, gatePref, gateFac, seals, helpKingdom, capataz, helpPool, feudAid, feudOverdrive, autoTurn } = S;
+  const { day, isNight, hits, gold, hearts, won, kills, goldEarned, redMoons, blackSuns, mvpNotice, morale, moraleLocked, dayMods, lastEvent, eventLog, fav, sector, sectorId, sectorDir, factions, purpleThisRun, darkChain, towers, city, feud, field, res, maos, nextGid, laws, conjCount, freeConjure, allies, gateAuto, gateMode, gatePref, gateFac, seals, helpKingdom, capataz, helpPool, feudAid, feudOverdrive, autoTurn, feudOut } = S;
   // `speed` viaja solto: o resto de S.debug (god) nunca é persistido.
-  return { day, isNight, hits, gold, hearts, won, kills, goldEarned, redMoons, blackSuns, mvpNotice, morale, moraleLocked, dayMods, lastEvent, eventLog, fav, sector, sectorId, sectorDir, factions, purpleThisRun, darkChain, towers, city, feud, field, res, maos, nextGid, laws, conjCount, freeConjure, allies, gateAuto, gateMode, gatePref, gateFac, seals, helpKingdom, capataz, helpPool, feudAid, feudOverdrive, autoTurn, speed: S.debug.speed };
+  return { day, isNight, hits, gold, hearts, won, kills, goldEarned, redMoons, blackSuns, mvpNotice, morale, moraleLocked, dayMods, lastEvent, eventLog, fav, sector, sectorId, sectorDir, factions, purpleThisRun, darkChain, towers, city, feud, field, res, maos, nextGid, laws, conjCount, freeConjure, allies, gateAuto, gateMode, gatePref, gateFac, seals, helpKingdom, capataz, helpPool, feudAid, feudOverdrive, autoTurn, feudOut, speed: S.debug.speed };
 }
 // Aplica um payload de run ao estado (com todas as migrações de saves antigos).
 function applyRun(d) {
@@ -5363,11 +5462,15 @@ function applyRun(d) {
   if (typeof S.res.comida !== "number") S.res.comida = 0;
   if (typeof S.maos !== "number") S.maos = 15;
   if (!S.fav || !S.fav.rel) S.fav = favDefault(); // saves antigos (Favores do Conselho)
+  if (!S.fav.open || !Object.keys(S.fav.open).length) favNewTurn(); // saves sem expediente sorteado
   if (typeof S.blackSuns !== "number") S.blackSuns = 0; // saves antigos
   if (typeof S.goldEarned !== "number") S.goldEarned = 0; // saves antigos
   if (typeof S.sectorId !== "number" || !S.sectorId) S.sectorId = randomSectorId(); // saves antigos
   if (!S.sectorDir) S.sectorDir = randomSectorDir(); // saves antigos
   if (!S.feedEff || typeof S.feedEff !== "object") S.feedEff = {};
+  // Olha o PAYLOAD, não o S: sem o campo no save, o Object.assign acima deixaria a cota
+  // da run anterior de pé e o extrator carregaria já "em manutenção".
+  if (!d.feudOut || typeof d.feudOut !== "object") S.feudOut = {}; // saves antigos (Em Manutenção)
   if (typeof S.helpPool !== "number") { S.helpPool = 0; S.helpKingdom = false; S.capataz = false; }
   if (!Array.isArray(S.laws)) { S.laws = []; S.conjCount = 0; S.freeConjure = false; } // saves antigos (árvores de leis)
   // migração de torres: descarta tipos removidos (bombarda/fornalha/bobina); ammo → ammoBy
@@ -5457,9 +5560,10 @@ function resetGame() {
     autoTurn: false, towerBuff: null,   // não vazam da run anterior
     towers: [null, null, null, null, null],
     res: (function () { const b = MIOLO.celeiros.per * mioloLvl("celeiros"); return { minerio: 30 + b, combustivel: 30 + b, bens: 30 + b, comida: 30 + b }; })(),
-    maos: Math.min(MAOS_CAP_MAX, MAOS_CAP_BASE + MIOLO.guilda.per * mioloLvl("guilda")), feedEff: {},
+    maos: Math.min(MAOS_CAP_MAX, MAOS_CAP_BASE + MIOLO.guilda.per * mioloLvl("guilda")), feedEff: {}, feudOut: {},
     debug: { god: false, speed: 1 },
   });
+  favNewTurn(); // expediente do primeiro turno (dia 1)
   initCity();
   buildNextWave();
   renderAll();
