@@ -20,6 +20,7 @@
   --sand-hi: #8a7148;
   --bronze: #5c4426;        /* fábricas */
   --bronze-hi: #7d5c31;
+  --wall: #4e3a20;          /* linha da muralha: marrom apagado, não compete com o campo */
   --serif: "IM Fell English", Georgia, serif;
   --display: "Cinzel", Georgia, serif;
 }
@@ -53,6 +54,18 @@ html, body {
   border-inline: 2px solid #2a2a30;
   box-shadow: 0 0 60px #000 inset;
   position: relative;
+}
+
+/* Sombra das nuvens: cobre a faixa do MUNDO (campo, muralha, esteira e cidade), não só
+   o canvas. `top`/`height` vêm do JS, medidos do #battlefield até o fim do #city-wrap —
+   assim HUD e abas ficam de fora e o texto delas não escurece. Fica sob o #light (5),
+   para a tinta de dia/noite ainda passar por cima. */
+#cloud-shade {
+  position: absolute; left: 0; right: 0;
+  pointer-events: none;
+  z-index: 4;
+  background-repeat: repeat-x;
+  transition: opacity 1.2s ease;  /* troca de clima entra sem estalo */
 }
 
 /* ===== Iluminação dia/noite ===== */
@@ -214,22 +227,78 @@ html, body {
 #astro-btn:active { background: rgba(238,205,92,.12); }
 /* Mensagem de combate (estilo PvZ): surge e some junto com o astro */
 #combat-msg {
-  position: absolute; left: 50%; top: 28%; transform: translate(-50%, -50%) scale(.96);
-  width: 90%; max-width: 360px; text-align: center; pointer-events: none; z-index: 3;
+  position: absolute; left: 50%; top: 44%; transform: translate(-50%, -50%) scale(.96);
+  /* z-index 6: acima da camada de nuvens (4). Texto nunca fica debaixo de efeito. */
+  width: 90%; max-width: 360px; text-align: center; pointer-events: none; z-index: 6;
   font-family: var(--display); font-weight: 700; font-size: clamp(12px, 3.4vw, 16px);
   letter-spacing: .5px; line-height: 1.2; color: #f3ead2;
-  text-shadow: 0 1px 4px #000, 0 0 12px rgba(0,0,0,.85);
+  /* Sombra enxuta: um contato fino para descolar do chão e um halo curto. O halo
+     grande de antes virava uma mancha escura em volta da frase. */
+  text-shadow: 0 1px 2px rgba(0,0,0,.75), 0 0 7px rgba(0,0,0,.5);
   opacity: 0; transition: opacity 1.4s ease, transform 1.4s ease;
 }
 #combat-msg.cm-show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 /* Lua Sangrenta (depressão) — vermelho sombrio */
-#combat-msg.cm-blood { color: #ff8a7a; text-shadow: 0 1px 4px #000, 0 0 16px rgba(194,47,47,.9); }
+#combat-msg.cm-blood { color: #ff8a7a; text-shadow: 0 1px 2px rgba(0,0,0,.75), 0 0 9px rgba(194,47,47,.5); }
 /* Sol Negro (loucura) — dourado pálido, trêmulo lento */
-#combat-msg.cm-dark { color: #eecd5c; text-shadow: 0 1px 4px #000, 0 0 16px rgba(238,205,92,.6); }
+#combat-msg.cm-dark { color: #eecd5c; text-shadow: 0 1px 2px rgba(0,0,0,.75), 0 0 9px rgba(238,205,92,.34); }
 #combat-msg.cm-dark.cm-show { animation: cmMad 4s ease-in-out infinite; }
 @keyframes cmMad {
   0%, 100% { transform: translate(-50%, -50%) scale(1) rotate(-.6deg); }
   50% { transform: translate(-50%, -50.5%) scale(1.015) rotate(.6deg); }
+}
+
+/* Dica do tutorial: mesmo lugar e mesma linguagem da mensagem de combate — as duas
+   nunca aparecem juntas (uma é do planejamento, a outra do combate), então dividem a
+   mesma linha e o olho não precisa procurar em dois lugares. */
+#tutorial-tip {
+  position: absolute; left: 50%; top: 44%; transform: translate(-50%, -50%) translateY(6px);
+  width: 90%; max-width: 360px; text-align: center; pointer-events: none; z-index: 6;
+  font-family: var(--display); font-weight: 700; font-size: clamp(11px, 3vw, 14px);
+  letter-spacing: .4px; line-height: 1.35; color: #f6eeda;
+  text-shadow: 0 1px 2px rgba(0,0,0,.75), 0 0 7px rgba(0,0,0,.55);
+  /* Sem isto a quebra deixa viúvas: "...com Extratores no / Feudo." O navegador
+     reparte as linhas em larguras parecidas em vez de encher a primeira e jogar o
+     resto para baixo. Onde não houver suporte, cai na quebra normal de antes. */
+  text-wrap: balance;
+  opacity: 0; transition: opacity .5s ease, transform .5s ease;
+}
+#tutorial-tip.tt-show { opacity: 1; transform: translate(-50%, -50%) translateY(0); }
+
+/* Anel dourado pulsando no botão de troca de campo enquanto o tutorial roda.
+   São DUAS ondas defasadas: com uma só, o botão passava metade do ciclo sem nada em
+   volta e era fácil o olho não achar um alvo de 30px no canto da tela. */
+#field-toggle.tut-ring::before,
+#field-toggle.tut-ring::after {
+  content: ""; position: absolute; inset: -7px;
+  border-radius: 50%; border: 3px solid var(--gold-hi, #e8b93a);
+  animation: tut-pulse 1.6s ease-out infinite;
+  pointer-events: none;
+}
+#field-toggle.tut-ring::before { animation-delay: .8s; }
+/* O botão também respira um halo, para o olho pousar no alvo e não só na onda */
+#field-toggle.tut-ring { animation: tut-glow 1.6s ease-in-out infinite; }
+/* Dica do Feudo: tudo acelera e clareia. É a única que manda sair do campo de cima. */
+#field-toggle.tut-ring.tut-hot::before,
+#field-toggle.tut-ring.tut-hot::after { animation-duration: 1s; border-color: #ffd964; }
+#field-toggle.tut-ring.tut-hot::before { animation-delay: .5s; }
+#field-toggle.tut-ring.tut-hot { animation-duration: 1s; }
+@keyframes tut-pulse {
+  0%   { transform: scale(.7);  opacity: 1; }
+  65%  { opacity: .5; }
+  100% { transform: scale(1.85); opacity: 0; }
+}
+@keyframes tut-glow {
+  0%, 100% { box-shadow: 0 2px 6px rgba(0,0,0,.6), inset 0 1px 2px rgba(255,255,255,.35), 0 0 0 0 rgba(232,185,58,0); }
+  50%      { box-shadow: 0 2px 6px rgba(0,0,0,.6), inset 0 1px 2px rgba(255,255,255,.35), 0 0 16px 4px rgba(232,185,58,.8); }
+}
+@media (prefers-reduced-motion: reduce) {
+  #field-toggle.tut-ring::after { animation: none; opacity: .85; transform: scale(1.15); }
+  #field-toggle.tut-ring::before { display: none; }
+  #field-toggle.tut-ring {
+    animation: none;
+    box-shadow: 0 2px 6px rgba(0,0,0,.6), inset 0 1px 2px rgba(255,255,255,.35), 0 0 14px 3px rgba(232,185,58,.75);
+  }
 }
 
 /* ===== Torres (muralha) ===== */
@@ -239,7 +308,7 @@ html, body {
     repeating-linear-gradient(90deg, transparent 0 34px, rgba(0,0,0,.28) 34px 36px),
     repeating-linear-gradient(0deg, transparent 0 16px, rgba(0,0,0,.22) 16px 18px),
     linear-gradient(180deg, #2a2a30 0%, #1c1c20 55%, #121214 100%);
-  border-top: 3px solid var(--gold);
+  border-top: 3px solid var(--fac, var(--wall)); /* cor da ideologia jurada; marrom sem nenhuma */
   box-shadow: 0 -4px 14px rgba(0,0,0,.55);
 }
 .tower-slot {
@@ -499,16 +568,17 @@ html, body {
   text-shadow: 0 2px 3px #000;
 }
 
-/* terrenos VAZIOS: apagados, tracejados, marca da zona pálida */
+/* Terrenos VAZIOS: tracejado da ZONA. Cada distrito tem sua cor — o traço puxa a cor
+   e a marca (△ ◇ ⚒) acompanha, senão o contorno fica forte e o glifo some. */
 .cell.empty {
-  border: 2px dashed rgba(160,141,106,.35);
+  border: 2px dashed rgba(186,162,118,.42);  /* Favela: areia quente */
   background: rgba(0,0,0,.22);
   box-shadow: none;
-  color: rgba(160,141,106,.5);
+  color: rgba(186,162,118,.46);
   font-size: 13px;
 }
-.cell.empty.z1 { border-color: rgba(120,130,70,.4); }
-.cell.empty.z2 { border-color: rgba(150,110,60,.4); }
+.cell.empty.z1 { border-color: rgba(146,166,78,.43); color: rgba(146,166,78,.49); }  /* Distrito do Povo */
+.cell.empty.z2 { border-color: rgba(194,132,62,.43); color: rgba(194,132,62,.49); }  /* Distrito das Fábricas */
 
 /* O Feudo: terreno livre de retaguarda (tom de terra) */
 .cell.zF {
@@ -561,9 +631,7 @@ html, body {
   justify-content: center;
   gap: clamp(2px, 1vw, 6px);
   padding: 1px 3px;
-  background: linear-gradient(180deg, #1a191d, #121214); /* mesmo tom escuro do HUD/rodapé */
-  border-top: 1px solid rgba(201,162,39,.25);
-  border-bottom: 1px solid rgba(201,162,39,.25);
+  /* sem caixa: os números vivem soltos na faixa, sem moldura própria */
   font-family: var(--display);
   flex: 0 0 auto;
   position: relative;
@@ -716,6 +784,12 @@ html, body {
   backdrop-filter: blur(2px);
 }
 #modal.hidden { display: none; }
+/* Fade das telas cheias: a classe `fading` leva a 0 e o JS só então aplica o hidden */
+#modal, #laws-scr, #fav-scr { transition: opacity .22s ease; }
+#modal.fading, #laws-scr.fading, #fav-scr.fading { opacity: 0; pointer-events: none; }
+@media (prefers-reduced-motion: reduce) {
+  #modal, #laws-scr, #fav-scr, #overlay { transition: none; }
+}
 #modal-box {
   width: 100%;
   max-width: 480px;
@@ -1175,6 +1249,53 @@ html, body {
     radial-gradient(ellipse 84% 72% at 50% 40%, transparent 0%, transparent 44%, rgba(5,4,6,.5) 74%, #050406 100%),
     linear-gradient(180deg, rgba(5,4,6,.42) 0%, transparent 20%, transparent 55%, rgba(5,4,6,.72) 100%);
 }
+/* Cinzas à deriva nos menus pré-jogo: o mesmo ar do campo de batalha, em CSS puro.
+   Três camadas de pontos que sobem em ritmos diferentes — o descompasso dá a parallax.
+   Cada camada percorre exatamente a altura do próprio tile, então o laço é invisível. */
+.motes-layer {
+  position: absolute; inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 1;
+  background-image:
+    radial-gradient(2.2px 2.2px at 18% 22%, rgba(255,228,180,.95), transparent 64%),
+    radial-gradient(1.8px 1.8px at 67% 58%, rgba(255,216,158,.85), transparent 64%),
+    radial-gradient(1.5px 1.5px at 41% 81%, rgba(255,240,210,.72), transparent 64%),
+    radial-gradient(1.3px 1.3px at 84% 37%, rgba(255,232,190,.62), transparent 64%),
+    radial-gradient(1.7px 1.7px at 30% 64%, rgba(255,222,170,.8),  transparent 64%),
+    radial-gradient(1.4px 1.4px at 74% 12%, rgba(255,236,198,.66), transparent 64%);
+  /* Tiles PRIMOS entre si (127, 191, 97, 233, 149, 271): como nenhum é múltiplo do
+     outro, os planos nunca voltam a coincidir dentro da animação. Os tamanhos redondos
+     de antes (120, 160, 200, 240) batiam em fase e alinhavam os pontos numa grade. */
+  background-size: 127px 233px, 191px 307px, 97px 379px, 233px 271px, 149px 191px, 271px 349px;
+  /* As cinzas sobem da base e se apagam CEDO, ainda sobre os telhados: deixá-las subir
+     até o céu limpo alongava o rastro e denunciava a repetição. */
+  -webkit-mask-image: linear-gradient(180deg, transparent 34%, rgba(0,0,0,.3) 58%, #000 78%, #000 93%, rgba(0,0,0,.45) 100%);
+  mask-image: linear-gradient(180deg, transparent 34%, rgba(0,0,0,.3) 58%, #000 78%, #000 93%, rgba(0,0,0,.45) 100%);
+  animation: motes-rise 41s linear infinite;
+}
+@keyframes motes-rise {
+  from { background-position: 0 0, 0 0, 0 0, 0 0, 0 0, 0 0; }
+  /* percursos também primos: cada plano sobe no seu próprio ritmo */
+  to   { background-position: 0 -466px, 0 -307px, 0 -1137px, 0 -542px, 0 -764px, 0 -349px; }
+}
+/* Névoa rasteira: assenta no pé do layout e respira devagar. Preta e discreta — ela
+   afunda a base na sombra em vez de clarear, e é isso que faz as cinzas saltarem. */
+.motes-layer::before {
+  content: "";
+  position: absolute; inset: 0;
+  background: linear-gradient(180deg,
+    transparent 46%,
+    rgba(6,5,8,.06) 70%,
+    rgba(6,5,8,.14) 88%,
+    rgba(6,5,8,.10) 100%);
+  animation: motes-fog 19s ease-in-out infinite alternate;
+}
+@keyframes motes-fog { from { opacity: .65; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .motes-layer, .motes-layer::before { animation: none; }
+}
+
 #menu-box { position: relative; z-index: 1; text-align: center; padding: 24px; max-width: 440px; }
 #menu-logo { display: block; width: min(82%, 350px); height: auto; margin: 4px auto 30px; filter: drop-shadow(0 6px 20px rgba(0,0,0,.85)); }
 
@@ -1548,6 +1669,13 @@ html, body {
   text-align: center;
   box-shadow: 0 0 40px rgba(201,162,39,.15), 0 12px 48px #000;
 }
+/* Entrada dos painéis: sobem um fio e assentam. Só transform/opacity, nada de layout. */
+@keyframes panel-in { from { opacity: 0; transform: translateY(10px) scale(.975); } to { opacity: 1; transform: none; } }
+#overlay-box { animation: panel-in .2s ease-out; }
+#modal-box { animation: panel-in .17s ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  #overlay-box, #modal-box { animation: none; }
+}
 #overlay-box h2 {
   margin-bottom: 12px;
   color: var(--gold-hi);
@@ -1557,20 +1685,19 @@ html, body {
   text-shadow: 0 0 14px rgba(201,162,39,.5);
 }
 #overlay-box p { color: var(--text); font-size: 16px; line-height: 1.55; margin-bottom: 18px; white-space: pre-line; }
-#overlay-btn {
-  background: linear-gradient(180deg, var(--gold-hi), var(--gold));
-  color: #2a1e04;
-  border: 1px solid #8a6d15;
-  padding: 11px 28px;
-  border-radius: 4px;
-  font-family: var(--display);
-  font-weight: 800;
-  font-size: 15px;
-  letter-spacing: .5px;
-  cursor: pointer;
-  box-shadow: 0 2px 10px rgba(201,162,39,.35);
+/* Rodapé FORA da caixa, sobre o fundo escurecido: substitui o antigo "Continuar" */
+#overlay {
+  flex-direction: column;
+  transition: opacity .22s ease;
 }
-/* "Pular" da abertura: discreto, sempre abaixo do botão principal */
+#overlay.fading { opacity: 0; }
+#overlay-foot {
+  margin-top: 14px; text-align: center;
+  font-family: var(--display); letter-spacing: 2px; font-size: 12px;
+  color: rgba(243,234,210,.72); text-shadow: 0 1px 4px #000;
+  pointer-events: none;
+}
+/* "Pular" da abertura: discreto, no pé da caixa */
 #overlay-skip {
   display: block;
   margin: 10px auto 0;
@@ -1685,7 +1812,9 @@ html, body {
 .fac-card.sel { border-color: var(--fc); box-shadow: 0 0 0 1px var(--fc), 0 0 22px -4px var(--fc), 0 6px 16px rgba(0,0,0,.5); transform: translateY(-2px); }
 .fac-card.locked { opacity: .6; cursor: default; filter: grayscale(.45) brightness(.8); }
 .fac-card.locked:hover { transform: none; border-color: color-mix(in srgb, var(--fc) 45%, #14120c); }
-#factions-box { position: relative; }
+#factions-box { position: relative; z-index: 1; } /* acima da camada de cinzas */
+/* Aqui a tela ROLA: fixed mantém as cinzas no ar em vez de rolarem junto com os cards. */
+#factions > .motes-layer { position: fixed; }
 .fac-actions .scr-back { align-self: center; }
 
 /* Botão de juramento: segure 2s */
@@ -1761,8 +1890,7 @@ body.fac-red   .tower-slot { border-bottom: 2px solid rgba(192,57,43,.55); }
 body.fac-blue  .cell.built.b-fab { box-shadow: inset 0 0 0 1px rgba(47,111,214,.5), inset 0 2px 6px rgba(0,0,0,.45); }
 body.fac-yellow .cell.zP, body.fac-yellow .cell.zD { box-shadow: inset 0 0 12px rgba(232,185,58,.25), 0 0 8px rgba(201,162,39,.2); }
 body.fac-pink  .cell.built.b-quartel { box-shadow: inset 0 0 0 1px rgba(214,96,143,.5), inset 0 2px 6px rgba(0,0,0,.45); }
-body.fac-purple #towers { border-top-color: #a86ae0; }
-body.fac-green  #towers { border-top-color: #4cae6a; }
+/* Roxos/Verdes não precisam mais de regra própria: --fac cobre as seis ideologias. */
 
 /* ---------- OS FAVORES ---------- */
 #fav-scr {
@@ -1770,7 +1898,7 @@ body.fac-green  #towers { border-top-color: #4cae6a; }
   display: flex; flex-direction: column;
   overflow-y: auto;
   background: linear-gradient(180deg, #14090b, #070406);
-  transition: background .3s;
+  transition: background .3s, opacity .22s ease; /* opacity: fade de entrada/saída da tela */
 }
 #fav-scr.hidden { display: none; }
 /* fundo temático por personagem: castelo bem suave por baixo + tinta da cor */

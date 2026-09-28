@@ -52,6 +52,7 @@ const S = {
   field: "city",          // view ativa do grid de baixo: "city" | "feud"
   res: { minerio: 0, combustivel: 0, bens: 0, comida: 0 }, // recursos do Feudo (só acumulam por ora)
   feudOut: {},            // gid -> quanto o extrator já arrancou NESTE turno (teto: maintCap)
+  weather: "normal",      // clima do turno: só camadas de desenho, zero efeito de jogo
   maos: 10,               // ✋ Mãos: moeda de trabalho (como 🪙/💎); custo p/ erguer fábricas
   nextGid: 1,
   placing: null,
@@ -129,7 +130,7 @@ const DAY1_EVENT = { id: "cafecomleite", ic: "☕", ty: "pos", t: "Café com Lei
   s: "A primeira manhã na muralha começa com café quente e leite fresco das últimas cabras do reino. Os artilheiros acordam animados: a mira nunca esteve tão firme.",
   e: { mods: { towerDmg: 1.5 } } };
 const ELDERS_EVENT = { id: "elders", ic: "🦴", ty: "neg", t: "Os Mortos Antigos",
-  s: "Os recém-tombados, ainda cheios de bolsas e relíquias, já foram todos derrubados. Agora sobem das criptas os mortos ANTIGOS — ossos secos, sem nada de valor. O saque por criatura despenca daqui em diante.",
+  s: "Os recém-tombados, ainda cheios de bolsas e relíquias, já foram todos derrubados. Agora sobem das criptas os mortos ANTIGOS: ossos secos, sem nada de valor. O saque por criatura despenca daqui em diante.",
   e: { eldersLoot: true } };
 function effectText(ev) {
   const e = ev.e, out = [];
@@ -221,7 +222,7 @@ const MIOLO = {
     flavor: "A guilda dos mineradores tem ideias como otimizar a produção." },
   guilda:     { name: "Guilda dos Trabalhadores", icon: "✋", color: "#e8e8e8", max: 5, cost: 2, per: 4,   desc: "+4 Mãos no início da run por nível",
     flavor: "A guilda dos trabalhadores traz mais mãos para o distrito." },
-  feitoria:   { name: "Feitoria Eficiente",      icon: "👷", color: "#e07b2f", max: 3, cost: 5, per: 0.10, desc: "-10% no custo de construir/reconstruir no Feudo por nível",
+  feitoria:   { name: "Feitoria Eficiente",      icon: "👷", color: "#e07b2f", max: 5, cost: 5, per: 0.08, desc: "-8% no custo de construir/reconstruir no Feudo por nível",
     flavor: "Engenheiros baratearam as obras da retaguarda." },
   manufatura: { name: "Manufatura Base",         icon: "🏭", color: "#e8c020", max: 5, cost: 4, per: 0.08, desc: "+8% de produção base das fábricas por nível",
     flavor: "Mestres artesãos elevam o rendimento base de toda fábrica." },
@@ -424,9 +425,45 @@ function applyFactionTint() {
   const b = document.body;
   b.classList.remove("fac-red", "fac-blue", "fac-yellow", "fac-pink", "fac-purple", "fac-green");
   for (const k of S.factions) b.classList.add("fac-" + k);
+  // --fac: cor da ideologia jurada, usada pela linha da muralha. Sai da tabela FACTIONS
+  // de propósito — uma segunda lista de cores no CSS sairia de sincronia na primeira
+  // vez que alguém mexesse numa delas. Sem ideologia, a variável some e a linha volta
+  // ao marrom padrão (--wall).
+  const f = curFaction();
+  if (f) b.style.setProperty("--fac", FACTIONS[f].color);
+  else b.style.removeProperty("--fac");
+  refreshArcane();
 }
+
+// ---------- Paleta arcana: cajado + selos de proteção ----------
+// A magia do Cetro (linhas de poder, selos desenhados) e os selos de proteção assumem a
+// cor da ideologia jurada. Sem ideologia, fica o roxo arcano de sempre.
+// Recalculada só na troca de facção: o draw() lê isto a cada frame, dentro de laços.
+const ARCANE_FALLBACK = "#a86ae0";
+function hexToRgb(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+function rgbToHex(c) { return "#" + c.map(v => v.toString(16).padStart(2, "0")).join(""); }
+function towardWhite(c, t) { return c.map(v => Math.round(v + (255 - v) * t)); }
+let ARCANE;
+function refreshArcane() {
+  const f = curFaction();
+  const base = hexToRgb(f ? FACTIONS[f].color : ARCANE_FALLBACK);
+  const light = towardWhite(base, 0.38); // realce, como o #c89aff era para o roxo
+  ARCANE = { base: base.join(","), light: light.join(","), hex: rgbToHex(base), lightHex: rgbToHex(light) };
+}
+refreshArcane();
 // aplica um ganho de moral já com o bônus dos Amarelos (só para deltas positivos)
-function gainMorale(v) { S.morale += v > 0 ? v * facMoraleGainMult() : v; clampMorale(); }
+// A Esperança era barata demais: bastavam alguns turnos limpos para travar a moral no
+// topo e lá ficar. Agora todo GANHO passa por um redutor global e toda PERDA por um
+// agravante, então manter o povo firme vira trabalho contínuo, não um estado alcançado.
+// Tudo que mexe na moral entra por aqui — nada de `S.morale +=` solto por aí.
+const MORALE_GAIN_MULT = 0.55, MORALE_LOSS_MULT = 1.4;
+function gainMorale(v) {
+  S.morale += v > 0 ? v * MORALE_GAIN_MULT * facMoraleGainMult() : v * MORALE_LOSS_MULT;
+  clampMorale();
+}
 
 // Cadeia secreta que revela os Roxos (a partir do dia 6)
 const DARK_EVENTS = [
@@ -435,6 +472,9 @@ const DARK_EVENTS = [
   { id: "d3", ic: "🟣", ty: "cha", t: "O Pacto Sombrio", s: "Você sela o pacto. A magia negra dos mortos passa a servir à muralha. Os ROXOS revelam-se, e agora respondem ao seu chamado.", e: {} },
 ];
 function maybeDarkEvent() {
+  // A cadeia existe só para REVELAR os Roxos. Quem já os desbloqueou não precisa
+  // reviver o pacto toda run — daí o corte por META, não por estado da partida.
+  if (facUnlocked("purple")) return null;
   if (S.purpleThisRun || S.darkChain >= 3 || S.day < 6) return null;
   if (Math.random() >= 0.4) return null;
   const ev = DARK_EVENTS[S.darkChain];
@@ -770,9 +810,9 @@ function openFavores() {
   // abre já focado em quem está visitando hoje
   if (S.fav && S.fav.visitor) favSel = FAV_ORDER.indexOf(S.fav.visitor);
   renderFavScr();
-  $("fav-scr").classList.remove("hidden");
+  fadeInScreen("fav-scr");
 }
-function closeFavores() { favView = null; $("fav-scr").classList.add("hidden"); renderAll(); }
+function closeFavores() { favView = null; fadeOutScreen("fav-scr", renderAll); }
 
 // Sorteio em SACO EMBARALHADO: os eventos do personagem saem em ordem aleatória
 // e só voltam a repetir quando todos tiverem saído. O saco é reembaralhado ao
@@ -826,7 +866,7 @@ function favTryAction(k, mode) {
   if (S.fav.used && !favFreeVisits) { toast("Você já tratou com uma aliança hoje. Volte amanhã."); return; }
   // Se alguém veio até você (dia 7+), essa visita tem prioridade: trava as demais.
   if (!favFreeVisits && S.fav.visitor && S.fav.visitor !== k) {
-    toast(`Hoje ${FAV_CHARS[S.fav.visitor].name.split(" ")[0]} veio até você — só com ${FAV_CHARS[S.fav.visitor].name.split(" ")[0]} dá pra tratar hoje.`);
+    toast(`Hoje ${FAV_CHARS[S.fav.visitor].name.split(" ")[0]} veio até você, e só com ${FAV_CHARS[S.fav.visitor].name.split(" ")[0]} dá pra tratar hoje.`);
     return;
   }
   // Fora do horário: não é interação nenhuma, então não gasta a visita do dia.
@@ -899,20 +939,20 @@ function renderFavHub(scr) {
   const actDisabled = interactable ? "" : "disabled";
   const actNote = favFreeVisits ? ""
     : S.fav.used ? `<div class="fav-used-note">Você já tratou com uma aliança hoje. Volte amanhã.</div>`
-    : visitor && !isVisitor ? `<div class="fav-used-note">Hoje ${FAV_CHARS[visitor].punIc} ${FAV_CHARS[visitor].name.split(" ")[0]} veio até você — só com ${FAV_CHARS[visitor].name.split(" ")[0]} dá pra tratar hoje.</div>`
+    : visitor && !isVisitor ? `<div class="fav-used-note">Hoje ${FAV_CHARS[visitor].punIc} ${FAV_CHARS[visitor].name.split(" ")[0]} veio até você, e só com ${FAV_CHARS[visitor].name.split(" ")[0]} dá pra tratar hoje.</div>`
     : !open ? `<div class="fav-used-note">${favClosedNote(k)}</div>`
     : "";
   scr.innerHTML = `
     <div class="laws-top"><button class="tavola-round tavola-back" id="fav-back">‹</button><button class="tavola-round" id="fav-help-btn">?</button></div>
     <h2 class="tavola-title fav-title"><span class="tt-a">— AS —</span><span class="tt-main">ALIANÇAS</span></h2>
-    <div id="fav-help" class="hidden"><b>As Alianças</b><p>Quatro figuras de Karzstak podem ajudar (ou atrapalhar) sua muralha. Você pode <b>visitar</b> qualquer uma delas <b>desde o dia 1</b> — converse, peça algo ou presenteie, <b>1 vez por dia</b>, entre os turnos. A partir do <b>dia ${FAV_VISIT_MIN_DAY}</b>, uma delas também pode <b>vir até você</b>: ignorar quem veio custa relação com todos — e quem veio está sempre disponível, fora de horário ou não.</p><p><b>Expediente:</b> o Rei atende dia e noite · a Rainha só de <b>dia</b> · o Conde só à <b>noite</b> · o Povo tem <b>70%</b> de dia e <b>30%</b> à noite. Tentar fora de horário não gasta sua visita.</p><p>Cada escolha muda a <b>relação</b> (0–100%). Relação no chão = <b>punição ativa</b>; relação no máximo = <b>bênção ativa</b>. O que você descobre nas conversas fica lembrado para sempre, entre todas as partidas.</p><button id="fav-dbg">debug: visitas infinitas ${favFreeVisits ? "✅" : "❌"}</button></div>
+    <div id="fav-help" class="hidden"><b>As Alianças</b><p>Quatro figuras de Karzstak podem ajudar (ou atrapalhar) sua muralha. Você pode <b>visitar</b> qualquer uma delas <b>desde o dia 1</b>: converse, peça algo ou presenteie, <b>1 vez por dia</b>, entre os turnos. A partir do <b>dia ${FAV_VISIT_MIN_DAY}</b>, uma delas também pode <b>vir até você</b>: ignorar quem veio custa relação com todos, e quem veio está sempre disponível, fora de horário ou não.</p><p><b>Expediente:</b> o Rei atende dia e noite · a Rainha só de <b>dia</b> · o Conde só à <b>noite</b> · o Povo tem <b>70%</b> de dia e <b>30%</b> à noite. Tentar fora de horário não gasta sua visita.</p><p>Cada escolha muda a <b>relação</b> (0–100%). Relação no chão = <b>punição ativa</b>; relação no máximo = <b>bênção ativa</b>. O que você descobre nas conversas fica lembrado para sempre, entre todas as partidas.</p><button id="fav-dbg">debug: visitas infinitas ${favFreeVisits ? "✅" : "❌"}</button></div>
     <div class="fav-carousel">
       <button class="fav-card fav-side left" data-k="${prev}"><img src="${FAV_CHARS[prev].img}?v=1" alt=""><div class="fav-card-t">-${FAV_CHARS[prev].art}-<br>${FAV_CHARS[prev].name}</div></button>
       <div class="fav-card fav-main"><img src="${c.img}?v=1" alt=""><div class="fav-card-t">-${c.art}-<br><b>${c.name}</b><span>${c.sub}</span></div></div>
       <button class="fav-card fav-side right" data-k="${next}"><img src="${FAV_CHARS[next].img}?v=1" alt=""><div class="fav-card-t">-${FAV_CHARS[next].art}-<br>${FAV_CHARS[next].name}</div></button>
     </div>
     <div class="fav-tier-row"><button id="fav-prev" class="fav-tarrow">‹</button><span class="fav-tier">${favTier(favRel(k), k)} (${favRel(k)}%)</span><button id="fav-next" class="fav-tarrow">›</button></div>
-    ${favPun(k) ? `<div class="fav-punish">${c.punIc} PUNIÇÃO ATIVA — ${c.punDesc}</div>` : favBless(k) ? `<div class="fav-bless">${c.punIc} BÊNÇÃO ATIVA — ${c.blessDesc}</div>` : ""}
+    ${favPun(k) ? `<div class="fav-punish">${c.punIc} PUNIÇÃO ATIVA: ${c.punDesc}</div>` : favBless(k) ? `<div class="fav-bless">${c.punIc} BÊNÇÃO ATIVA: ${c.blessDesc}</div>` : ""}
     <div class="fav-actions${(!interactable) && !favFreeVisits ? " fav-used" : ""}">
       <button class="fav-abtn wide" data-act="talk" ${actDisabled}>🗣 CONVERSAR</button>
       <div class="fav-arow">
@@ -1064,7 +1104,7 @@ function favNewDay() {
 }
 // Efeitos por turno das punições/bênçãos (Rei / Conde). Rainha e Povo são multiplicadores.
 function favPunishTick() {
-  if (favPun("rei")) { S.morale -= 6; clampMorale(); addFloat(2, 0.45, "👑 O Rei retirou o apoio: −6 moral", "#e0705f"); }
+  if (favPun("rei")) { gainMorale(-6); addFloat(2, 0.45, "👑 O Rei retirou o apoio: −6 moral", "#e0705f"); }
   else if (favBless("rei")) { gainMorale(3); addFloat(2, 0.45, "👑 O Rei exalta seu nome: +3 moral", "#eecd5c"); }
   if (favPun("conde")) { S.hits = Math.max(1, S.hits - 1); addFloat(2, 0.52, "🐀 Os ratos roem a muralha: −1 🧱", "#e0705f"); }
 }
@@ -1140,7 +1180,7 @@ function openDistrict() {
       </div>
       <div class="dist-sector">SETOR <b>${formatSectorId(S.sectorId)}</b> DE KARZSTAK · <b>${(S.sectorDir || "").toUpperCase()}</b></div>
       <div class="dist-div"></div>
-      <div class="dist-line"><span class="dl-k">IDEOLOGIA:</span> <span class="dl-v" style="color:${f ? FACTIONS[f].color : "#9b8f77"}">${f ? FACTIONS[f].name.toUpperCase() : "NENHUMA"}</span>${S.purpleThisRun ? ` <span style="color:#c89aff">· pacto sombrio</span>` : ""}</div>
+      <div class="dist-line"><span class="dl-k">IDEOLOGIA:</span> <span class="dl-v" style="color:${f ? FACTIONS[f].color : "#9b8f77"}">${f ? FACTIONS[f].name.toUpperCase() : "NENHUMA"}</span></div>
       ${f ? `<div class="dist-sub">${FACTIONS[f].desc}</div>` : ""}
       <div class="dist-line"><span class="dl-k">OPOSIÇÃO:</span> <span class="dl-v" style="color:${opp ? opp.color : "#9b8f77"}">${opp ? opp.name.toUpperCase() : f ? "TODAS" : "—"}</span></div>
       ${f ? `<div class="dist-sub">${opp ? DEBUFF_BY_CHOICE[f] : "sofre todas as penalidades"}</div>` : ""}
@@ -1193,6 +1233,19 @@ const ASTRO_IMG = { day: new Image(), night: new Image() };
 ASTRO_IMG.day.src = "ICONE-DIA.png?v=1";
 ASTRO_IMG.night.src = "ICONE-NOITE.png?v=2";
 
+// ---------- Holofote e Moedor de Plebe ----------
+// HOLOFOTE: não fere ninguém. Acende UMA lane e tudo que atira ali bate mais forte, crita
+// mais e acerta mais rápido. Demora SPOT_MOVE_SEC para mudar de foco, então escolher a
+// lane certa é uma decisão, não um reflexo — é o preço de um suporte tão forte.
+const SPOT_MOVE_SEC = 8;     // tempo parado antes de poder varrer para outra lane
+const SPOT_DMG = 0.3;        // +30% de dano na lane acesa
+const SPOT_CRIT = 0.15;      // +15 pontos percentuais de crítico
+const SPOT_SPEED = 0.75;     // projéteis viajam mais rápido: menos tiro desperdiçado
+let litLanes = new Set();    // recalculado a cada update, a partir dos holofotes vivos
+// MOEDOR DE PLEBE: mói uma tropa a cada GRIND_EVERY segundos e o sangue anima o resto.
+// Não consome munição — consome VIDAS, que custaram ouro no Portão. Expira no fim do turno.
+const GRIND_EVERY = 30, GRIND_DUR = 25, GRIND_MULT = 0.5;
+
 // ---------- Torres — 3 categorias (Básicas 1 munição / Avançadas 2 / Icônicas 3) ----------
 // Cada torre exige TODAS as munições de `ammos` (estoque por tipo). Força ∝ categoria; custo em ouro 1×/2×/3×.
 const TOWER_TYPES = {
@@ -1203,6 +1256,7 @@ const TOWER_TYPES = {
   tesla:       { name: "Torre Tesla",        tier: "basic", icon: "⚡", cost: 45, dmg: 7,  rate: 2.8, range: 999,  aoe: 0,   ptime: 0.25, ammos: ["condutores"], chain: 3 },
   canalizador: { name: "Filtro Mágico",      tier: "basic", icon: "🔮", cost: 40, dmg: 12, rate: 2.2, range: 999,  aoe: 0,   ptime: 0.6,  ammos: ["essencia"], magic: true },
   acido:       { name: "Chuveiro Ácido",     tier: "basic", icon: "🚿", cost: 35, dmg: 10, rate: 2.0, range: 999,  aoe: 0.5, ptime: 0.5,  ammos: ["quimicos"] },
+  holofote:    { name: "Holofote",           tier: "basic", icon: "🔦", cost: 40, dmg: 0,  rate: 1.0, range: 999,  aoe: 0,   ptime: 0.3,  ammos: ["condutores"], support: "spot" },
   // ===== AVANÇADAS (custo 2×, 2 munições) — desbloqueáveis =====
   balista:     { name: "Balista Pesada",     tier: "adv", icon: "🏰", cost: 45, dmg: 22, rate: 2.6, range: 999,  aoe: 0,   ptime: 0.7,  ammos: ["virotes", "oleo"],     locked: true, medalCost: 15 },
   canhao:      { name: "Canhão de Ferro",    tier: "adv", icon: "💣", cost: 60, dmg: 30, rate: 3.6, range: 999,  aoe: 1.2, ptime: 1.1,  ammos: ["pedras", "oleo"],      locked: true, medalCost: 20 },
@@ -1215,6 +1269,7 @@ const TOWER_TYPES = {
   serras:      { name: "Lançador de Serras", tier: "adv", icon: "🪚", cost: 60, dmg: 45, rate: 4.6, range: 999,  aoe: 0,   ptime: 0.6,  ammos: ["pedras", "virotes"], pierce: 99, locked: true, medalCost: 30 },
   escolamagos: { name: "Escola de Magos",    tier: "adv", icon: "🎓", cost: 55, dmg: 0,  rate: 2.8, range: 999,  aoe: 0,   ptime: 0.4,  ammos: ["essencia", "quimicos"], support: "mage", locked: true, medalCost: 30 },
   propaganda:  { name: "Máquina de Propaganda", tier: "adv", icon: "📢", cost: 55, dmg: 0, rate: 3.2, range: 999, aoe: 0,   ptime: 0.4,  ammos: ["condutores", "essencia"], support: "charm", locked: true, medalCost: 30 },
+  moedor:      { name: "Moedor de Plebe",    tier: "adv", icon: "⚙️", cost: 60, dmg: 0,  rate: GRIND_EVERY, range: 999, aoe: 0, ptime: 0.4, ammos: [], support: "grind", locked: true, medalCost: 30 },
   // ===== ICÔNICAS (custo 3×, 3 munições) — desbloqueáveis =====
   mortenegra:  { name: "Morte Negra",        tier: "legend", icon: "💀", cost: 100, dmg: 45, rate: 2.4, range: 999, aoe: 0.8, ptime: 0.6, ammos: ["virotes", "quimicos", "essencia"], magic: true, locked: true, medalCost: 40 },
   apagador:    { name: "Apagador",           tier: "legend", icon: "🕳️", cost: 110, dmg: 60, rate: 3.4, range: 999, aoe: 1.5, ptime: 1.0, ammos: ["pedras", "oleo", "quimicos"], locked: true, medalCost: 45 },
@@ -1230,27 +1285,29 @@ const TIER_META = { basic: "Básicas", adv: "Avançadas", legend: "Icônicas" };
 const TIER_LABEL = { basic: "Básica", adv: "Avançada", legend: "Icônica" }; // singular (painel da torre)
 // Lore mais longa (≈2 linhas) para o painel da torre. A ARS_LORE curta segue nos cards do Arsenal.
 const TOWER_LORE = {
+  holofote:    "Uma lente de Argamato montada sobre engrenagens pesadas. Onde o facho cai, o vigia enxerga a emenda da armadura, e o tiro seguinte encontra ela.",
+  moedor:      "A engrenagem come um soldado e devolve coragem para os outros. Ninguem pergunta de onde vem o cheiro, e a fila continua se formando.",
   besta:       "A primeira arma erguida nas ameias de Karzstak. Cada virote leva gravado o nome de um vigia que tombou na muralha.",
   catapulta:   "Madeira velha, contrapeso e ódio acumulado. Arremessa pedregulhos sobre a horda desde o primeiro cerco desta cidade.",
   caldeirao:   "Óleo fervente despejado do alto dos portões. A sopa que ninguém quer provar borbulha dia e noite à espera da carne fria.",
   tesla:       "Presente das oficinas a vapor da cidade baixa. Relâmpago engarrafado em bobinas de cobre que salta de morto em morto.",
   canalizador: "Um pilar de runas alimentado por um fio do Turbilhão Nexus. Destila a magia bruta em raios que ignoram carne e selo.",
-  acido:       "Os alquimistas juram que a chuva verde não corrói a muralha — mentem. Contra os mortos, porém, ela dissolve tudo que se move.",
+  acido:       "Os alquimistas juram que a chuva verde não corrói a muralha. Mentem. Contra os mortos, porém, ela dissolve tudo que se move.",
   balista:     "Virotes do tamanho de lanças, untados em óleo do reino. Atravessam três cadáveres e ainda acendem o quarto no caminho.",
   canhao:      "Pólvora e ferro fundido nas velhas forjas reais. O rugido que responde ao rugido da horda, calando lanes inteiras.",
-  cospefogo:   "Construído sobre a boca de uma antiga forja. O fogo aqui nunca dorme — apenas espera a próxima leva de carne seca.",
+  cospefogo:   "Construído sobre a boca de uma antiga forja. O fogo aqui nunca dorme, apenas espera a próxima leva de carne seca.",
   soprador:    "Sopro do inverno preso em tubos de bronze. Congela a marcha dos que não sentem frio, prendendo-os como estátuas de gelo.",
   prisma:      "Lapidado de um único Coração de Argamato. Parte a luz em feixes que também partem os mortos em cacos brilhantes.",
   lancaacido:  "A resposta dos engenheiros à carne que não teme lâminas. Um jato pressurizado que corrói osso, tendão e feitiço.",
   aquatico:    "Água canalizada a uma pressão impossível, afiada como aço. Corta fileiras inteiras antes que a lane sequer perceba.",
-  cacadores:   "Os últimos batedores das florestas mortas montam guarda. Suas lâminas curvas sempre voltam — às vezes com mais de uma cabeça.",
+  cacadores:   "Os últimos batedores das florestas mortas montam guarda. Suas lâminas curvas sempre voltam, às vezes com mais de uma cabeça.",
   serras:      "Discos dentados arrancados de serrarias abandonadas. Giram pela lane inteira sem nunca perder o fio nem a fome por carne.",
   escolamagos: "Os últimos eruditos de Karzstak dão aula sob cerco. Rompem os selos dos mortos e sussurram força aos vivos na muralha.",
   propaganda:  "Alto-falantes de latão que cospem promessas antigas. Às vezes um morto escuta, hesita, e vira a lâmina contra os seus.",
   mortenegra:  "Dizem que o próprio rei negativo recua quando este sino dobra. A peste que ele espalha não distingue morto de morto.",
   apagador:    "Onde ele dispara, o cronista escreve só uma linha: 'não sobrou nada'. Nem pó, nem nome, nem lembrança de quem marchava ali.",
   raiosolar:   "Relíquia da Igreja do Amanhecer, guardada por gerações. Um pedaço aprisionado do sol que odeia a noite e o que rasteja nela.",
-  midas:       "O tesouro do reino refundido em arma. Cada disparo custa uma fortuna — e cada morto tombado devolve um pouco do brilho.",
+  midas:       "O tesouro do reino refundido em arma. Cada disparo custa uma fortuna, e cada morto tombado devolve um pouco do brilho.",
   baladeira:   "Um estilingue abençoado que arremessa cristais vivos. Ricocheteiam entre os mortos como uma prece que nunca erra o alvo.",
   trabuco:     "Karzstak arremessa os próprios escombros de volta ao inimigo. Entulho, ferro-velho e desespero caindo do céu sobre a horda.",
   prisioneiros:"Quando faltam pedras, sobram condenados. A muralha os devolve à horda como aríetes de carne que ainda gritam ao voar.",
@@ -1301,10 +1358,18 @@ function consumeTowerAmmo(t, cost, fx) {
 // ---------- Inimigos ----------
 // Ritmo global de marcha (estilo PvZ): <1 deixa a horda mais lenta, turnos mais longos.
 const ENEMY_MARCH = 0.82;
+// A muralha às vezes simplesmente aguenta: 1 em 5 batidas não tira hit nem gasta o selo.
+// Suaviza o azar sem baratear o erro — perder 5 hits seguidos deixa de ser sentença.
+const WALL_FORGIVE = 0.2;
+// Crítico global das torres: 1 em 5 tiros dobra o dano. Vale para TODA torre, e os
+// bônus de crítico dos caminhos somam por cima disto, então torre de crítico segue
+// sendo torre de crítico. Eleva o dano médio em ~20%, que é justamente o que o +20%
+// de vida dos inimigos deste mesmo ajuste devolve.
+const CRIT_BASE = 0.2, CRIT_MULT = 2;
 // Resistência global: +50% de vida em TODOS os tipos. É um multiplicador de spawn, não
 // uma edição dos `hp` abaixo — assim os números de ENEMY_TYPES seguem sendo o design base
 // (e os cortes de peso do pickWave, como `hp >= 40`, continuam valendo o que valiam).
-const ENEMY_TOUGHNESS = 1.5;
+const ENEMY_TOUGHNESS = 3.6;
 const ENEMY_TYPES = {
   rastejante: { name: "Rastejante",  icon: "🧟", hp: 14, spd: 0.040, armor: 1,  gold: 2, heart: .25, period: "day",   minDay: 1 },
   corredor:   { name: "Corredor",    icon: "🏃", hp: 8,  spd: 0.105, armor: 1,  gold: 2, heart: .20, period: "day",   minDay: 2 },
@@ -1596,8 +1661,9 @@ function allyHpMult() {
 }
 function allyDmgMult() {
   const infusor = (S.towerBuff && S.towerBuff.t > 0) ? S.towerBuff.atk : 0; // Infusor Arcano
+  const moedor = (S.allyGrind && S.allyGrind.t > 0) ? S.allyGrind.mult : 0; // Moedor de Plebe
   const laws = (law("L24") ? 0.10 : 0) + (S.hits === 1 && law("L30") ? 0.25 : 0); // Lei do Machado + Última Trincheira
-  return (1 + cityFxScan(c => c.built === "quartel", "tD") + 0.08 * groupLvlSum("praca_militar") + infusor + laws) * favAllyMult();
+  return (1 + cityFxScan(c => c.built === "quartel", "tD") + 0.08 * groupLvlSum("praca_militar") + infusor + moedor + laws) * favAllyMult();
 }
 
 function summonAlly(type, fac) {
@@ -2288,6 +2354,40 @@ const TOWER_PATHS = {
       { n: "Sinfonia", d: "Cadência +70%",                             fx: { r: .7 } },
     ] },
   ] },
+  holofote: { paths: [
+    { key: "lente", name: "Lente", tiers: [
+      { n: "Vidro Polido",   d: "+8% de crítico na lane acesa",        fx: { critC: .08 } },
+      { n: "Cristal Focal",  d: "+15% de crítico na lane acesa",       fx: { critC: .15 } },
+      { n: "Olho de Argamato", d: "+25% de crítico e crítico ×2,5",    fx: { critC: .25, critM: 2.5 } },
+    ] },
+    { key: "torre", name: "Torre", tiers: [
+      { n: "Mancal Leve",    d: "Varre de lane 40% mais rápido",        fx: { r: .4 } },
+      { n: "Rolamento Duplo", d: "Varre 70% mais rápido",               fx: { r: .7 } },
+      { n: "Giro Livre",     d: "Varre 120% mais rápido",               fx: { r: 1.2 } },
+    ] },
+    { key: "facho", name: "Facho", tiers: [
+      { n: "Espelho Côncavo", d: "Consome menos condutores",            fx: { save: .3 } },
+      { n: "Refletor Duplo", d: "Reforça as tropas em +10%",            fx: { buffAtk: .1 } },
+      { n: "Aurora",        d: "Reforça as tropas em +25%",             fx: { buffAtk: .25 } },
+    ] },
+  ] },
+  moedor: { paths: [
+    { key: "engrenagem", name: "Engrenagem", tiers: [
+      { n: "Dentes Novos",  d: "Bônus das tropas +10%",                 fx: { buffAtk: .1 } },
+      { n: "Eixo Reforçado", d: "Bônus das tropas +20%",                fx: { buffAtk: .2 } },
+      { n: "Rolo de Ferro", d: "Bônus das tropas +40%",                 fx: { buffAtk: .4 } },
+    ] },
+    { key: "turno", name: "Turno", tiers: [
+      { n: "Hora Extra",    d: "Bônus dura +8s",                        fx: { buffT: 8 } },
+      { n: "Jornada Dobrada", d: "Bônus dura +15s",                     fx: { buffT: 15 } },
+      { n: "Sem Descanso",  d: "Bônus dura +25s",                       fx: { buffT: 25 } },
+    ] },
+    { key: "esteira", name: "Esteira", tiers: [
+      { n: "Alimentação Rápida", d: "Mói 40% mais rápido",              fx: { r: .4 } },
+      { n: "Funil Largo",   d: "Mói 70% mais rápido",                   fx: { r: .7 } },
+      { n: "Linha Contínua", d: "Mói 120% mais rápido e cura as tropas", fx: { r: 1.2, heal: 6 } },
+    ] },
+  ] },
   escolamagos: { paths: [
     { key: "dissonancia", name: "Dissonância", tiers: [
       { n: "Contra-Selo", d: "Selos rompidos ficam +10% vulneráveis", fx: { dispelVuln: .1 } },
@@ -2356,6 +2456,7 @@ function isTowerMaxed(t) {
 function towerPathFx(t) {
   const out = {};
   const P = towerPathsOf(t), tiers = towerTiers(t);
+  if (!P) return out; // torre sem caminhos definidos: sem bônus, mas sem derrubar o painel
   P.paths.forEach((p, pi) => {
     for (let i = 0; i < tiers[pi]; i++)
       for (const [k, v] of Object.entries(p.tiers[i].fx || {})) out[k] = (out[k] || 0) + v;
@@ -2366,6 +2467,7 @@ function towerPathFx(t) {
 function towerPathName(t) {
   const P = towerPathsOf(t), tiers = towerTiers(t);
   let best = -1, name = null;
+  if (!P) return name;
   P.paths.forEach((p, pi) => { if (tiers[pi] > best && tiers[pi] > 0) { best = tiers[pi]; name = p.tiers[tiers[pi] - 1].n; } });
   return name;
 }
@@ -2589,11 +2691,13 @@ function tryAura(pts) {
 
 // ---------- Linhas de poder (botão direito / toque no campo) ----------
 // Laser base (linha de poder) — habilidade inicial FRACA (melhorável no futuro).
-const POWER_DPS = 3;          // dano por segundo, de leve, só uma ajuda (nerfado de 5)
+// +30% em todo o cajado (laser, selos fechados e Zeta): no começo da run o jogador
+// quase não tem torre, e o cetro é a única arma que não depende de economia.
+const POWER_DPS = 3.9;        // dano por segundo, de leve, só uma ajuda (era 3)
 const POWER_RADIUS = 13;      // alcance da linha em px (nerfado de 20)
 const POWER_LIFE = 0.45;      // segundos até a linha se dissipar (some bem rápido)
 const POWER_MAX_PTS = 20;     // limite de comprimento do traço = menos distância (nerfado de 36)
-const SEAL_DMG = 15;          // dano extra do selo (traço fechado ao redor do inimigo)
+const SEAL_DMG = 20;          // dano extra do selo (traço fechado ao redor do inimigo) (era 15)
 const SEAL_CLOSE_PX = 34;     // distância máxima entre início e fim para fechar o selo
 
 // Tipos de SELO (nome ritual por forma). Fechados = fortes; traços abertos (letras) = mais fracos.
@@ -2601,7 +2705,7 @@ const SEALS = {
   alpha: { name: "Selo Alpha", ic: "🔺", closed: true,  dmg: SEAL_DMG, color: "#e0705f" }, // triângulo
   omega: { name: "Selo Omega", ic: "⭕", closed: true,  dmg: SEAL_DMG, color: "#5aa9ff" }, // círculo
   beta:  { name: "Selo Beta",  ic: "🟥", closed: true,  dmg: SEAL_DMG, color: "#7ac36a" }, // quadrado
-  zeta:  { name: "Selo Zeta",  ic: "🇿",  closed: false, dmg: 7, cost: 1, color: "#c9b45a" }, // Z curto, custa 💎
+  zeta:  { name: "Selo Zeta",  ic: "🇿",  closed: false, dmg: 9, cost: 1, color: "#c9b45a" }, // Z curto, custa 💎 (era 7)
 };
 // forma fechada reconhecida → chave do selo
 function closedSealKey(shape) { return shape === "triangle" ? "alpha" : shape === "square" ? "beta" : "omega"; }
@@ -3009,9 +3113,17 @@ $("place-ok").onclick = () => {
 };
 
 // ---------- Navegação Cidade ↔ Feudo ----------
+// A esteira vertical (#belt-v) é COMPARTILHADA pelos dois campos: as caixas de recurso
+// do Feudo e as de munição da Cidade sobem pela mesma calha. Ao trocar de vista, as que
+// já estavam em voo continuavam deslizando na tela errada. Esvaziar é só visual — os
+// temporizadores de entrega já agendados seguem correndo e creditam tudo normalmente.
+function clearBelts() {
+  document.querySelectorAll("#belt-v .crate-v, #belt .crate").forEach(el => el.remove());
+}
 function toggleField() {
   S.field = S.field === "city" ? "feud" : "city";
   if (S.field === "feud" && S.placing) stopPlacing(); // não posiciona no Feudo
+  clearBelts();
   renderCity();
 }
 function renderFieldToggle() {
@@ -3215,8 +3327,20 @@ function renderResBar() {
 // Números de recurso ao vivo. A barra e o resumo de "Seu Setor" leem o MESMO estado a
 // cada frame — a produção corre continuamente, então esperar por um renderHUD deixava
 // os dois defasados. Só encosta no DOM quando o texto muda de fato.
-function setText(el, txt) { if (el && el.textContent !== txt) el.textContent = txt; }
+function setText(el, txt) {
+  if (!el || el.textContent === txt) return;
+  const hadValue = el.textContent !== "";
+  el.textContent = txt;
+  // Pulso curto no número que mudou: o ganho vira um evento visível sem poluir o campo
+  // com mais um float. Web Animations em vez de trocar classe, que forçaria reflow a
+  // cada moeda ganha — e o campo já desenha a 60fps ao lado.
+  if (hadValue && el.animate) {
+    el.animate([{ transform: "scale(1)" }, { transform: "scale(1.22)" }, { transform: "scale(1)" }],
+      { duration: 240, easing: "ease-out" });
+  }
+}
 function syncLiveRes() {
+  syncCloudShade(); // a camada de nuvens acompanha clima, ciclo e tamanho do layout
   const bar = $("res-bar");
   if (bar) {
     if (S.field === "feud") {
@@ -3280,7 +3404,7 @@ function openExtractorPanel(i) {
       ${BUILD_FLAVOR[c.built] ? `<div class="bd-flavor">${BUILD_FLAVOR[c.built]}</div>` : ""}
       <div class="bd-desc">${desc}</div>
       <div class="bd-fx">${fx}</div>
-      ${maint ? `<div class="bd-maint">${maint}${maintDone(c.gid) ? " — <b>EM MANUTENÇÃO</b>, volta no próximo turno." : ""}</div>` : ""}
+      ${maint ? `<div class="bd-maint">${maint}${maintDone(c.gid) ? ": <b>EM MANUTENÇÃO</b>, volta no próximo turno." : ""}</div>` : ""}
       ${bdSectionHTML(off, !!b.struct, "")}`;
     m.appendChild(wrap);
     bdWireCommon(wrap, off, cells, null, () => openExtractorPanel(i));
@@ -3356,21 +3480,21 @@ const BUILD_FLAVOR = {
   fab_condutores: "Bobinas e fios trançados canalizam o trovão da Tesla.",
   fab_quimicos:   "Vapores verdes escapam das frestas. O cheiro avisa antes da placa.",
   quartel:        "Beliches apertados e aço afiado: aqui dorme a linha de frente.",
-  cortico:        "Apertado, barulhento e cheio de vida — braços novos para a muralha.",
+  cortico:        "Apertado, barulhento e cheio de vida: braços novos para a muralha.",
   praca_publica:  "O coração do distrito: feiras, fofocas e impostos.",
   praca_trabalho: "Sinos marcam os turnos; as construções vizinhas rendem mais.",
   praca_vigia:    "Do alto da torre, o vigia enxerga a horda antes de todos.",
   praca_festival: "Música contra o medo: enquanto houver dança, há esperança.",
-  praca_jardim:   "Um respiro verde entre muros — os feridos saram mais rápido.",
+  praca_jardim:   "Um respiro verde entre muros: os feridos saram mais rápido.",
   praca_militar:  "Campo de treino: cada golpe ensaiado aqui vale um lá fora.",
   praca_chique:   "Mármore importado e ouro fácil. A nobreza agradece.",
-  praca_abandonada: "Saqueadores reviram os escombros — lucro com gosto de poeira.",
+  praca_abandonada: "Saqueadores reviram os escombros: lucro com gosto de poeira.",
   praca_cerimonial: "Velas acesas pelos que se foram alimentam o cristal.",
   praca_estranha: "Ninguém sabe quem a construiu. Às vezes ela retribui.",
   capela:         "Orações baixas costuram os feridos de volta à linha.",
   estabulo:       "Cascos ferrados e crina ao vento: as tropas marcham mais rápido.",
   tesouraria:     "Cofres trancados a sete chaves rendem juros de guerra.",
-  laboratorio:    "Engrenagens, retortas e ideias perigosas — a produção agradece.",
+  laboratorio:    "Engrenagens, retortas e ideias perigosas: a produção agradece.",
   templo:         "A fé sobe em cânticos e volta em coragem, turno após turno.",
   oficina:        "Andaimes permanentes: a muralha se remenda sem parar.",
   refinaria:      "Prensa o pó de Argamato em cristais que pulsam como corações.",
@@ -3408,7 +3532,7 @@ function bdSectionHTML(off, noPow, label = "-MELHORIAS-") {
     <button class="bd-round" id="bd-del" title="Demolir (sem reembolso)">🗑</button>
     <span class="bd-sec-t">${label}</span>
     ${noPow ? `<span class="bd-round bd-ghost"></span>` : `<button class="bd-round${off ? " bd-off" : ""}" id="bd-pow" title="${off ? "Religar estrutura" : "Desativar estrutura"}">⏻</button>`}
-  </div>${off ? `<div class="bd-off-note">⏸ ESTRUTURA DESATIVADA — efeitos e consumo pausados.</div>` : ""}`;
+  </div>${off ? `<div class="bd-off-note">⏸ ESTRUTURA DESATIVADA: efeitos e consumo pausados.</div>` : ""}`;
 }
 function bdUpCard(icon, costTxt, name, desc, enabled, fn) {
   const b = document.createElement("button");
@@ -3930,9 +4054,11 @@ function openModal(title, buildFn) {
   const m = $("modal-content");
   m.innerHTML = "";
   buildFn(m);
-  $("modal").classList.remove("hidden");
+  fadeInScreen("modal");
 }
-function closeModal() { $("modal").classList.add("hidden"); $("modal").querySelector(".modal-foot")?.remove(); }
+function closeModal() {
+  fadeOutScreen("modal", () => $("modal").querySelector(".modal-foot")?.remove());
+}
 $("modal-close").onclick = closeModal;
 $("modal").onclick = (e) => { if (e.target === $("modal")) closeModal(); };
 $("field-toggle").onclick = toggleField;
@@ -3969,12 +4095,12 @@ function lawXY(id) {
 let lawsSelected = null;
 function openMelhorias() {
   lawsSelected = null;
-  $("laws-scr").classList.remove("hidden");
+  fadeInScreen("laws-scr");
   buildLawsWheel();
   renderLawsDetail();
   centerLawsWheel();
 }
-function closeMelhorias() { $("laws-scr").classList.add("hidden"); }
+function closeMelhorias() { fadeOutScreen("laws-scr"); }
 function buildLawsWheel() {
   const wheel = $("laws-wheel");
   // fundo SVG: anéis + raios das 8 linhas
@@ -4107,6 +4233,14 @@ function renderDebugPanel() {
     row("Passar para o próximo turno (fora de turno)", "⏭ Passar turno", 0, !S.waveActive, () => { if (S.isNight) { S.isNight = false; S.day++; } else { S.isNight = true; } S.gold += 15 + S.day * 3; buildNextWave(); renderAll(); renderDebugPanel(); }),
     row(`Muralha invencível ${S.debug.god ? "✅" : "❌"}`, "🛡 God", 0, true, () => { S.debug.god = !S.debug.god; renderDebugPanel(); }),
     row(`Velocidade do jogo: ${S.debug.speed}x`, "⏩ Alternar", 0, true, () => { const i = SPEEDS.indexOf(S.debug.speed); S.debug.speed = SPEEDS[(i + 1) % SPEEDS.length]; renderHUD(); renderDebugPanel(); }),
+    // Circula Céu Aberto ▸ Turvo ▸ Tempestade ▸ Perfeito. O clima é só desenho, então
+    // trocar aqui vale na hora: o próximo frame já pinta o céu novo.
+    row(`Clima do turno: ${weather().ic} ${weather().name}`, "🌦 Alternar", 0, true, () => {
+      const i = WEATHER_KEYS.indexOf(S.weather);
+      S.weather = WEATHER_KEYS[(i + 1) % WEATHER_KEYS.length];
+      toast(`${weather().ic} ${weather().name}: ${weather().desc}`);
+      renderDebugPanel();
+    }),
     row(`Conselho: desbloquear todos (${councilUnlocked().length}/${COUNCIL_ORDER.length})`, "🤝 Rede", 0, councilUnlocked().length < COUNCIL_ORDER.length, () => { META.council = [...COUNCIL_ORDER]; saveMeta(META); toast("🤝 Conselho: todos apresentados."); renderDebugPanel(); }),
   );
 }
@@ -4194,7 +4328,7 @@ function promptSaveName() {
     hint.textContent = "Dê um nome a este save (ou deixe em branco para um nome automático).";
     m.appendChild(hint);
     const warn = document.createElement("div"); warn.className = "panel-hint";
-    warn.textContent = "⚠ Os turnos só são salvos no começo deles — salvar no meio de um turno faz ele recomeçar ao carregar. Um autosave é feito a cada 5 dias.";
+    warn.textContent = "⚠ Os turnos só são salvos no começo deles. Salvar no meio de um turno faz ele recomeçar ao carregar. Um autosave é feito a cada 5 dias.";
     m.appendChild(warn);
     const inp = document.createElement("input");
     inp.className = "save-name-input"; inp.type = "text"; inp.maxLength = 40;
@@ -4220,7 +4354,7 @@ function openSavesList(onLoaded) {
   openModal("Carregar jogo", (m) => {
     if (!slots.length) {
       const d = document.createElement("div"); d.className = "panel-hint";
-      d.textContent = "Nenhum jogo salvo ainda. Salve pelo menu de Configurações (⚙) durante a partida — e a cada 5 dias um autosave é feito automaticamente.";
+      d.textContent = "Nenhum jogo salvo ainda. Salve pelo menu de Configurações (⚙) durante a partida, e a cada 5 dias um autosave é feito automaticamente.";
       m.appendChild(d); return;
     }
     for (const s of slots) {
@@ -4266,7 +4400,7 @@ const COMBAT_MSGS = {
   blacksun: [
     "Há. Há. Há.|Estamos perdidos.",
     "O sol morreu|e ninguém percebeu. Ha!",
-    "Ria comigo —|é tudo o que resta.",
+    "Ria comigo...|é tudo o que resta.",
   ],
   // Lua Sangrenta = depressão
   bloodmoon: [
@@ -4393,6 +4527,12 @@ $("astro-btn").onclick = () => {
       d.innerHTML = `<span class="wicon">${t.icon}</span><span class="wname">${t.name}${t.armor < 1 ? " (resistente)" : ""}${t.spd > 0.08 ? " (veloz)" : ""}</span><span class="wcount">×${n}</span>`;
       m.appendChild(d);
     }
+    // Clima do turno: puramente visual, mas o jogador merece saber o que vai enxergar.
+    const sky = document.createElement("div");
+    sky.className = "panel-hint";
+    sky.innerHTML = `${weather().ic} <b>${weather().name}:</b> ${weather().desc}`
+      + (S.weather === "turvo" ? " <i>As torres continuam mirando normalmente.</i>" : "");
+    m.appendChild(sky);
     // O saque mingua a cada dia: o jogador precisa ver isso para planejar os gastos.
     const loot = document.createElement("div");
     loot.className = "panel-hint";
@@ -4439,11 +4579,16 @@ function startWave() {
   if (S.waveActive) return;
   S.waveActive = true;
   stopPlacing();
+  stopTutorial();  // as dicas são do planejamento; em combate a linha é da mensagem de combate
   closeModal();
   $("conveyor").classList.add("running");
   $("conveyor-v").classList.add("running");
   spawnQueue = [...S.nextWave];
-  spawnTimer = 0.5; supplyTimer = 0;
+  // 1,5s antes do primeiro aviso: o astro leva ~1,4s para sumir, e a caveira nasce no
+  // mesmo topo da tela. Sem essa folga as duas coisas se sobrepõem na virada do turno.
+  spawnTimer = 1.5; supplyTimer = 0;
+  S.allyGrind = null;                                   // o Moedor recomeça a cada turno
+  for (const t of S.towers) if (t) { t.spot = null; t.spotT = 0; } // holofotes reapontam
   S.groundFires = [];
   S.turnHitsLost = 0;
   qCd = {};
@@ -4466,6 +4611,7 @@ function spawnEnemy(lane, type) {
     armor: dm("allArmored", 0) ? Math.min(t.armor, 0.6) : t.armor, // evento "Marcha Blindada"
     burn: 0,
     aura: Math.random() < 0.2 ? SHAPE_KEYS[Math.floor(Math.random() * 3)] : null, // 1/5 nasce com aura (ameaça)
+    ph: Math.random() * 6.283, // fase da passada (só visual: desencontra o balanço da horda)
   });
 }
 
@@ -4591,10 +4737,8 @@ function tickExtractProd(dt) {
     const before = resAmount(b.res);
     addResource(b.res, Math.min(want, left));
     S.feudOut[gid] = maintOut(gid) + (resAmount(b.res) - before);
-    if (maintDone(gid)) {
-      toast(`🔧 ${b.icon} ${b.name}: teto de ${maintCap()} atingido — em manutenção até o próximo turno.`);
-      renderCity(); // pinta a chave inglesa na célula na hora
-    }
+    // Sem toast: a chave inglesa na célula e a linha no painel já contam a história.
+    if (maintDone(gid)) renderCity();
   }
 }
 function tickSupplyChain(dt) {
@@ -4792,12 +4936,14 @@ function chipWall(dmg, lane) {
   if (S.seals[lane]) {
     S.seals[lane] = 0;
     S.sweeps.push({ lane, y: 1 });
-    addFloat(lane, 0.9, "◈ SELO ROMPIDO", "#c89aff");
+    addFloat(lane, 0.9, "◈ SELO ROMPIDO", ARCANE.lightHex);
     for (const o of S.enemies) if (o.lane === lane) o.hp = -999; // sem recompensa
     return;
   }
   S.wallChip = (S.wallChip || 0) + dmg;
-  if (S.wallChip < WALL_CHIP_PER_HIT) { addFloat(lane, 0.95, "🧱 lascou", "#c8b088"); return; }
+  // Tiro de longe que não completou um hit: a muralha aguentou. "Lascou" soava como
+  // dano levado, quando na prática nada foi perdido ainda.
+  if (S.wallChip < WALL_CHIP_PER_HIT) { addFloat(lane, 0.95, "🧱 RESISTIU", "#c8b088"); return; }
   S.wallChip -= WALL_CHIP_PER_HIT;
   S.hits--;
   S.turnHitsLost++;
@@ -4834,7 +4980,10 @@ function projectileHit(p) {
   }
   for (const e of hit) {
     let dmg = p.dmg;
-    if (fx.critC && Math.random() < fx.critC) { dmg *= (fx.critM || 2); }
+    // Crítico: base global + o que os caminhos da torre somarem + o holofote da lane.
+    const critC = Math.min(0.95, CRIT_BASE + (fx.critC || 0) + (litLanes.has(e.lane) ? SPOT_CRIT : 0));
+    const crit = Math.random() < critC;
+    if (crit) dmg *= Math.max(CRIT_MULT, fx.critM || 0);
     if (fx.vsArm && e.armor < 1) dmg *= 1 + fx.vsArm;
     if (fx.ramp) { e._ramp = (e._ramp || 0) + 1; dmg *= 1 + Math.min(1, e._ramp * fx.ramp); }
     dmg *= p.magic ? 1 : armorFactor(e);
@@ -4858,7 +5007,8 @@ function projectileHit(p) {
       e.hp = 0;
       addFloat(e.lane, e.y - 0.08, "EXECUTADO!", "#ff8a6a");
     }
-    addFloat(e.lane, e.y - 0.04, `-${dealt}`, p.magic ? "#c89aff" : p.chain ? "#8ae0ff" : "#eecd5c");
+    addFloat(e.lane, e.y - 0.04, crit ? `-${dealt} ✦` : `-${dealt}`,
+      crit ? "#ffd86a" : p.magic ? "#c89aff" : p.chain ? "#8ae0ff" : "#eecd5c");
   }
   // fogo no chão
   if (fx.ground) {
@@ -4875,6 +5025,12 @@ function update(dt) {
     tickOficinaRepair(dt);
   }
   if (S.towerBuff && S.towerBuff.t > 0) S.towerBuff.t -= dt; // Infusor Arcano (buff de tropas)
+  if (S.allyGrind && S.allyGrind.t > 0) S.allyGrind.t -= dt; // Moedor de Plebe
+  // Lanes acesas pelos holofotes: recalculado aqui para o tiro e o crítico consultarem.
+  litLanes = new Set();
+  for (const t of S.towers) {
+    if (t && TOWER_TYPES[t.type] && TOWER_TYPES[t.type].support === "spot" && t.spot != null) litLanes.add(t.spot);
+  }
   for (const fx of S.effects) fx.life -= dt;
   S.effects = S.effects.filter(fx => fx.life > 0);
   for (const f of S.floats) { f.life -= dt; f.y -= dt * 0.045; }
@@ -5015,11 +5171,36 @@ function update(dt) {
         for (const e of S.enemies) {
           if (e.y > 0.6 && e.armor < 1) {
             e.armor = 1; e.vuln = Math.max(e.vuln || 0, 0.15 + (fx.dispelVuln || 0));
-            addFloat(e.lane, e.y - 0.04, "◈ selo rompido", "#c89aff");
+            addFloat(e.lane, e.y - 0.04, "◈ selo rompido", ARCANE.lightHex);
           }
         }
         if (Math.random() < 0.5) { const h = 5 + (fx.heal || 0); for (const a of S.allies) healAlly(a, h); }
         else { S.towerBuff = { atk: 0.2 + (fx.buffAtk || 0), t: buffT }; }
+      }
+      else if (tt.support === "spot") {
+        // Varre para a lane com mais inimigos, mas só depois de SPOT_MOVE_SEC parado.
+        t.spotT = (t.spotT ?? 0) - towerRate(t);
+        if (t.spot == null) t.spot = i;
+        if (t.spotT <= 0) {
+          const carga = [0, 0, 0, 0, 0];
+          for (const e of S.enemies) if (e.hp > 0) carga[e.lane] += e.maxHp;
+          let alvo = t.spot;
+          for (let L = 0; L < LANES; L++) if (carga[L] > carga[alvo]) alvo = L;
+          if (alvo !== t.spot) { t.spot = alvo; addFloat(alvo, 0.86, "🔦 iluminado", "#ffe9a8"); }
+          t.spotT = SPOT_MOVE_SEC;
+        }
+      }
+      else if (tt.support === "grind") {
+        // Mói a tropa mais fraca: quem já ia cair de qualquer jeito rende o buff.
+        const vivos = S.allies.filter(a => a.hp > 0);
+        if (vivos.length) {
+          const vitima = vivos.reduce((a, b) => (b.hp < a.hp ? b : a));
+          vitima.hp = 0;
+          S.allyGrind = { t: GRIND_DUR + (fx.buffT || 0), mult: GRIND_MULT + (fx.buffAtk || 0) };
+          addFloat(vitima.lane, vitima.y, "⚙️ MOÍDO", "#e0705f");
+          addFloat(2, 0.8, `⚙️ Tropas +${Math.round(S.allyGrind.mult * 100)}%`, "#eecd5c");
+          S.effects.push({ x: vitima.lane, y: vitima.y, life: 0.4, max: 0.4, type: "grind" });
+        }
       }
       else if (tt.support === "charm") {
         // Máquina de Propaganda: às vezes vira tropas inimigas contra os seus.
@@ -5046,8 +5227,8 @@ function update(dt) {
     S.projectiles.push({
       type: t.type, fromLane: i, target,
       ex: target.lane, ey: target.y,
-      t: 0, dur: tt.ptime * (fx.fast ? 0.4 : 1),
-      dmg: towerDmg(t), aoe: (tt.aoe || (fx.aoeOn ? 0.5 : 0)) * (1 + (fx.aoeM || 0)),
+      t: 0, dur: tt.ptime * (fx.fast ? 0.4 : 1) * (litLanes.has(target.lane) ? SPOT_SPEED : 1),
+      dmg: towerDmg(t) * (litLanes.has(target.lane) ? 1 + SPOT_DMG : 1), aoe: (tt.aoe || (fx.aoeOn ? 0.5 : 0)) * (1 + (fx.aoeM || 0)),
       magic: tt.magic, chain: (tt.chain ? tt.chain + (fx.chain || 0) : (fx.chain ? 1 + fx.chain : 0)) + (tt.magic && law("L42") ? 1 : 0),
       slow: tt.slow, pierce: tt.pierce || 0, boomerang: tt.boomerang, fx,
     });
@@ -5056,8 +5237,8 @@ function update(dt) {
       const t2 = targets[x + 1];
       S.projectiles.push({
         type: t.type, fromLane: i, target: t2, ex: t2.lane, ey: t2.y,
-        t: 0, dur: tt.ptime * (fx.fast ? 0.4 : 1),
-        dmg: towerDmg(t) * 0.8, aoe: 0, magic: tt.magic, chain: 0, fx,
+        t: 0, dur: tt.ptime * (fx.fast ? 0.4 : 1) * (litLanes.has(t2.lane) ? SPOT_SPEED : 1),
+        dmg: towerDmg(t) * 0.8 * (litLanes.has(t2.lane) ? 1 + SPOT_DMG : 1), aoe: 0, magic: tt.magic, chain: 0, fx,
       });
     }
     renderTowers();
@@ -5140,11 +5321,19 @@ function update(dt) {
         e.hp = -999;
         continue;
       }
+      // Perdão da muralha: a pedra aguenta. Vem ANTES do selo de propósito — se viesse
+      // depois, o selo seria consumido numa batida que a muralha ia aparar de graça.
+      if (!S.debug.god && Math.random() < WALL_FORGIVE) {
+        addFloat(e.lane, 0.92, "🧱 A MURALHA AGUENTOU", "#c8b088");
+        S.effects.push({ x: e.lane, y: 0.95, life: 0.35, max: 0.35, type: "forgive" });
+        e.hp = -999;
+        continue;
+      }
       // selo de proteção: limpa a lane inteira e desaparece
       if (S.seals[e.lane]) {
         S.seals[e.lane] = 0;
         S.sweeps.push({ lane: e.lane, y: 1 });
-        addFloat(e.lane, 0.9, "◈ SELO ROMPIDO", "#c89aff");
+        addFloat(e.lane, 0.9, "◈ SELO ROMPIDO", ARCANE.lightHex);
         for (const o of S.enemies) {
           if (o.lane === e.lane) o.hp = -999; // sem recompensa, como cortador de grama
         }
@@ -5175,6 +5364,7 @@ function update(dt) {
       S.allies.push({ type: "sombra", fac: "purple", lane: e.lane, y: e.y, hp, maxHp: hp, state: "idle", ttl: facSpectralTtl() });
       addFloat(e.lane, e.y - 0.05, "👻 Sombra!", "#c89aff");
     }
+    addBloodPool(e.lane, e.y);
     const t = ENEMY_TYPES[e.type];
     // O saque do corpo é sorteado; a recompensa de torre (bountyG) sempre paga —
     // o jogador comprou aquele upgrade, não faria sentido o dado engoli-lo.
@@ -5291,15 +5481,15 @@ function endWave() {
   if (groupLvlSum("templo")) gainMorale(3 * groupLvlSum("templo")); // Templo da Fé
   if (groupLvlSum("praca_festival")) gainMorale(2 * groupLvlSum("praca_festival")); // Praça do Festival
   const aband = groupLvlSum("praca_abandonada"); // Praça Abandonada: saque rende ouro mas assusta
-  if (aband) { S.morale -= aband; clampMorale(); }
-  if (S.capataz && !law("L47")) { S.morale -= CAPATAZ_MORALE; clampMorale(); addFloat(2, 0.55, `👊 Capataz: -${CAPATAZ_MORALE} moral`, "#e0705f"); } // Motor Perpétuo isenta
+  if (aband) gainMorale(-aband);
+  if (S.capataz && !law("L47")) { gainMorale(-CAPATAZ_MORALE); addFloat(2, 0.55, `👊 Capataz: -${CAPATAZ_MORALE} moral`, "#e0705f"); } // Motor Perpétuo isenta
   if (S.feudAid) { // Pedir Ajuda: o Reino manda materiais brutos, mas admitir fraqueza assusta o povo
     for (const k of Object.keys(RESOURCES)) addResource(k, FEUD_AID_RES);
-    S.morale -= FEUD_TOGGLE_MORALE; clampMorale();
+    gainMorale(-FEUD_TOGGLE_MORALE);
     addFloat(2, 0.62, `🆘 Pedir Ajuda: -${FEUD_TOGGLE_MORALE} moral`, "#e0705f");
   }
   if (S.feudOverdrive) { // Sobrecarga: extratores no limite, trabalhadores exaustos
-    S.morale -= FEUD_TOGGLE_MORALE; clampMorale();
+    gainMorale(-FEUD_TOGGLE_MORALE);
     addFloat(2, 0.69, `⚙️ Sobrecarga: -${FEUD_TOGGLE_MORALE} moral`, "#e0705f");
   }
   // Praça Estranha: bônus caótico por nível (ouro / moral / 💎)
@@ -5326,7 +5516,7 @@ function endWave() {
   // Leis do setor: peso permanente na moral, a cada turno
   const lawM = lawsMoralPerTurn();
   if (lawM > 0) gainMorale(lawM);
-  else if (lawM < 0) { S.morale += lawM; clampMorale(); }
+  else if (lawM < 0) gainMorale(lawM);
   if (law("L1")) addResource("comida", 1); // Ração Justa
   // Moral: resultado do turno. Turno perfeito sobe a Esperança; hits perdidos sobem o Medo
   if (S.turnHitsLost === 0) gainMorale(5 + (law("L2") ? 2 : 0)); // turno perfeito (+Festivais)
@@ -5334,14 +5524,15 @@ function endWave() {
     let loss = -9 * S.turnHitsLost;
     if (law("L26")) loss *= 0.75;              // Abrigos Subterrâneos
     if (S.isNight && law("L37")) loss *= 0.75; // Lampiões de Argamato
-    S.morale += loss; clampMorale();
+    gainMorale(loss);
   }
   S.freeConjure = law("L43") && S.turnHitsLost === 0; // Olho do Turbilhão
   const wasNight = S.isNight;
   if (wasNight && bloodMoon()) S.redMoons++; // sobreviveu a uma lua vermelha
   if (wasNight && S.day % 10 === 5) S.blackSuns++; // sobreviveu ao dia de Sol Negro
   if (S.isNight) { S.isNight = false; S.day++; } else { S.isNight = true; }
-  favNewTurn(); // cada turno tem seu próprio expediente nas Alianças
+  favNewTurn();      // cada turno tem seu próprio expediente nas Alianças
+  newTurnWeather();  // e seu próprio céu
   buildNextWave();
 
   // Teto do modo infinito: o MVP acaba no dia 100.
@@ -5448,9 +5639,9 @@ const SAVE_KEY = "mds-save6"; // slot de RETOMADA (Continuar): sempre sobrescrit
 
 // Empacota o estado da run atual (mesmos campos de sempre).
 function runPayload() {
-  const { day, isNight, hits, gold, hearts, won, kills, goldEarned, redMoons, blackSuns, mvpNotice, morale, moraleLocked, dayMods, lastEvent, eventLog, fav, sector, sectorId, sectorDir, factions, purpleThisRun, darkChain, towers, city, feud, field, res, maos, nextGid, laws, conjCount, freeConjure, allies, gateAuto, gateMode, gatePref, gateFac, seals, helpKingdom, capataz, helpPool, feudAid, feudOverdrive, autoTurn, feudOut } = S;
+  const { day, isNight, hits, gold, hearts, won, kills, goldEarned, redMoons, blackSuns, mvpNotice, morale, moraleLocked, dayMods, lastEvent, eventLog, fav, sector, sectorId, sectorDir, factions, purpleThisRun, darkChain, towers, city, feud, field, res, maos, nextGid, laws, conjCount, freeConjure, allies, gateAuto, gateMode, gatePref, gateFac, seals, helpKingdom, capataz, helpPool, feudAid, feudOverdrive, autoTurn, feudOut, weather: wx } = S;
   // `speed` viaja solto: o resto de S.debug (god) nunca é persistido.
-  return { day, isNight, hits, gold, hearts, won, kills, goldEarned, redMoons, blackSuns, mvpNotice, morale, moraleLocked, dayMods, lastEvent, eventLog, fav, sector, sectorId, sectorDir, factions, purpleThisRun, darkChain, towers, city, feud, field, res, maos, nextGid, laws, conjCount, freeConjure, allies, gateAuto, gateMode, gatePref, gateFac, seals, helpKingdom, capataz, helpPool, feudAid, feudOverdrive, autoTurn, feudOut, speed: S.debug.speed };
+  return { day, isNight, hits, gold, hearts, won, kills, goldEarned, redMoons, blackSuns, mvpNotice, morale, moraleLocked, dayMods, lastEvent, eventLog, fav, sector, sectorId, sectorDir, factions, purpleThisRun, darkChain, towers, city, feud, field, res, maos, nextGid, laws, conjCount, freeConjure, allies, gateAuto, gateMode, gatePref, gateFac, seals, helpKingdom, capataz, helpPool, feudAid, feudOverdrive, autoTurn, feudOut, weather: wx, speed: S.debug.speed };
 }
 // Aplica um payload de run ao estado (com todas as migrações de saves antigos).
 function applyRun(d) {
@@ -5471,6 +5662,8 @@ function applyRun(d) {
   // Olha o PAYLOAD, não o S: sem o campo no save, o Object.assign acima deixaria a cota
   // da run anterior de pé e o extrator carregaria já "em manutenção".
   if (!d.feudOut || typeof d.feudOut !== "object") S.feudOut = {}; // saves antigos (Em Manutenção)
+  // Checa o PAYLOAD: sem o campo, sorteia um céu novo em vez de herdar o da run anterior.
+  if (!WEATHER[d.weather]) S.weather = rollWeather(); // saves antigos (clima do turno)
   if (typeof S.helpPool !== "number") { S.helpPool = 0; S.helpKingdom = false; S.capataz = false; }
   if (!Array.isArray(S.laws)) { S.laws = []; S.conjCount = 0; S.freeConjure = false; } // saves antigos (árvores de leis)
   // migração de torres: descarta tipos removidos (bombarda/fornalha/bobina); ammo → ammoBy
@@ -5557,13 +5750,15 @@ function resetGame() {
     seals: [1, 1, 1, 1, 1], sweeps: [],
     helpKingdom: false, capataz: false, helpPool: 0, feudAid: false, feudOverdrive: false,
     placing: null, laws: [], conjCount: 0, freeConjure: false, paused: false,
-    autoTurn: false, towerBuff: null,   // não vazam da run anterior
+    autoTurn: false, towerBuff: null, allyGrind: null,   // não vazam da run anterior
     towers: [null, null, null, null, null],
     res: (function () { const b = MIOLO.celeiros.per * mioloLvl("celeiros"); return { minerio: 30 + b, combustivel: 30 + b, bens: 30 + b, comida: 30 + b }; })(),
     maos: Math.min(MAOS_CAP_MAX, MAOS_CAP_BASE + MIOLO.guilda.per * mioloLvl("guilda")), feedEff: {}, feudOut: {},
     debug: { god: false, speed: 1 },
   });
-  favNewTurn(); // expediente do primeiro turno (dia 1)
+  bloodPools = [];            // o chão da run nova começa limpo
+  favNewTurn();               // expediente do primeiro turno (dia 1)
+  S.weather = rollWeather();  // sem toast: a abertura já tem telas demais
   initCity();
   buildNextWave();
   renderAll();
@@ -5572,6 +5767,26 @@ function resetGame() {
 // ---------- Overlay ----------
 let overlayCb = null;
 let overlaySkipCb = null;
+// Fade genérico de telas cheias. Esconder é assíncrono: a classe `fading` leva a
+// opacidade a 0 e só então o elemento sai do fluxo, senão o `display:none` cortaria a
+// transição no primeiro frame.
+const SCREEN_FADE_MS = 220;
+function fadeInScreen(id) {
+  const el = $(id);
+  el.classList.remove("fading");
+  el.classList.remove("hidden");
+}
+function fadeOutScreen(id, then) {
+  const el = $(id);
+  if (el.classList.contains("hidden")) { then && then(); return; }
+  el.classList.add("fading");
+  setTimeout(() => {
+    el.classList.add("hidden");
+    el.classList.remove("fading");
+    then && then();
+  }, SCREEN_FADE_MS);
+}
+
 function showOverlay(title, text, cb) {
   $("overlay-title").textContent = title;
   $("overlay-text").textContent = text;
@@ -5579,16 +5794,22 @@ function showOverlay(title, text, cb) {
   overlaySkipCb = null;                          // só sequências (re)armam o "Pular"
   $("overlay-skip").classList.add("hidden");
   $("overlay-box").scrollTop = 0;                // texto longo sempre começa do topo
-  $("overlay").classList.remove("hidden");
+  fadeInScreen("overlay");
 }
-$("overlay-btn").onclick = () => {
-  $("overlay").classList.add("hidden");
-  if (overlayCb) { const f = overlayCb; overlayCb = null; f(); }
-};
+// Sem botão "Continuar": sair é clicar fora, como no painel do Setor. O rodapé sobre o
+// fundo escurecido diz isso, e o clique só conta se cair FORA da caixa.
+function closeOverlay() {
+  if ($("overlay").classList.contains("fading")) return; // ignora cliques durante o fade
+  fadeOutScreen("overlay", () => {
+    if (overlayCb) { const f = overlayCb; overlayCb = null; f(); }
+  });
+}
+$("overlay").onclick = (e) => { if (e.target === $("overlay") || e.target === $("overlay-foot")) closeOverlay(); };
 $("overlay-skip").onclick = () => {
-  $("overlay").classList.add("hidden");
   overlayCb = null;
-  if (overlaySkipCb) { const f = overlaySkipCb; overlaySkipCb = null; f(); }
+  fadeOutScreen("overlay", () => {
+    if (overlaySkipCb) { const f = overlaySkipCb; overlaySkipCb = null; f(); }
+  });
 };
 
 // Sequência de telas [titulo, texto]: "Continuar" avança uma a uma, "Pular" salta direto para done().
@@ -5696,6 +5917,495 @@ const PATCHES = Array.from({ length: 12 }, () => ({
   x: Math.random(), y: Math.random(),
   rx: Math.random() * 40 + 22, ry: Math.random() * 14 + 8,
 }));
+// Partículas de ambiente: poeira à deriva de dia, brasas subindo à noite. Posição é
+// calculada a partir do relógio (sem estado a atualizar), então isto não entra no update.
+const MOTES = Array.from({ length: 24 }, () => ({
+  x: Math.random(), y: Math.random(),
+  r: Math.random() * 1.1 + 0.4,
+  // ~4 a 11 px/s num campo de 250px: um floco atravessa em 23–60s. A 4 px/s de antes
+  // eles tecnicamente andavam, mas na prática pareciam pregados no fundo.
+  sp: 0.015 + Math.random() * 0.028,
+  sway: Math.random() * 18 + 6,
+  ph: Math.random() * 100,
+}));
+
+// Relógio VISUAL, em segundos. Anda junto com a velocidade do jogo, ao contrário do
+// performance.now(): no 5x a poeira, a chuva, as nuvens e a passada da horda aceleram
+// com o resto do mundo, em vez de ficarem num ritmo de relógio de parede.
+let vClock = 0;
+
+// Paleta do ar: a névoa do horizonte e as partículas seguem o ciclo e os eventos celestes.
+function airTone() {
+  if (bloodMoon()) return { haze: "168,54,44", mote: "255,150,120", up: true };
+  if (blackSun()) return { haze: "40,34,46", mote: "160,150,190", up: true };
+  if (S.isNight) return { haze: "92,108,150", mote: "255,206,140", up: true };
+  return { haze: "226,186,116", mote: "255,238,200", up: false };
+}
+
+// Fendas de terra seca e cascalho fino: sorteados uma vez, em coordenadas normalizadas,
+// para o terreno não "reembaralhar" a cada redimensionamento.
+const CRACKS = Array.from({ length: 10 }, () => {
+  const pts = [{ x: Math.random(), y: Math.random() }];
+  let a = Math.random() * 6.283, x = pts[0].x, y = pts[0].y;
+  for (let i = 0, segs = 3 + Math.floor(Math.random() * 4); i < segs; i++) {
+    a += (Math.random() - 0.5) * 1.1;
+    const len = 0.03 + Math.random() * 0.06;
+    x += Math.cos(a) * len; y += Math.sin(a) * len * 0.55;
+    pts.push({ x, y });
+  }
+  return pts;
+});
+const GRIT = Array.from({ length: 240 }, () => ({
+  x: Math.random(), y: Math.random(), r: Math.random() * 0.9 + 0.3, light: Math.random() < 0.42,
+}));
+// Vida teimando em nascer num chão de guerra. Tudo em coordenadas normalizadas e
+// sorteado uma vez, para o terreno não reembaralhar a cada redimensionamento.
+const TUFTS = Array.from({ length: 26 }, () => ({          // grama rala e raízes
+  x: Math.random(), y: Math.random(),
+  blades: 2 + Math.floor(Math.random() * 3),
+  h: 0.018 + Math.random() * 0.026,
+  lean: (Math.random() - 0.5) * 0.9,
+  dry: Math.random() < 0.45,                                // metade puxa para o palha
+}));
+const ROOTS = Array.from({ length: 7 }, () => ({           // raízes rastejando no chão
+  x: Math.random(), y: 0.1 + Math.random() * 0.8,
+  len: 0.06 + Math.random() * 0.1,
+  ang: (Math.random() - 0.5) * 1.2,
+}));
+const FLOWERS = Array.from({ length: 22 }, () => ({        // microflores azuis e amarelas
+  x: Math.random(), y: Math.random(),
+  blue: Math.random() < 0.5,
+  r: 0.9 + Math.random() * 0.8,
+}));
+// Sangue SECO: só perto da muralha (y alto), que é onde a horda chega e morre.
+const OLD_BLOOD = Array.from({ length: 14 }, () => ({
+  x: Math.random(), y: 0.72 + Math.random() * 0.26,
+  rx: 5 + Math.random() * 13, ry: 3 + Math.random() * 7,
+  rot: Math.random() * 3.14,
+  spots: 1 + Math.floor(Math.random() * 3),
+}));
+
+// ---------- Clima do turno (100% cosmético) ----------
+// Sorteado a cada turno. NADA aqui toca alcance, mira, dano ou spawn: são só camadas de
+// desenho. No Turno Turvo o jogador perde a horda de vista, mas as torres continuam
+// enxergando tudo, porque a névoa é pintada depois da lógica, sobre o quadro pronto.
+const WEATHER = {
+  normal:     { w: 65, ic: "⛅",  name: "Céu Aberto",     desc: "Nuvens passando, névoa fraca.",                     clouds: 1,   haze: 1,    fog: 0,    rain: 0, bolts: false },
+  turvo:      { w: 20, ic: "🌫️", name: "Turno Turvo",     desc: "Névoa densa: a horda só aparece de perto.",         clouds: 0,   haze: 1.1,  fog: 1,    rain: 0, bolts: false },
+  tempestade: { w: 10, ic: "⛈️", name: "Tempestade",      desc: "Céu fechado, chuva e relâmpagos.",                  clouds: 1.9, haze: 0.8,  fog: 0.22, rain: 1, bolts: true },
+  perfeito:   { w: 5,  ic: "✨",  name: "Turno Perfeito",  desc: "Ar limpo, visibilidade total.",                     clouds: 0,   haze: 0,    fog: 0,    rain: 0, bolts: false },
+};
+const WEATHER_KEYS = Object.keys(WEATHER);
+// Os primeiros dias saem sempre de céu aberto. Não é uma regra anunciada: é só para o
+// jogador aprender o campo com a horda à vista, sem uma tempestade ou uma névoa densa
+// logo no dia 1 fazendo ele achar que o jogo está quebrado.
+const WEATHER_GRACE_DAYS = 3;
+function rollWeather() {
+  if ((S.day || 1) <= WEATHER_GRACE_DAYS) return "normal";
+  const total = WEATHER_KEYS.reduce((s, k) => s + WEATHER[k].w, 0);
+  let r = Math.random() * total;
+  for (const k of WEATHER_KEYS) { r -= WEATHER[k].w; if (r <= 0) return k; }
+  return "normal";
+}
+function weather() { return WEATHER[S.weather] || WEATHER.normal; }
+// Sem toast: o clima é linguagem visual, o jogador lê no céu. Anunciar em texto
+// transformaria um detalhe de ambientação em aviso de sistema.
+function newTurnWeather() { S.weather = rollWeather(); }
+
+// ---------- Sombras de nuvem ----------
+// Só as SOMBRAS passam pelo campo — a nuvem em si está fora de quadro, acima. Cada nuvem
+// é um aglomerado de bolhas com borda esfumada: as bolhas maiores no meio e menores nas
+// pontas dão a silhueta de cúmulo, e a sobreposição cria a variação de densidade que uma
+// elipse só não teria. Medidas em unidades da ALTURA do campo, para a proporção não
+// esticar em tela larga.
+// A faixa tem CLOUD_BAND× a largura da tela e uma nuvem por "casa", cada uma sorteada
+// só no miolo da sua casa. Isso garante céu limpo entre elas: nuvem nenhuma encosta na
+// vizinha, mesmo no pior sorteio. Medidas em frações da LARGURA da camada, para a
+// proporção da nuvem não esticar agora que a camada é alta (campo + cidade).
+const CLOUD_BAND = 3, CLOUD_COUNT = 6;
+const CLOUDS = Array.from({ length: CLOUD_COUNT }, (_, i) => {
+  const n = 9 + Math.floor(Math.random() * 5);
+  const span = 0.24 + Math.random() * 0.12;
+  const puffs = [];
+  for (let k = 0; k < n; k++) {
+    const t = n === 1 ? 0.5 : k / (n - 1);
+    const bulge = Math.sin(Math.PI * t);     // volume no meio, afinando nas beiradas
+    puffs.push({
+      dx: (t - 0.5) * span + (Math.random() - 0.5) * 0.014,
+      // Duas fileiras de bolhas: a de cima empilha sobre a de baixo e é isso que dá
+      // altura ao cúmulo. Com uma fileira só a nuvem saía chapada.
+      dy: -(0.008 + Math.random() * 0.03) * bulge - (k % 2 ? 0.012 * bulge : 0),
+      r: (0.022 + Math.random() * 0.02) * (0.55 + 0.7 * bulge),
+    });
+  }
+  return {
+    x: (i + 0.22 + Math.random() * 0.56) / CLOUD_COUNT, // miolo da casa: sobra folga
+    y: 0.08 + Math.random() * 0.8,
+    span, baseR: 0.016 + Math.random() * 0.01, puffs,
+  };
+});
+// A faixa é assada uma vez e vira o background de #cloud-shade; o CSS a repete em X e
+// rola a background-position, então o desfile é contínuo e não custa nada por frame.
+function buildCloudTex(w, h) {
+  const bandW = w * CLOUD_BAND;
+  const dpr = devicePixelRatio || 1;
+  const cv = document.createElement("canvas");
+  cv.width = Math.max(1, Math.round(bandW * dpr));
+  cv.height = Math.max(1, Math.round(h * dpr));
+  const g = cv.getContext("2d");
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  // Silhueta 2D de contorno esfumaçado: cada nuvem é UM path só — a base achatada mais
+  // as bolhas, todas no mesmo preenchimento. Com winding nonzero as subpaths se UNEM, o
+  // interior sai com densidade uniforme e o blur trata apenas a BORDA. Somar gradientes
+  // (como antes) empilhava alfa nas sobreposições e criava miolos escuros: era isso que
+  // dava o aspecto de fumaça suja em vez de nuvem.
+  if ("filter" in g) g.filter = `blur(${Math.max(3, w * 0.013).toFixed(1)}px)`;
+  // O bitmap é assado ESCURO e a opacidade da camada é que dosa. Assim o multiplicador
+  // da Tempestade tem para onde subir: com o bitmap claro, `opacity: 1.9` era clampado
+  // em 1 pelo CSS e a nuvem de tempestade ficava idêntica à de céu aberto.
+  g.fillStyle = "rgba(0,0,0,.46)";
+  for (const c of CLOUDS) {
+    const cx = c.x * bandW, cy = c.y * h;
+    g.beginPath();
+    g.ellipse(cx, cy, c.span * w * 0.5, c.baseR * w, 0, 0, Math.PI * 2); // base achatada
+    for (const p of c.puffs) {
+      g.moveTo(cx + p.dx * w + p.r * w, cy + p.dy * w);
+      g.arc(cx + p.dx * w, cy + p.dy * w, p.r * w, 0, Math.PI * 2);
+    }
+    g.fill();
+  }
+  if ("filter" in g) g.filter = "none";
+  return cv;
+}
+// Uma nuvem leva CLOUD_CROSS_SEC para varrer a largura da tela; a sombra é forte no sol
+// a pino e quase nada ao luar, porque é a luz que a projeta.
+const CLOUD_CROSS_SEC = 74;
+function cloudAlpha() {
+  const base = bloodMoon() ? 0.30 : blackSun() ? 0.26 : S.isNight ? 0.22 : 0.62;
+  return Math.min(1, base * weather().clouds); // opacity CSS não passa de 1
+}
+// Mantém a camada colada na faixa do mundo e com a opacidade do clima atual. Chamada a
+// cada frame pelo syncLiveRes, mas só encosta no DOM quando algo muda de verdade.
+// A faixa de nuvens é UMA só, do topo do campo ao fim da cidade, mas é exibida em duas
+// partes que compartilham o mesmo deslocamento horizontal, então a sombra atravessa a
+// muralha sem emenda:
+//   · a fatia de cima é desenhada DENTRO do canvas, logo após o chão — assim o astro, os
+//     números e a horda ficam por CIMA dela;
+//   · o resto vai na camada #cloud-shade, sobre a muralha, a esteira e a cidade.
+// O deslocamento vem do relógio visual, então as nuvens também aceleram no 2x/5x.
+let shadeKey = "", shadeAlpha = -1, shadeGeo = null, cloudTex = null;
+function cloudOffset(w) {
+  const bandW = w * CLOUD_BAND;
+  return ((vClock * (w / CLOUD_CROSS_SEC)) % bandW + bandW) % bandW;
+}
+function syncCloudShade() {
+  const el = $("cloud-shade");
+  if (!el) return;
+  const a = +cloudAlpha().toFixed(3);
+  if (a !== shadeAlpha) { el.style.opacity = a; shadeAlpha = a; }
+  const bf = $("battlefield"), cw = $("city-wrap");
+  if (!bf || !cw) return;
+  const top = bf.offsetTop;
+  const H = Math.round(cw.offsetTop + cw.offsetHeight - top);
+  const W = Math.round($("game").clientWidth);
+  const fieldH = Math.round(bf.offsetHeight);
+  if (!W || !H) return;
+  const key = `${W}x${H}x${fieldH}@${devicePixelRatio || 1}`;
+  if (key !== shadeKey) {
+    cloudTex = buildCloudTex(W, H);
+    shadeGeo = { W, H, fieldH, bandW: Math.round(W * CLOUD_BAND) };
+    el.style.top = (top + fieldH) + "px";       // começa onde o canvas acaba
+    el.style.height = (H - fieldH) + "px";
+    el.style.backgroundImage = `url(${cloudTex.toDataURL("image/png")})`;
+    el.style.backgroundSize = `${shadeGeo.bandW}px ${H}px`;
+    shadeKey = key;
+  }
+  if (a <= 0) return;
+  // Mesma origem horizontal do canvas; o -fieldH em Y continua a faixa de onde ela parou.
+  el.style.backgroundPosition = `${-cloudOffset(shadeGeo.W)}px ${-fieldH}px`;
+}
+// Fatia de cima da mesma faixa, desenhada no canvas do campo.
+function drawFieldClouds(w, h) {
+  const a = cloudAlpha();
+  if (a <= 0 || !cloudTex || !shadeGeo) return;
+  const off = cloudOffset(shadeGeo.W);
+  const dpr = devicePixelRatio || 1;
+  const sh = Math.min(cloudTex.height, Math.round(shadeGeo.fieldH * dpr));
+  ctx.save();
+  ctx.globalAlpha = a;
+  // duas cópias lado a lado: quando uma sai pela esquerda, a outra já entrou
+  ctx.drawImage(cloudTex, off * dpr, 0, shadeGeo.W * dpr, sh, 0, 0, w, h);
+  ctx.drawImage(cloudTex, (off - shadeGeo.bandW) * dpr, 0, shadeGeo.W * dpr, sh, 0, 0, w, h);
+  ctx.restore();
+}
+
+// ---------- Chuva, relâmpago e névoa densa ----------
+// Camada de clima que vai DEPOIS das unidades, para poder ocultá-las. Nada disso existe
+// no update: a chuva é calculada a partir do relógio e o relâmpago tem seu próprio
+// temporizador visual, sem estado de jogo.
+const RAIN = Array.from({ length: 110 }, () => ({
+  x: Math.random(), y: Math.random(),
+  len: 0.05 + Math.random() * 0.07,
+  sp: 0.75 + Math.random() * 0.7,
+}));
+let boltFlash = 0, boltNext = 0, boltLast = 0;
+function drawWeatherOverlay(w, h) {
+  const wt = weather();
+  const now = performance.now();
+
+  // Névoa densa: forte no alto (de onde a horda desce) e rala perto da muralha.
+  if (wt.fog > 0) {
+    const tone = bloodMoon() ? "120,70,70" : S.isNight ? "120,132,162" : "206,200,186";
+    const f = ctx.createLinearGradient(0, 0, 0, h);
+    f.addColorStop(0, `rgba(${tone},${(0.92 * wt.fog).toFixed(3)})`);
+    f.addColorStop(0.38, `rgba(${tone},${(0.74 * wt.fog).toFixed(3)})`);
+    f.addColorStop(0.68, `rgba(${tone},${(0.3 * wt.fog).toFixed(3)})`);
+    f.addColorStop(1, `rgba(${tone},${(0.08 * wt.fog).toFixed(3)})`);
+    ctx.fillStyle = f;
+    ctx.fillRect(0, 0, w, h);
+  }
+
+  if (wt.rain > 0) {
+    const tSec = vClock; // a chuva também acelera no 2x/5x
+    ctx.save();
+    ctx.strokeStyle = "rgba(186,206,230,.34)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (const d of RAIN) {
+      const my = (d.y + tSec * d.sp) % 1;
+      const y0 = my * h, x0 = d.x * w + my * w * 0.06; // leve inclinação no vento
+      ctx.moveTo(x0, y0);
+      ctx.lineTo(x0 - d.len * h * 0.22, y0 + d.len * h);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  if (wt.bolts) {
+    const dt = boltLast ? Math.min(200, now - boltLast) : 0;
+    boltLast = now;
+    if (!boltNext) boltNext = now + 2000 + Math.random() * 5000;
+    if (now >= boltNext) { boltFlash = 1; boltNext = now + 3500 + Math.random() * 9000; }
+    if (boltFlash > 0) {
+      // decai rápido e com um repique no meio: dá o "pisca-pisca" do relâmpago
+      const k = boltFlash;
+      const puls = k > 0.72 ? 1 : k > 0.5 ? 0.25 : k;
+      ctx.fillStyle = `rgba(206,224,255,${(0.34 * puls).toFixed(3)})`;
+      ctx.fillRect(0, 0, w, h);
+      boltFlash = Math.max(0, boltFlash - dt / 420);
+    }
+  } else {
+    boltFlash = 0; boltNext = 0; boltLast = 0;
+  }
+}
+
+// ---------- Textura do chão ----------
+// Tudo que é ESTÁTICO no terreno (gradiente, manchas, trilhas, fendas, cascalho, grão)
+// é assado uma vez num canvas fora de tela. O draw() faz um drawImage no lugar de ~90
+// paths por frame — fica mais rico e mais barato ao mesmo tempo.
+let groundTex = null, groundKey = "";
+function buildGroundTex(w, h, dpr) {
+  const cv = document.createElement("canvas");
+  cv.width = Math.max(1, Math.round(w * dpr));
+  cv.height = Math.max(1, Math.round(h * dpr));
+  const g = cv.getContext("2d");
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const laneW = w / LANES;
+
+  // Base: horizonte batido de luz no topo, sombra da muralha embaixo.
+  const base = g.createLinearGradient(0, 0, 0, h);
+  base.addColorStop(0, "#5c4733");
+  base.addColorStop(0.34, "#4a3826");
+  base.addColorStop(0.72, "#3c2d1c");
+  base.addColorStop(1, "#2d2113");
+  g.fillStyle = base;
+  g.fillRect(0, 0, w, h);
+
+  // Manchas de terra úmida, agora com borda esfumada (antes eram elipses de corte duro).
+  for (const p of PATCHES) {
+    g.save();
+    g.translate(p.x * w, p.y * h);
+    g.scale(1, p.ry / p.rx);
+    const rg = g.createRadialGradient(0, 0, 0, 0, 0, p.rx);
+    rg.addColorStop(0, "rgba(34,23,12,.46)");
+    rg.addColorStop(1, "rgba(34,23,12,0)");
+    g.fillStyle = rg;
+    g.beginPath(); g.arc(0, 0, p.rx, 0, 7); g.fill();
+    g.restore();
+  }
+
+  // Lanes: faixa alternada + TRILHA, o miolo pisado por onde a horda passa há cem anos.
+  for (let i = 0; i < LANES; i++) {
+    g.fillStyle = i % 2 ? "rgba(30,20,10,.20)" : "rgba(30,20,10,.12)";
+    g.fillRect(i * laneW + 4, 0, laneW - 8, h);
+    const rut = g.createLinearGradient(i * laneW, 0, (i + 1) * laneW, 0);
+    rut.addColorStop(0, "rgba(154,128,88,0)");
+    rut.addColorStop(0.5, "rgba(154,128,88,.11)");
+    rut.addColorStop(1, "rgba(154,128,88,0)");
+    g.fillStyle = rut;
+    g.fillRect(i * laneW, 0, laneW, h);
+  }
+  g.strokeStyle = "rgba(110,82,50,.32)";
+  g.lineWidth = 1;
+  for (let i = 1; i < LANES; i++) {
+    g.beginPath(); g.moveTo(i * laneW, 0); g.lineTo(i * laneW, h); g.stroke();
+  }
+
+  // Fendas: sulco escuro + um fio de luz deslocado na borda, que dá o relevo de terra rachada.
+  g.lineCap = "round"; g.lineJoin = "round";
+  for (const c of CRACKS) {
+    const trace = (dx, dy) => {
+      g.beginPath();
+      g.moveTo(c[0].x * w + dx, c[0].y * h + dy);
+      for (const p of c) g.lineTo(p.x * w + dx, p.y * h + dy);
+      g.stroke();
+    };
+    g.strokeStyle = "rgba(24,16,7,.32)"; g.lineWidth = 1.7; trace(0, 0);
+    g.strokeStyle = "rgba(146,120,82,.17)"; g.lineWidth = 0.8; trace(0.9, -0.9);
+  }
+
+  // Cascalho: sombra embaixo, corpo, ponto de luz em cima. Alphas baixos de propósito —
+  // com mais contraste eles saltam do chão como bolinhas em vez de virarem terreno.
+  for (const p of PEBBLES) {
+    const px = p.x * w, py = p.y * h;
+    g.fillStyle = "rgba(20,13,6,.26)";
+    g.beginPath(); g.arc(px, py + 0.8, p.r, 0, 7); g.fill();
+    g.fillStyle = p.dark ? "rgba(94,76,50,.34)" : "rgba(152,128,90,.36)";
+    g.beginPath(); g.arc(px, py, p.r, 0, 7); g.fill();
+    g.fillStyle = "rgba(214,190,144,.16)";
+    g.beginPath(); g.arc(px - p.r * 0.3, py - p.r * 0.35, p.r * 0.42, 0, 7); g.fill();
+  }
+
+  // Sangue seco junto à muralha: manchas irregulares, marrom-avermelhadas e opacas.
+  // Ficam ANTES da vegetação para a grama poder nascer por cima delas.
+  for (const b of OLD_BLOOD) {
+    g.save();
+    g.translate(b.x * w, b.y * h);
+    g.rotate(b.rot);
+    for (let k = 0; k < b.spots; k++) {
+      const s = 1 - k * 0.3;
+      g.fillStyle = `rgba(78,22,16,${(0.3 - k * 0.07).toFixed(3)})`;
+      g.beginPath();
+      g.ellipse(k * b.rx * 0.5, k * b.ry * 0.4, b.rx * s, b.ry * s, 0, 0, Math.PI * 2);
+      g.fill();
+    }
+    g.restore();
+  }
+
+  // Raízes rastejando: um traço escuro com um realce por cima, como as fendas.
+  g.lineCap = "round";
+  for (const r of ROOTS) {
+    const x0 = r.x * w, y0 = r.y * h, len = r.len * w;
+    const draw = (dx, dy) => {
+      g.beginPath();
+      g.moveTo(x0 + dx, y0 + dy);
+      g.quadraticCurveTo(x0 + Math.cos(r.ang) * len * 0.5 + dx, y0 + Math.sin(r.ang) * len * 0.9 + dy,
+                         x0 + Math.cos(r.ang) * len + dx, y0 + Math.sin(r.ang) * len * 0.3 + dy);
+      g.stroke();
+    };
+    g.strokeStyle = "rgba(38,26,12,.34)"; g.lineWidth = 1.8; draw(0, 0);
+    g.strokeStyle = "rgba(122,104,64,.16)"; g.lineWidth = 0.8; draw(0.7, -0.7);
+  }
+
+  // Tufos de grama: 2 a 4 lâminas saindo do mesmo ponto, algumas verdes, outras secas.
+  g.lineWidth = 1;
+  for (const t of TUFTS) {
+    const x0 = t.x * w, y0 = t.y * h, hh = t.h * h;
+    g.strokeStyle = t.dry ? "rgba(138,126,66,.4)" : "rgba(86,124,58,.46)";
+    for (let b = 0; b < t.blades; b++) {
+      const off = (b - (t.blades - 1) / 2) * 2.2;
+      g.beginPath();
+      g.moveTo(x0 + off, y0);
+      g.quadraticCurveTo(x0 + off + t.lean * hh * 0.4, y0 - hh * 0.6, x0 + off + t.lean * hh, y0 - hh);
+      g.stroke();
+    }
+  }
+
+  // Microflores: um ponto de cor e um miolo claro. É o que traz cor viva sem poluir.
+  for (const f of FLOWERS) {
+    const fx = f.x * w, fy = f.y * h;
+    g.fillStyle = f.blue ? "rgba(96,132,210,.55)" : "rgba(226,196,74,.55)";
+    g.beginPath(); g.arc(fx, fy, f.r, 0, 7); g.fill();
+    g.fillStyle = "rgba(255,248,214,.45)";
+    g.beginPath(); g.arc(fx, fy, f.r * 0.4, 0, 7); g.fill();
+  }
+
+  // Grão fino: tira o aspecto de chapa lisa sem virar ruído.
+  for (const s of GRIT) {
+    g.fillStyle = s.light ? "rgba(184,158,112,.13)" : "rgba(18,12,5,.17)";
+    g.beginPath(); g.arc(s.x * w, s.y * h, s.r, 0, 7); g.fill();
+  }
+  return cv;
+}
+function ensureGroundTex(w, h) {
+  const dpr = devicePixelRatio || 1;
+  const key = `${Math.round(w)}x${Math.round(h)}@${dpr}`;
+  if (!groundTex || groundKey !== key) { groundTex = buildGroundTex(w, h, dpr); groundKey = key; }
+  return groundTex;
+}
+
+// Sombras de contato: sem elas os sprites parecem colados sobre o fundo, não em pé nele.
+// Numa passada só, com um fillStyle para todas — save/restore por unidade custava ~1ms
+// por frame com a horda cheia, e são 600 corpos no dia 30.
+// ---------- Sangue fresco ----------
+// Cada morto deixa uma poça que seca e some. Vive fora de S: é puramente decorativo,
+// não entra no save nem no update (some pelo relógio visual, então acelera no 5x).
+const BLOOD_LIFE = 6;      // segundos de vida da poça
+const BLOOD_MAX = 60;      // teto: no dia 30 morrem centenas por turno
+let bloodPools = [];
+const BLOOD_BURST = 0.2;   // 1 em 5 mortos estoura em vez de só sangrar
+function addBloodPool(lane, y) {
+  if (bloodPools.length >= BLOOD_MAX) bloodPools.shift();
+  const burst = Math.random() < BLOOD_BURST;
+  const spots = [];
+  // Estouro: mais respingos, maiores e espalhados mais longe do corpo.
+  const n = burst ? 6 + Math.floor(Math.random() * 4) : 3 + Math.floor(Math.random() * 3);
+  for (let i = 0; i < n; i++) {
+    const far = burst ? 40 : 22;
+    spots.push({
+      dx: (Math.random() - 0.5) * far, dy: (Math.random() - 0.5) * far * 0.5,
+      rx: (burst ? 5 : 3.5) + Math.random() * (burst ? 12 : 8),
+      ry: (burst ? 3 : 2.5) + Math.random() * (burst ? 7 : 5),
+    });
+  }
+  bloodPools.push({ lane, y, born: vClock, spots, burst });
+  if (burst) {
+    // Animação própria: anel de respingo abrindo, separado da poça que fica no chão.
+    S.effects.push({ x: lane, y, life: 0.42, max: 0.42, type: "burst" });
+    addFloat(lane, y - 0.05, "💥", "#b8322a");
+  }
+}
+function drawBloodPools(laneW, h) {
+  if (!bloodPools.length) return;
+  // O clamp em 0 não é zelo excessivo: se o relógio visual recuar (debug, seek de
+  // animação), a idade fica negativa e o raio da elipse vai a negativo — o canvas lança
+  // IndexSizeError e derruba o draw inteiro, levando o jogo junto.
+  bloodPools = bloodPools.filter(p => vClock - p.born < BLOOD_LIFE && vClock >= p.born);
+  for (const p of bloodPools) {
+    const age = Math.max(0, Math.min(1, (vClock - p.born) / BLOOD_LIFE));
+    // cresce depressa no primeiro instante e depois seca devagar
+    const spread = Math.max(0, Math.min(1, age * 6));
+    const a = (1 - age) * (1 - age) * (p.burst ? 0.72 : 0.58);
+    const cx = p.lane * laneW + laneW / 2, cy = p.y * h + 4;
+    ctx.fillStyle = `rgba(${p.burst ? "124,18,16" : "104,16,14"},${a.toFixed(3)})`;
+    for (const s of p.spots) {
+      ctx.beginPath();
+      ctx.ellipse(cx + s.dx * spread, cy + s.dy * spread, s.rx * spread, s.ry * spread, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+}
+
+function drawGroundShadows(laneW, h) {
+  ctx.fillStyle = "rgba(0,0,0,.32)";
+  const blob = (lane, y, rx) => {
+    ctx.beginPath();
+    ctx.ellipse(lane * laneW + laneW / 2, y * h + 5, rx, rx * 0.34, 0, 0, Math.PI * 2);
+    ctx.fill();
+  };
+  for (const e of S.enemies) blob(e.lane, e.y, ENEMY_TYPES[e.type].armor < 1 ? 11 : 9);
+  for (const a of S.allies) blob(a.lane, a.y, 9);
+}
 
 function draw() {
   // o backing store é sincronizado pelo ResizeObserver, não a cada frame
@@ -5710,31 +6420,33 @@ function draw() {
   const astroTarget = S.waveActive ? 0 : 1;
   astroFade += Math.sign(astroTarget - astroFade) * Math.min(Math.abs(astroTarget - astroFade), 0.72 * dtF);
 
-  const ground = ctx.createLinearGradient(0, 0, 0, h);
-  ground.addColorStop(0, "#4a3826");
-  ground.addColorStop(1, "#382a19");
-  ctx.fillStyle = ground;
-  ctx.fillRect(0, 0, w, h);
+  ctx.drawImage(ensureGroundTex(w, h), 0, 0, w, h);
+  drawFieldClouds(w, h); // fatia de cima da faixa de nuvens (ver syncCloudShade)
 
-  ctx.fillStyle = "rgba(40,28,16,.35)";
-  for (const p of PATCHES) {
-    ctx.beginPath(); ctx.ellipse(p.x * w, p.y * h, p.rx, p.ry, 0, 0, 7); ctx.fill();
-  }
+  // Névoa do horizonte: o topo do campo é de onde a horda vem, e ficava um corte seco.
+  const air = airTone();
+  const hazeM = weather().haze;
+  if (hazeM > 0) {
+  const haze = ctx.createLinearGradient(0, 0, 0, h * 0.42);
+  // Bem discreta: a textura do chão já entrega o horizonte batido de luz. A névoa aqui
+  // só ambienta e separa o dia da noite — não é para ser notada por si só.
+  haze.addColorStop(0, `rgba(${air.haze},${(0.11 * hazeM).toFixed(3)})`);
+  haze.addColorStop(0.55, `rgba(${air.haze},${(0.04 * hazeM).toFixed(3)})`);
+  haze.addColorStop(1, `rgba(${air.haze},0)`);
+  ctx.fillStyle = haze;
+  ctx.fillRect(0, 0, w, h * 0.42);
 
-  for (let i = 0; i < LANES; i++) {
-    ctx.fillStyle = i % 2 ? "rgba(30,20,10,.22)" : "rgba(30,20,10,.14)";
-    ctx.fillRect(i * laneW + 4, 0, laneW - 8, h);
+  // Partículas: sobem à noite (brasas), descem de dia (poeira). Leve bamboleio lateral.
+  const tSec = vClock;
+  for (const m of MOTES) {
+    const travel = tSec * m.sp;
+    const my = (air.up ? (m.y - travel) : (m.y + travel)) % 1;
+    const py = (my < 0 ? my + 1 : my) * h;
+    const px = m.x * w + Math.sin(tSec * 0.8 + m.ph) * m.sway;
+    ctx.fillStyle = `rgba(${air.mote},${0.05 + 0.07 * (0.5 + 0.5 * Math.sin(tSec * 1.6 + m.ph))})`;
+    ctx.beginPath(); ctx.arc(px, py, m.r, 0, 7); ctx.fill();
   }
-  ctx.strokeStyle = "rgba(110,82,50,.35)";
-  ctx.lineWidth = 1;
-  for (let i = 1; i < LANES; i++) {
-    ctx.beginPath(); ctx.moveTo(i * laneW, 0); ctx.lineTo(i * laneW, h); ctx.stroke();
-  }
-
-  for (const p of PEBBLES) {
-    ctx.fillStyle = p.dark ? "rgba(30,20,10,.5)" : "rgba(140,115,80,.4)";
-    ctx.beginPath(); ctx.arc(p.x * w, p.y * h, p.r, 0, 7); ctx.fill();
-  }
+  } // fim do bloco de névoa/partículas (Turno Perfeito não desenha nenhum dos dois)
 
   // Astro no topo da lane central; faz fade-out no ataque e fade-in no planejamento.
   const drawAstro = () => {
@@ -5773,7 +6485,7 @@ function draw() {
     const img = ASTRO_IMG.night;
     if (img.complete && img.naturalWidth) {
       if (fullMoon) { ctx.shadowColor = "#e0a080"; ctx.shadowBlur = 18; }
-      ctx.globalAlpha = 0.45 * astroFade;             // lua mais transparente
+      ctx.globalAlpha = 0.34 * astroFade;             // lua mais transparente (0.45 −25%)
       ctx.drawImage(img, ax - 20, ay - 20, 40, 40);   // arte da lua menor (60→40px)
       ctx.globalAlpha = astroFade;
       ctx.shadowBlur = 0;
@@ -5817,9 +6529,9 @@ function draw() {
         for (const p of l.pts) ctx.lineTo(p.x * w, p.y * h);
         ctx.closePath();
       };
-      path(); ctx.fillStyle = `rgba(168,106,224,${0.22 * a * flick})`; ctx.fill();
-      path(); ctx.shadowColor = "#a86ae0"; ctx.shadowBlur = 22; ctx.strokeStyle = `rgba(168,106,224,${0.5 * a})`; ctx.lineWidth = 9; ctx.stroke();
-      path(); ctx.shadowBlur = 14; ctx.strokeStyle = `rgba(200,154,255,${0.9 * a * flick})`; ctx.lineWidth = 5; ctx.stroke();
+      path(); ctx.fillStyle = `rgba(${ARCANE.base},${0.22 * a * flick})`; ctx.fill();
+      path(); ctx.shadowColor = ARCANE.hex; ctx.shadowBlur = 22; ctx.strokeStyle = `rgba(${ARCANE.base},${0.5 * a})`; ctx.lineWidth = 9; ctx.stroke();
+      path(); ctx.shadowBlur = 14; ctx.strokeStyle = `rgba(${ARCANE.light},${0.9 * a * flick})`; ctx.lineWidth = 5; ctx.stroke();
       path(); ctx.shadowColor = "#fff"; ctx.shadowBlur = 6; ctx.strokeStyle = `rgba(255,244,255,${0.95 * a * flick})`; ctx.lineWidth = 1.8; ctx.stroke();
       ctx.shadowBlur = 0;
       continue;
@@ -5849,8 +6561,8 @@ function draw() {
       for (let i = i0 + 1; i < N; i++) ctx.lineTo(P[i].x, P[i].y);
     };
     const layers = [
-      { col: "168,106,224", sh: "#a86ae0", blur: 20, wdt: 8,   al: 0.45 },
-      { col: "200,154,255", sh: "#a86ae0", blur: 13, wdt: 4.5, al: 0.9 * flick },
+      { col: ARCANE.base,  sh: ARCANE.hex, blur: 20, wdt: 8,   al: 0.45 },
+      { col: ARCANE.light, sh: ARCANE.hex, blur: 13, wdt: 4.5, al: 0.9 * flick },
       { col: "255,244,255", sh: "#fff",    blur: 6,  wdt: 1.6, al: 0.95 * flick },
     ];
     if (i0 < N - 1) {
@@ -5863,15 +6575,41 @@ function draw() {
     ctx.shadowBlur = 0;
   }
 
+  // Feixe do Holofote: a lâmpada está NA MURALHA, então o cone nasce estreito embaixo e
+  // se abre subindo até o horizonte — e clareia mais perto da fonte, porque lá a luz
+  // ainda está concentrada. Fica sob as unidades: ilumina o chão sem lavar os sprites.
+  for (const L of litLanes) {
+    const cx = L * laneW + laneW / 2;
+    const beam = ctx.createLinearGradient(0, h, 0, 0);
+    beam.addColorStop(0, "rgba(255,238,190,.22)");
+    beam.addColorStop(0.55, "rgba(255,232,170,.11)");
+    beam.addColorStop(1, "rgba(255,226,150,.03)");
+    ctx.save();
+    ctx.fillStyle = beam;
+    ctx.beginPath();
+    ctx.moveTo(cx - laneW * 0.16, h);   // ponta estreita, junto à muralha
+    ctx.lineTo(cx + laneW * 0.16, h);
+    ctx.lineTo(cx + laneW * 0.46, 0);   // boca larga, no horizonte
+    ctx.lineTo(cx - laneW * 0.46, 0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
   // selos de proteção: runa discreta na base de cada lane protegida
   for (let i = 0; i < LANES; i++) {
     if (!S.seals[i]) continue;
     const sx = i * laneW + laneW / 2;
-    const pulse = 0.35 + 0.15 * Math.sin(performance.now() / 600 + i);
-    ctx.fillStyle = `rgba(200,154,255,${pulse})`;
-    ctx.font = "10px sans-serif";
+    // Depois que o chão ganhou grama, raízes e flores, a runa de 10px a 35% de opacidade
+    // simplesmente desaparecia no meio do detalhe. Maior, mais opaca e com halo próprio.
+    const pulse = 0.72 + 0.2 * Math.sin(vClock * 1.7 + i);
+    ctx.save();
     ctx.textAlign = "center";
-    ctx.fillText("◈", sx, h - 12);
+    ctx.shadowColor = ARCANE.hex; ctx.shadowBlur = 9;
+    ctx.font = "700 14px sans-serif";
+    ctx.fillStyle = `rgba(${ARCANE.light},${pulse.toFixed(3)})`;
+    ctx.fillText("◈", sx, h - 11);
+    ctx.restore();
   }
 
   // varredura de selo rompido: onda arcana subindo a lane
@@ -5879,7 +6617,7 @@ function draw() {
     const sx = sw.lane * laneW, sy = sw.y * h;
     const grad = ctx.createLinearGradient(0, sy - 18, 0, sy + 18);
     grad.addColorStop(0, "transparent");
-    grad.addColorStop(0.5, "rgba(200,154,255,.55)");
+    grad.addColorStop(0.5, `rgba(${ARCANE.light},.55)`);
     grad.addColorStop(1, "transparent");
     ctx.fillStyle = grad;
     ctx.fillRect(sx + 2, sy - 18, laneW - 4, 36);
@@ -5982,16 +6720,53 @@ function draw() {
   for (const fx of S.effects) {
     const k = 1 - fx.life / fx.max;
     const fxx = fx.x * laneW + laneW / 2, fxy = fx.y * h;
+    if (fx.type === "burst") {
+      // Estouro: respingos saindo em raios, com um clarão curto no centro.
+      ctx.save();
+      const r = 6 + k * 30;
+      ctx.strokeStyle = `rgba(150,26,22,${(1 - k) * 0.8})`;
+      ctx.lineWidth = 2.5;
+      ctx.lineCap = "round";
+      for (let s = 0; s < 8; s++) {
+        const ang = (s / 8) * Math.PI * 2 + fx.x;
+        ctx.beginPath();
+        ctx.moveTo(fxx + Math.cos(ang) * r * 0.45, fxy + Math.sin(ang) * r * 0.28);
+        ctx.lineTo(fxx + Math.cos(ang) * r, fxy + Math.sin(ang) * r * 0.62);
+        ctx.stroke();
+      }
+      ctx.fillStyle = `rgba(210,70,56,${(1 - k) * 0.5})`;
+      ctx.beginPath(); ctx.arc(fxx, fxy, 7 * (1 - k), 0, 7); ctx.fill();
+      ctx.restore();
+      continue;
+    }
+    if (fx.type === "forgive") {
+      // A muralha aparou: lasca de pedra e poeira, sem o vermelho de dano.
+      ctx.save();
+      ctx.strokeStyle = `rgba(200,176,136,${(1 - k) * 0.85})`;
+      ctx.lineWidth = 2 + (1 - k) * 3;
+      ctx.beginPath(); ctx.arc(fxx, fxy, 10 + k * 34, 0, 7); ctx.stroke();
+      ctx.restore();
+      continue;
+    }
+    if (fx.type === "grind") {
+      // Moedor: anel vermelho colapsando PARA DENTRO, sugando em vez de explodir.
+      ctx.save();
+      ctx.strokeStyle = `rgba(190,60,50,${(1 - k) * 0.9})`;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.arc(fxx, fxy, 34 * (1 - k) + 4, 0, 7); ctx.stroke();
+      ctx.restore();
+      continue;
+    }
     if (fx.type === "seal") {
       // flash do selo roxo: onda de choque com brilho + disco esmaecendo
       ctx.save();
       const r = 8 + k * 66;
-      ctx.shadowColor = "#a86ae0"; ctx.shadowBlur = 20;
-      ctx.strokeStyle = `rgba(200,154,255,${(1 - k) * 0.9})`;
+      ctx.shadowColor = ARCANE.hex; ctx.shadowBlur = 20;
+      ctx.strokeStyle = `rgba(${ARCANE.light},${(1 - k) * 0.9})`;
       ctx.lineWidth = 3 + (1 - k) * 4;
       ctx.beginPath(); ctx.arc(fxx, fxy, r, 0, 7); ctx.stroke();
       ctx.shadowBlur = 0;
-      ctx.fillStyle = `rgba(168,106,224,${(1 - k) * 0.22})`;
+      ctx.fillStyle = `rgba(${ARCANE.base},${(1 - k) * 0.22})`;
       ctx.beginPath(); ctx.arc(fxx, fxy, r * 0.68, 0, 7); ctx.fill();
       ctx.restore();
       continue;
@@ -6108,9 +6883,15 @@ function draw() {
     ctx.restore();
   }
 
+  drawBloodPools(laneW, h); // no chão, sob as sombras e a horda
+  drawGroundShadows(laneW, h);
   for (const e of S.enemies) {
     const t = ENEMY_TYPES[e.type];
-    const x = e.lane * laneW + laneW / 2, y = e.y * h;
+    const x = e.lane * laneW + laneW / 2;
+    // Passada: um balanço vertical minúsculo, fora de fase por inimigo. A horda deixa de
+    // deslizar em bloco e passa a marchar. Só o sprite sobe — `e.y` (colisão) não muda,
+    // e a sombra fica no chão, então o pé "descola" de leve a cada passo.
+    const y = e.y * h + Math.sin(vClock * 5.13 + (e.ph || 0)) * 1.6;
     ctx.font = (t.armor < 1 ? 24 : 20) + "px sans-serif";
     ctx.fillText(e.burn > 0 ? "🔥" : t.icon, x, y);
     if (e._targeted) {
@@ -6173,6 +6954,17 @@ function draw() {
   }
   ctx.globalAlpha = 1;
 
+  // Clima por cima das unidades: é o que permite a névoa engolir a horda de longe.
+  drawWeatherOverlay(w, h);
+
+  // Vinheta: escurece os cantos e empurra o olho para o centro da lane. Vem antes do
+  // astro de propósito, para o sol/lua e o número do dia não perderem contraste.
+  const vig = ctx.createRadialGradient(w / 2, h * 0.52, Math.min(w, h) * 0.34, w / 2, h * 0.52, Math.max(w, h) * 0.78);
+  vig.addColorStop(0, "rgba(0,0,0,0)");
+  vig.addColorStop(1, "rgba(0,0,0,.42)");
+  ctx.fillStyle = vig;
+  ctx.fillRect(0, 0, w, h);
+
   // astro por último: inimigos passam por baixo dele
   drawAstro();
 }
@@ -6189,6 +6981,7 @@ function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.min(0.1, (now - lastT) / 1000) * S.debug.speed;
   lastT = now;
+  vClock += dt;   // relógio VISUAL: já vem multiplicado pela velocidade do jogo
   update(dt);
   if (menusOpen()) return;
   syncLiveRes();
@@ -6260,8 +7053,53 @@ const LORE_COMMAND =
   + "Proteja seu setor. Atravesse a noite. Talhe seu nome nos tijolos das muralhas da realeza.\n\n"
   + "Nosso lema é um só: Karzstak NÃO deve cair. Não importa o custo.";
 
-const TUTORIAL_TEXT =
-  "1. Construa uma Fábrica de Virotes 🏹 no distrito de baixo.\n2. Construa uma Besta 🏹 num portão, cada torre usa a munição da SUA fábrica.\n3. A esteira abastece por proximidade: torre 5 primeiro, depois 4, 3... e só passa adiante quando a da vez está cheia.\n4. A muralha aguenta 5 HITS. Aperte ▶ Turno e sobreviva.\n\n✍ Desenhe formas no campo: círculo, triângulo ou quadrado sobre suas tropas dá auras (vida, ataque, defesa); a forma exigida sobre um inimigo com aura o dispela. Cada conjuração custa 1 💎.";
+
+// ---------- Tutorial rápido no campo ----------
+// Substitui a antiga tela "Suas Ordens": em vez de mais um modal antes de o jogador ver
+// o jogo, as instruções passam SOBRE o campo, já com tudo à vista. Enquanto rodam, um
+// anel dourado pulsa no botão de troca de campo, que é o controle menos óbvio da tela.
+const TUTORIAL_TIPS = [
+  "Construa Torres no topo da muralha.",
+  "Construa Fábricas para alimentar as Torres.",
+  "Alimente as Fábricas com Extratores no Feudo.",
+  "Praças e Edifícios melhoram a produtividade e fornecem recursos.",
+  "Clique com o botão DIREITO do mouse para usar habilidade.",
+  "Clique e arraste com o botão ESQUERDO para usar o cajado arcano.",
+  "Este trabalho é difícil. Boa Sorte.",
+];
+// A única dica que manda o jogador SAIR do campo de cima. É nela que o anel do botão
+// de troca de campo acelera, senão o aviso mais forte apareceria enquanto o texto
+// ainda está falando da muralha.
+const TIP_FEUD = 2;
+// O tempo de leitura acompanha o tamanho da dica: com um valor fixo, "Boa Sorte."
+// ficava tanto tempo na tela quanto uma frase de duas linhas.
+const TIP_MS_PER_CHAR = 62, TIP_MIN_MS = 2300, TIP_MAX_MS = 3600, TIP_GAP_MS = 550;
+const tipHold = (txt) => Math.max(TIP_MIN_MS, Math.min(TIP_MAX_MS, txt.length * TIP_MS_PER_CHAR));
+let tutTimer = null;
+function stopTutorial() {
+  clearTimeout(tutTimer); tutTimer = null;
+  $("tutorial-tip").classList.remove("tt-show");
+  $("field-toggle").classList.remove("tut-ring", "tut-hot");
+}
+function runTutorial() {
+  stopTutorial();
+  const tip = $("tutorial-tip");
+  $("field-toggle").classList.add("tut-ring");
+  let i = 0;
+  const step = () => {
+    if (i >= TUTORIAL_TIPS.length) { stopTutorial(); return; }
+    $("field-toggle").classList.toggle("tut-hot", i === TIP_FEUD);
+    const txt = TUTORIAL_TIPS[i++];
+    tip.textContent = txt;
+    tip.classList.add("tt-show");
+    tutTimer = setTimeout(() => {
+      tip.classList.remove("tt-show");
+      tutTimer = setTimeout(step, TIP_GAP_MS);
+    }, tipHold(txt));
+  };
+  step();
+}
+$("pause-tutorial").onclick = () => { closePause(); runTutorial(); };
 
 function setupMenu() {
   const hasSave = !!localStorage.getItem(SAVE_KEY);
@@ -6448,6 +7286,8 @@ function toggleLoadout(kind, key) {
 // Lore curta exibida sob o nome de cada item do Arsenal
 const ARS_LORE = {
   // Torres — Básicas
+  holofote:    "Não fere: aponta. E o que ela aponta, morre.",
+  moedor:      "Uma vida moída por vez, e a tropa inteira avança.",
   besta:       "A primeira arma das ameias, fiel desde o início.",
   catapulta:   "Madeira velha e ódio, desde o primeiro cerco.",
   caldeirao:   "Sopa fervente que ninguém quer provar.",
@@ -6481,7 +7321,7 @@ const ARS_LORE = {
   // Praças — Distrito do Povo
   praca_publica:    "Feira, fofoca e o censo do que ainda vive.",
   praca_festival:   "Uma noite de música que segura as outras.",
-  praca_jardim:     "Flores na guerra: teimosia — e cura.",
+  praca_jardim:     "Flores na guerra: teimosia, e cura.",
   praca_chique:     "Os nobres pagam caro para esquecer o cerco.",
   praca_cerimonial: "Os caídos viram nomes; os nomes, cristal.",
   // Praças — Distrito das Fábricas
@@ -6517,7 +7357,9 @@ function loadoutMissing() {
 }
 // texto de traço da torre (mesmo do menu de construção)
 function towerTrait(tt) {
-  return tt.support === "heal" ? "cura passiva das tropas" :
+  return tt.support === "spot" ? "acende uma lane: +30% de dano, +15% de crítico e tiro mais rápido ali" :
+    tt.support === "grind" ? `sacrifica 1 tropa a cada ${GRIND_EVERY}s: +${Math.round(GRIND_MULT*100)}% para as tropas por ${GRIND_DUR}s` :
+    tt.support === "heal" ? "cura passiva das tropas" :
     tt.support === "buff" ? "fortalece as tropas" :
     tt.support === "mage" ? "rompe selos e reforça tropas" :
     tt.support === "charm" ? "vira inimigos contra os seus" :
@@ -6667,7 +7509,7 @@ document.querySelectorAll("#scr-ranking .rank-tab").forEach(t => {
 function rivalPreview(k) {
   if (isOutcast(k)) {
     const f = FACTIONS[k];
-    return `<b>${facIc(k)} ${f.name}</b> são odiados por TODOS: sofrem todas as penalidades — e não impõem penalidade a ninguém.`;
+    return `<b>${facIc(k)} ${f.name}</b> são odiados por TODOS: sofrem todas as penalidades, e não impõem penalidade a ninguém.`;
   }
   const r = FACTIONS[RIVAL[k]];
   return `Oposição: <b>${facIc(RIVAL[k])} ${r.name}</b> · penalidade: ${DEBUFF_BY_CHOICE[k]}`;
@@ -6685,7 +7527,7 @@ function openFactionInfo() {
     }
     for (const k of OUTCAST) {
       const p = FACTIONS[k], dp = document.createElement("div"); dp.className = "wave-row";
-      const how = facUnlocked(k) ? "Desbloqueada." : p.dlc ? "DLC — bloqueada." : "Jogue para desbloquear.";
+      const how = facUnlocked(k) ? "Desbloqueada." : p.dlc ? "DLC: bloqueada." : "Jogue para desbloquear.";
       dp.innerHTML = `<span class="wicon">${facIc(k)}</span><span class="wname"><b>${p.name}</b>: ${p.desc}<br><span class="cmb-desc">Odiada por todas: sofre todas as penalidades e não pune ninguém. ${how}</span></span>`;
       m.appendChild(dp);
     }
@@ -6791,10 +7633,10 @@ $("btn-infinito").onclick = () => {
       ["O Decreto", LORE_DECREE],
       ["O que Sobrou do Mundo", LORE_WORLD],
       [`Setor ${formatSectorId(S.sectorId)} · Muralha ${S.sectorDir}`, LORE_COMMAND],
-      ["Suas Ordens", TUTORIAL_TEXT],
     ], () => {
       // O evento do dia 1 nunca é pulado: ele explica o modificador já aplicado.
-      showOverlay(`${DAY1_EVENT.ic} Dia 1: ${DAY1_EVENT.t}`, `${DAY1_EVENT.s}\n\n${effectText(DAY1_EVENT)}`);
+      // Fechado ele, o tutorial roda SOBRE o campo, com o jogo já à vista.
+      showOverlay(`${DAY1_EVENT.ic} Dia 1: ${DAY1_EVENT.t}`, `${DAY1_EVENT.s}\n\n${effectText(DAY1_EVENT)}`, runTutorial);
     });
   });
 };
@@ -6810,7 +7652,7 @@ $("menu-help").onclick = () => {
   openModal("Karzstak Must Not Fall", (m) => {
     const d = document.createElement("div"); d.className = "panel-hint";
     d.innerHTML = "Há cento e vinte anos os mortos marcham, e <b>Karzstak não pode cair</b>. Você é o novo comandante de um dos setores da muralha: o rei lhe confiou o <b>Cetro Real</b>.<br><br>"
-      + "<b>Como jogar:</b> aperte <b>▶ Turno</b> e sobreviva à horda. Construa <b>fábricas</b> no distrito para abastecer as <b>torres</b> nos portões; erga <b>edifícios</b> para fortalecer a cidade. A muralha aguenta alguns <b>hits</b> — se zerar, a run acaba.<br><br>"
+      + "<b>Como jogar:</b> aperte <b>▶ Turno</b> e sobreviva à horda. Construa <b>fábricas</b> no distrito para abastecer as <b>torres</b> nos portões; erga <b>edifícios</b> para fortalecer a cidade. A muralha aguenta alguns <b>hits</b>. Se zerar, a run acaba.<br><br>"
       + "<b>Infinito</b> = sobreviva o máximo que puder. <b>História</b> = campanhas (em breve). <b>Miolo / Conselho / Arsenal</b> = progressão persistente entre runs.";
     m.appendChild(d);
   });

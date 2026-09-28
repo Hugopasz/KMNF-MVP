@@ -3,6 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<!-- O ?v= dos assets só resolve se ESTE arquivo for buscado de novo. Com o index em
+     cache o navegador continua pedindo a versão velha do game.js e a atualização
+     parece não ter acontecido. Estas linhas pedem revalidação do documento. -->
+<meta http-equiv="Cache-Control" content="no-cache, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
 <title>Karzstak Must Not Fall · MVP</title>
 <!-- App em tela cheia no iPhone/Android (via "Adicionar à Tela de Início") -->
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -14,7 +19,7 @@
 <link rel="preload" as="image" href="ASSET_ICONE-MIOLO.png?v=1">
 <link rel="preload" as="image" href="ASSET_ICONE-CONSELHO.png?v=1">
 <link rel="preload" as="image" href="ASSET_ICONE-ARSENAL.png?v=1">
-<link rel="stylesheet" href="style.css?v=169">
+<link rel="stylesheet" href="style.css?v=187">
 </head>
 <body>
 <div id="game">
@@ -41,6 +46,7 @@
     <canvas id="canvas"></canvas>
     <button id="astro-btn" title="Vigia da torre: próxima horda"></button>
     <div id="combat-msg"></div>
+    <div id="tutorial-tip"></div>
   </div>
 
   <!-- Portões / torres: 5 slots -->
@@ -59,6 +65,9 @@
     <!-- Setinha: alterna Cidade ↔ O Feudo (círculo dourado, triângulo p/ baixo) -->
     <button id="field-toggle" class="to-feud" title="Ir para O Feudo"><span class="ft-tri"></span></button>
   </div>
+
+  <!-- Sombra das nuvens sobre o setor inteiro (campo + muralha + cidade) -->
+  <div id="cloud-shade" aria-hidden="true"></div>
 
   <!-- Toast leve -->
   <div id="toast"></div>
@@ -93,7 +102,7 @@
     <div class="laws-top"><button class="tavola-round tavola-back" id="laws-back">‹</button><button class="tavola-round" id="laws-help-btn">?</button></div>
     <div id="laws-help" class="hidden">
       <b>As Leis do Setor</b>
-      <p>Cada melhoria é uma lei assinada por você, comandante. Leis são permanentes e pesam na moral do povo a cada turno — algumas melhoram a vida de todos, outras trocam bem-estar por poder.</p>
+      <p>Cada melhoria é uma lei assinada por você, comandante. Leis são permanentes e pesam na moral do povo a cada turno: algumas melhoram a vida de todos, outras trocam bem-estar por poder.</p>
       <p>Avance cada linha do centro para fora. As leis lendárias exigem as duas linhas vizinhas completas.</p>
       <p class="laws-limit">Leis assinadas: <b id="laws-limit-n">0/30</b></p>
       <button id="laws-dbg">debug: assinar tudo</button>
@@ -116,6 +125,7 @@
       <div id="menu-bg-day"></div>
       <div id="menu-bg-night"></div>
       <div id="menu-vignette"></div>
+      <div class="motes-layer"></div>
     </div>
     <button id="menu-help" title="Sobre / Como jogar">?</button>
     <div id="menu-box">
@@ -208,6 +218,7 @@
         <div id="settings-list" class="hidden"></div>
         <button id="pause-save" class="pause-btn">💾 Salvar jogo</button>
         <button id="pause-load" class="pause-btn">📂 Carregar jogo</button>
+        <button id="pause-tutorial" class="pause-btn">🎓 Mostrar tutorial</button>
         <button id="pause-exit" class="pause-btn">🏰 Sair ao Menu</button>
         <button id="pause-debug" class="pause-btn" title="Menu de debug">🐞 Debug</button>
         <div id="pause-debug-panel" class="hidden"></div>
@@ -221,9 +232,9 @@
     <div id="overlay-box">
       <h2 id="overlay-title"></h2>
       <p id="overlay-text"></p>
-      <button id="overlay-btn">Continuar</button>
       <button id="overlay-skip" class="hidden">Pular ⏭</button>
     </div>
+    <div id="overlay-foot">CLIQUE FORA PARA CONTINUAR</div>
   </div>
 
   <!-- Tela de Vitória -->
@@ -260,9 +271,10 @@ Agora só resta continuar resistindo. O rei negativa não descansa, e nem suas h
 
   <!-- Escolha de Facções (início da run) -->
   <div id="factions" class="hidden">
+    <div class="motes-layer" aria-hidden="true"></div>
     <div id="factions-box"></div>
   </div>
 </div>
-<script src="game.js?v=237"></script>
+<script src="game.js?v=267"></script>
 </body>
 </html>
