@@ -84,50 +84,56 @@ function dm(key, def) { return (S.dayMods && S.dayMods[key] != null) ? S.dayMods
 
 // ---------- Eventos Diários (rogue-like) ----------
 // e: efeitos { gold, hearts, hits, morale, mods:{...} }. mods viram S.dayMods do dia.
+// w: peso no sorteio (1 = normal, omitido = 1).
+// Devolver 🧱 é a recompensa mais forte do jogo: hit perdido não volta de nenhuma outra
+// forma que o jogador controle, então cair um desses no sorteio apaga uma noite ruim
+// inteira. Por isso os eventos que curam a muralha saem com peso baixo, e o que cura 2
+// sai com peso menor ainda. É o único lugar onde mexer no peso muda a dificuldade.
+const EV_W_HEAL = 0.2, EV_W_HEAL_BIG = 0.12;
 const EVENTS = [
   // ===== POSITIVOS (20) =====
   { id: "p1",  ic: "🌾", ty: "pos", t: "Colheita Abençoada", s: "Os campos internos renderam além do esperado. Os cofres da guarda agradecem.", e: { gold: 35, morale: 8 } },
-  { id: "p2",  ic: "🔨", ty: "pos", t: "Mutirão da Muralha", s: "Pedreiros voluntários trabalharam a noite toda reforçando as brechas.", e: { hits: 2, morale: 6 } },
+  { id: "p2",  ic: "🔨", ty: "pos", t: "Mutirão das Muralhas", s: "Pedreiros voluntários trabalharam a noite toda reforçando as brechas.", e: { hits: 2, morale: 6 }, w: EV_W_HEAL_BIG },
   { id: "p3",  ic: "💎", ty: "pos", t: "Veio de Argamato", s: "Mineiros encontraram um bolsão de cristais intactos sob o distrito.", e: { hearts: 6, morale: 6 } },
-  { id: "p4",  ic: "🎺", ty: "pos", t: "Notícia da Frente Norte", s: "Um setor vizinho resistiu. O moral dispara em toda a muralha.", e: { morale: 18 } },
+  { id: "p4",  ic: "🎺", ty: "pos", t: "Notícia da Frente Norte", s: "Um setor vizinho resistiu. O moral dispara em todas as muralhas.", e: { morale: 18 } },
   { id: "p5",  ic: "🏹", ty: "pos", t: "Carregamento de Virotes", s: "Uma carroça de munição chegou dos arsenais reais.", e: { gold: 20, mods: { prod: 1.25 } } },
   { id: "p6",  ic: "⚙️", ty: "pos", t: "Engrenagens Novas", s: "Um engenheiro ajustou as fábricas. Hoje elas cantam.", e: { mods: { prod: 1.35 }, morale: 5 } },
   { id: "p7",  ic: "🔥", ty: "pos", t: "Fervor no Muro", s: "Os soldados amanheceram inspirados. Suas armas parecem mais certeiras.", e: { mods: { towerDmg: 1.3 }, morale: 5 } },
-  { id: "p8",  ic: "🪙", ty: "pos", t: "Mercadores Gratos", s: "Comerciantes salvos por sua muralha retribuem com ouro.", e: { gold: 45 } },
+  { id: "p8",  ic: "🪙", ty: "pos", t: "Mercadores Gratos", s: "Comerciantes salvos por suas muralhas retribuem com ouro.", e: { gold: 45 } },
   { id: "p9",  ic: "🕊️", ty: "pos", t: "Manhã Silenciosa", s: "Por algum motivo, os mortos hesitam. O vigia enxerga mais longe.", e: { mods: { warn: 2 }, morale: 6 } },
   { id: "p10", ic: "🍞", ty: "pos", t: "Rações Extras", s: "O conselho liberou os estoques. Ninguém luta de barriga vazia.", e: { gold: 15, morale: 10 } },
   { id: "p11", ic: "🛡️", ty: "pos", t: "Reforços do Interior", s: "Um pelotão da guarda real reforça a linha por hoje.", e: { mods: { enemyDmg: 0.8 }, morale: 6 } },
   { id: "p12", ic: "💰", ty: "pos", t: "Dízimo de Guerra", s: "As paróquias arrecadaram para a defesa do setor.", e: { gold: 30, hearts: 2 } },
-  { id: "p13", ic: "🌟", ty: "pos", t: "Bênção do Cristal", s: "O Turbilhão Nexus pulsa forte hoje. A cidade inteira sente.", e: { morale: 14, hits: 1 } },
+  { id: "p13", ic: "🌟", ty: "pos", t: "Bênção do Cristal", s: "O Turbilhão Nexus pulsa forte hoje. A cidade inteira sente.", e: { morale: 14, hits: 1 }, w: EV_W_HEAL },
   { id: "p14", ic: "🧰", ty: "pos", t: "Peças Sobressalentes", s: "Recuperaram material de um posto abandonado.", e: { gold: 25, mods: { prod: 1.2 } } },
   { id: "p15", ic: "🎯", ty: "pos", t: "Treino da Aurora", s: "Os artilheiros treinaram ao amanhecer. A mira está afiada.", e: { mods: { towerDmg: 1.2 }, morale: 4 } },
   { id: "p16", ic: "🐴", ty: "pos", t: "Cavalaria de Passagem", s: "Cavaleiros a caminho de outro setor deixam suprimentos.", e: { gold: 22, hearts: 3 } },
   { id: "p17", ic: "🌙", ty: "pos", t: "Presságio Favorável", s: "Os astros sorriem. Dizem que hoje a sorte está do seu lado.", e: { morale: 12 } },
   { id: "p18", ic: "🔮", ty: "pos", t: "Visão do Vidente", s: "Um oráculo previu as investidas. O vigia ganha tempo precioso.", e: { mods: { warn: 3 } } },
   { id: "p19", ic: "🏰", ty: "pos", t: "Ordem do Rei", s: "O soberano cita seu setor como exemplo. A tropa se enche de orgulho.", e: { morale: 16, gold: 10 } },
-  { id: "p20", ic: "❤️", ty: "pos", t: "Filhos da Muralha", s: "As crianças do distrito trouxeram água e canções aos soldados.", e: { morale: 11, hits: 1 } },
+  { id: "p20", ic: "❤️", ty: "pos", t: "Filhos das Muralhas", s: "As crianças do distrito trouxeram água e canções aos soldados.", e: { morale: 11, hits: 1 }, w: EV_W_HEAL },
   // ===== NEGATIVOS (10) =====
   { id: "n1",  ic: "🩸", ty: "neg", t: "Baixas na Noite", s: "Alguns guardas não voltaram da última investida. O luto pesa.", e: { morale: -12 } },
-  { id: "n2",  ic: "🕳️", ty: "neg", t: "Brecha no Alicerce", s: "Uma fenda se abriu na base da muralha durante a madrugada.", e: { hits: -1, morale: -6 } },
+  { id: "n2",  ic: "🕳️", ty: "neg", t: "Brecha no Alicerce", s: "Uma fenda se abriu na base das muralhas durante a madrugada.", e: { hits: -1, morale: -6 } },
   { id: "n3",  ic: "💸", ty: "neg", t: "Cofre Saqueado", s: "Desertores levaram parte do ouro do setor ao fugir.", e: { gold: -30, morale: -6 } },
   { id: "n4",  ic: "🌧️", ty: "neg", t: "Tempestade de Cinzas", s: "A poeira dos mortos entope as engrenagens. As fábricas engasgam.", e: { mods: { prod: 0.7 } } },
-  { id: "n5",  ic: "😨", ty: "neg", t: "Boatos de Queda", s: "Espalharam que a muralha vizinha caiu. O medo se alastra.", e: { morale: -16 } },
+  { id: "n5",  ic: "😨", ty: "neg", t: "Boatos de Queda", s: "Espalharam que as muralhas vizinhas caíram. O medo se alastra.", e: { morale: -16 } },
   { id: "n6",  ic: "🦠", ty: "neg", t: "Febre no Distrito", s: "Uma doença varre os alojamentos. Menos mãos para trabalhar.", e: { mods: { prod: 0.8 }, morale: -6 } },
   { id: "n7",  ic: "🌫️", ty: "neg", t: "Neblina Cega", s: "Uma névoa densa encobre o horizonte. O vigia mal enxerga.", e: { mods: { warn: -1.5 } } },
   { id: "n8",  ic: "⚰️", ty: "neg", t: "Deserção", s: "Parte da guarnição fugiu na calada. A linha está mais fraca hoje.", e: { mods: { enemyDmg: 1.2 }, morale: -8 } },
   { id: "n9",  ic: "🥀", ty: "neg", t: "Racionamento", s: "Os estoques minguam. O conselho corta as verbas do setor.", e: { gold: -20, morale: -8 } },
-  { id: "n10", ic: "🌑", ty: "neg", t: "Presságio Sombrio", s: "Corvos rodeiam a muralha. Ninguém dorme direito.", e: { morale: -14 } },
+  { id: "n10", ic: "🌑", ty: "neg", t: "Presságio Sombrio", s: "Corvos rodeiam as muralhas. Ninguém dorme direito.", e: { morale: -14 } },
   // ===== CAÓTICOS (5) =====
   { id: "c1",  ic: "⚔️", ty: "cha", t: "Fúria dos Mortos", s: "Algo os enlouquece: hoje a horda avança mais rápido, mas você jurou vingança (moral em alta).", e: { mods: { enemySpd: 1.3 }, morale: 12 } },
   { id: "c2",  ic: "🛢️", ty: "cha", t: "Munição Instável", s: "Um lote defeituoso chegou: as torres batem MUITO mais forte, mas gastam o dobro de munição.", e: { mods: { towerDmg: 1.6, ammoCost: 2 } } },
   { id: "c3",  ic: "🐗", ty: "cha", t: "Marcha Blindada", s: "Só os mais couraçados vieram hoje: todos os mortos chegam com armadura.", e: { mods: { allArmored: true }, gold: 20 } },
   { id: "c4",  ic: "🎲", ty: "cha", t: "Feira do Conde", s: "O Conde dos Ratos abre seu mercado: ouro farto hoje, mas as fábricas rendem menos.", e: { gold: 60, mods: { prod: 0.6 } } },
-  { id: "c5",  ic: "💥", ty: "cha", t: "Sobrecarga do Nexus", s: "O cristal transborda: produção turbinada, mas a muralha racha com a energia.", e: { mods: { prod: 1.8 }, hits: -1 } },
+  { id: "c5",  ic: "💥", ty: "cha", t: "Sobrecarga do Nexus", s: "O cristal transborda: produção turbinada, mas as muralhas racham com a energia.", e: { mods: { prod: 1.8 }, hits: -1 } },
 ];
 // Evento FIXO ao amanhecer do dia 11: chegam os mortos antigos, o saque despenca.
 // Evento OBRIGATÓRIO do dia 1: começa a run com um empurrão nas torres.
 const DAY1_EVENT = { id: "cafecomleite", ic: "☕", ty: "pos", t: "Café com Leite",
-  s: "A primeira manhã na muralha começa com café quente e leite fresco das últimas cabras do reino. Os artilheiros acordam animados: a mira nunca esteve tão firme.",
+  s: "A primeira manhã nas muralhas começa com café quente e leite fresco das últimas cabras do reino. Os artilheiros acordam animados: a mira nunca esteve tão firme.",
   e: { mods: { towerDmg: 1.5 } } };
 const ELDERS_EVENT = { id: "elders", ic: "🦴", ty: "neg", t: "Os Mortos Antigos",
   s: "Os recém-tombados, ainda cheios de bolsas e relíquias, já foram todos derrubados. Agora sobem das criptas os mortos ANTIGOS: ossos secos, sem nada de valor. O saque por criatura despenca daqui em diante.",
@@ -152,7 +158,10 @@ function effectText(ev) {
 }
 function pickDailyEvent() {
   const pool = EVENTS.filter(e => e.id !== S.lastEvent);
-  return pool[Math.floor(Math.random() * pool.length)];
+  const total = pool.reduce((s, e) => s + (e.w ?? 1), 0);
+  let r = Math.random() * total;
+  for (const e of pool) { r -= (e.w ?? 1); if (r <= 0) return e; }
+  return pool[pool.length - 1];
 }
 function applyDailyEvent(ev) {
   let e = ev.e;
@@ -161,8 +170,11 @@ function applyDailyEvent(ev) {
     e = { ...e };
     for (const k of ["gold", "hearts", "hits", "morale"]) if (typeof e[k] === "number") e[k] = Math.round(e[k] / 2);
   }
-  if (e.gold) S.gold = Math.max(0, S.gold + e.gold);
-  if (e.hearts) S.hearts = Math.max(0, S.hearts + e.hearts);
+  // Sem trava em zero: um evento de -30 🪙 com 10 no cofre cobra os 30 e deixa -20.
+  // Truncar a cobrança era um perdão invisível, e quem soubesse disso gastava tudo
+  // antes do amanhecer para receber o prejuízo de graça.
+  if (e.gold) S.gold += e.gold;
+  if (e.hearts) S.hearts += e.hearts;
   if (e.hits) S.hits = Math.max(1, Math.min(maxHits(), S.hits + e.hits));
   if (e.morale) gainMorale(e.morale);
   if (e.mods) Object.assign(S.dayMods, e.mods);
@@ -176,7 +188,7 @@ const FACTIONS = {
   red:    { ic: "🔴", name: "Os Vermelhos", tag: "Sacrifício pelo Reino",  flavor: "Guiados pelo Rei.",              color: "#c0392b", desc: "+12% de dano das torres." },
   blue:   { ic: "🔵", name: "Os Azuis",     tag: "Esforço de Guerra",      flavor: "Ciência é Progresso.",          color: "#2f6fd6", desc: "+15% de produção fabril." },
   yellow: { ic: "🟡", name: "Os Amarelos",  tag: "A Igreja do Amanhecer",  flavor: "Culto ao Deus do Sol.",         color: "#e8b93a", desc: "+30% de ganho de moral." },
-  pink:   { ic: "🌸", name: "As Rosas",      tag: "Lealdade pela Rainha",   flavor: "Admiradores da Matrona.",       color: "#d6608f", desc: "+2 de vida base da muralha." },
+  pink:   { ic: "🌸", name: "As Rosas",      tag: "Lealdade pela Rainha",   flavor: "Admiradores da Matrona.",       color: "#d6608f", desc: "+2 de vida base das muralhas." },
   purple: { ic: "🟣", name: "Os Roxos",      tag: "Culto da Lua",           flavor: "Filhos da Magia Negra.",        color: "#a86ae0", desc: "Mortos viram Sombras (10%).", secret: true },
   green:  { ic: "🟢", name: "Os Verdes",      tag: "Povos Mágicos",          flavor: "Refugiados das florestas antigas.", color: "#4cae6a", desc: "Tropas curam por turno.", secret: true, dlc: true },
 };
@@ -387,7 +399,7 @@ function facUnlocked(k) { return k === "purple" ? !!META.purple : k === "green" 
 // e, como ninguém os tem por rival, não impõem penalidade a ideologia nenhuma.
 function curFaction() { return S.factions[0] || null; }
 const RIVAL = { red: "yellow", yellow: "blue", blue: "pink", pink: "red" };
-const DEBUFF_BY_CHOICE = { red: "ganho de moral -30%", yellow: "produção -15%", blue: "-1 hit máximo da muralha", pink: "dano das torres -12%" };
+const DEBUFF_BY_CHOICE = { red: "ganho de moral -30%", yellow: "produção -15%", blue: "-1 hit máximo das muralhas", pink: "dano das torres -12%" };
 function facTowerMult() {
   const f = curFaction(); let m = 1;
   if (f === "red") m += 0.12;
@@ -493,7 +505,7 @@ function randomSector() {
 // ---------- OS FAVORES: Rei, Rainha, Conde dos Ratos e Povo Comum ----------
 // Relação 0..100 por personagem (RESETA por run). Resultados descobertos e o
 // contador de eventos persistem entre TODAS as runs (localStorage próprio).
-// 1 interação por dia (conversar OU pedir OU presentear), só ENTRE turnos.
+// 1 interação por TURNO (conversar OU pedir OU presentear), só ENTRE turnos.
 const FAV_KEY = "mknf-favores";
 const FAV_EV_GOAL = 50; // meta exibida no contador de eventos
 function loadFavMeta() {
@@ -504,9 +516,25 @@ const FAVMETA = loadFavMeta();
 function saveFavMeta() { localStorage.setItem(FAV_KEY, JSON.stringify(FAVMETA)); }
 // VISITAR (você vai até eles, escolhendo quem): liberado desde o dia 1.
 // RECEBER VISITA (um visitante fixo aparece sozinho e cobra atenção): só a partir
-// deste dia. De qualquer forma, é 1 interação por dia.
+// deste dia. De qualquer forma, é 1 interação por turno.
 const FAV_VISIT_MIN_DAY = 7;
-function favDefault() { return { rel: { rei: 50, rainha: 50, conde: 50, povo: 50 }, used: false, last: {}, bag: {}, visitor: null, open: {} }; }
+function favDefault() { return { rel: { rei: 50, rainha: 50, conde: 50, povo: 50 }, used: false, last: {}, bag: {}, visitor: null, open: {}, visitDay: null }; }
+// Gasta a interação DO TURNO. Se havia visitante, a visita dele fica resolvida pelo DIA:
+// a interação é por turno, mas quem veio à muralha veio uma vez só. Sem isso, tratar com
+// o visitante de manhã e passar a noite contaria como "ignorou a visita" e cobraria a
+// punição de novo — o comandante seria punido por uma visita que ele atendeu.
+function favSpend(k) {
+  if (favFreeVisits) return;
+  S.fav.used = true;
+  if (S.fav.visitor && (k == null || k === S.fav.visitor)) S.fav.visitDay = S.day;
+}
+// Nome do personagem DENTRO de uma frase, com o artigo certo. Antes era a primeira
+// palavra do nome de tela, o que dava "POVOS veio visitar" — nome de cartaz não serve
+// como sujeito de oração. O fallback mantém a frase de pé se alguém esquecer o `short`.
+function favShort(k) {
+  const c = FAV_CHARS[k];
+  return c ? (c.short || c.name.split(" ")[0]) : "";
+}
 
 function favTier(v, k) {
   if (v === 50) return k === "rainha" ? "NEUTRA" : k === "povo" ? "NEUTROS" : "NEUTRO"; // ponto de partida da run
@@ -545,12 +573,14 @@ function favFxText(e) {
 function favApplyFx(e) {
   for (const [k, v] of Object.entries(e)) {
     if (!v) continue;
-    if (k === "gold") S.gold = Math.max(0, S.gold + v);
-    else if (k === "hearts") S.hearts = Math.max(0, S.hearts + v);
+    // Custos de diálogo também podem deixar no vermelho (ver applyDailyEvent).
+    // O caminho POSITIVO continua passando pelo addResource, que respeita os tetos.
+    if (k === "gold") S.gold += v;
+    else if (k === "hearts") S.hearts += v;
     else if (k === "morale") gainMorale(v);
     else if (k === "hits") S.hits = Math.max(1, Math.min(maxHits(), S.hits + v));
-    else if (k === "maos") { if (v > 0) addResource("maos", v); else S.maos = Math.max(0, S.maos + v); }
-    else { if (v > 0) addResource(k, v); else S.res[k] = Math.max(0, (S.res[k] || 0) + v); }
+    else if (k === "maos") { if (v > 0) addResource("maos", v); else S.maos += v; }
+    else { if (v > 0) addResource(k, v); else S.res[k] = (S.res[k] || 0) + v; }
   }
 }
 
@@ -558,7 +588,7 @@ function favApplyFx(e) {
 // presentes fixos (o personagem escolhe o que quer). Punição em relação 0.
 const FAV_CHARS = {
   rei: {
-    art: "O", name: "REI QUE NÃO DORME", sub: "REGENTE DE KARZSTAK", img: "REI-ICONE.png",
+    art: "O", name: "REI QUE NÃO DORME", short: "o Rei", sub: "REGENTE DE KARZSTAK", img: "REI-ICONE.png",
     punIc: "👑", punDesc: "O Rei retira seu apoio: −6 de moral por turno.",
     blessDesc: "O Rei exalta seu nome: +3 de moral por turno.",
     askIntro: "Você pede uma reunião emergencial com o Rei.", askQuote: "Comandante, o que precisa?",
@@ -575,7 +605,7 @@ const FAV_CHARS = {
     ],
   },
   rainha: {
-    art: "A", name: "RAINHA DAS ROSAS", sub: "MATRONA DA CIDADE", img: "RAINHA-ICONE.png",
+    art: "A", name: "RAINHA DAS ROSAS", short: "a Rainha", sub: "MATRONA DA CIDADE", img: "RAINHA-ICONE.png",
     punIc: "🌹", punDesc: "A Rainha sussurra contra você: tropas batem −25% enquanto durar.",
     blessDesc: "A Rainha inspira suas tropas: +15% de dano enquanto durar.",
     askIntro: "Você solicita audiência no jardim real.", askQuote: "Seja breve, o chá esfria.",
@@ -592,9 +622,9 @@ const FAV_CHARS = {
     ],
   },
   conde: {
-    art: "O", name: "CONDE DOS RATOS", sub: "LORDE DO SUBSOLO", img: "CONDE-ICONE.png",
-    punIc: "🐀", punDesc: "Os ratos roem os alicerces: −1 hit da muralha por turno.",
-    blessDesc: "Os ratos remendam os alicerces: +1 hit da muralha a cada amanhecer.",
+    art: "O", name: "CONDE DOS RATOS", short: "o Conde", sub: "LORDE DO SUBSOLO", img: "CONDE-ICONE.png",
+    punIc: "🐀", punDesc: "Os ratos roem os alicerces: −1 hit das muralhas por turno.",
+    blessDesc: "Os ratos remendam os alicerces: +1 hit das muralhas a cada amanhecer.",
     askIntro: "Você desce aos túneis do mercado ilegal.", askQuote: "Tudo tem um preço, comandante...",
     asks: [
       { t: "Preciso de Combustíveis.", e: { combustivel: 5 }, rel: 8 },
@@ -609,10 +639,10 @@ const FAV_CHARS = {
     ],
   },
   povo: {
-    art: "OS", name: "POVOS COMUNS", sub: "ALDEÕES HUMANOS", img: "OS-POVOS-ICONE.png",
+    art: "OS", name: "POVOS COMUNS", short: "o povo", sub: "ALDEÕES HUMANOS", img: "OS-POVOS-ICONE.png",
     punIc: "🔥", punDesc: "O povo cruza os braços: produção −20% enquanto durar.",
     blessDesc: "O povo trabalha cantando: produção +10% enquanto durar.",
-    askIntro: "Você sobe num caixote na praça e pede ajuda ao povo.", askQuote: "O que a muralha precisa de nós?",
+    askIntro: "Você sobe num caixote na praça e pede ajuda ao povo.", askQuote: "O que as muralhas precisam de nós?",
     asks: [
       { t: "Preciso de Comida.", e: { comida: 5 }, rel: 8 },
       { t: "Preciso de voluntários.", e: { maos: 3 }, rel: 15 },
@@ -636,9 +666,9 @@ const FAV_EVENTS = {
       c: [{ t: "Eh... Estou de ressaca, minha alteza.", e: { comida: 5 }, rel: -5 },
           { t: "Estou bem! A cidade é mais importante.", e: { bens: 5 }, rel: 6 },
           { t: "Cuida da sua vida, Corôa!", e: { morale: 8 }, rel: -8 }] },
-    { id: "r2", s: "O Rei inspeciona a muralha do alto de seu corcel.", q: "Estas rachaduras... são recentes?",
+    { id: "r2", s: "O Rei inspeciona as muralhas do alto de seu corcel.", q: "Estas rachaduras... são recentes?",
       c: [{ t: "Já mandei reparar, alteza.", e: { hits: 1 }, rel: 6 },
-          { t: "A muralha aguenta mais que o senhor.", e: { morale: 6 }, rel: -6 },
+          { t: "As muralhas aguentam mais que o senhor.", e: { morale: 6 }, rel: -6 },
           { t: "Preciso de verba para isso.", e: { gold: 30 }, rel: -4 }] },
     { id: "r3", s: "Durante o banquete real, o Rei ergue a taça na sua direção.", q: "Um brinde ao comandante da Muralha Oeste!",
       c: [{ t: "Ao Rei e a Karzstak!", e: { morale: 10 }, rel: 7 },
@@ -658,7 +688,7 @@ const FAV_EVENTS = {
           { t: "Executar é desperdício de Mãos.", e: { maos: 1 }, rel: -4 }] },
     { id: "r7", s: "O Rei o convoca à sala do trono vazia, sem guardas.", q: "Se eu cair, quem protege Karzstak?",
       c: [{ t: "O senhor não vai cair.", e: { morale: 6 }, rel: 6 },
-          { t: "A muralha protege. Sempre protegeu.", e: { hits: 1 }, rel: 2 },
+          { t: "As muralhas protegem. Sempre protegeram.", e: { hits: 1 }, rel: 2 },
           { t: "Eu protejo. Com ou sem coroa.", e: { morale: 10 }, rel: -7 }] },
     { id: "r8", s: "O Rei testa uma besta nova no pátio e erra todos os alvos.", q: "O vento, comandante. Foi o vento.",
       c: [{ t: "Claramente o vento, alteza.", e: { gold: 25 }, rel: 5 },
@@ -667,7 +697,7 @@ const FAV_EVENTS = {
     { id: "r9", s: "O Rei encontrou seu relatório de baixas rasurado.", q: "Está escondendo números de mim?",
       c: [{ t: "Jamais, alteza. Foi a chuva.", e: { gold: 20 }, rel: -6 },
           { t: "Sim. Para proteger o moral.", e: { morale: 6 }, rel: 4 },
-          { t: "Números não seguram muralha.", e: { hits: 1 }, rel: -2 }] },
+          { t: "Números não seguram muralhas.", e: { hits: 1 }, rel: -2 }] },
     { id: "r10", s: "No aniversário da coroação, o Rei distribui presentes à corte.", q: "Para você, comandante... escolha.",
       c: [{ t: "O que sua alteza julgar justo.", e: { gold: 40 }, rel: 6 },
           { t: "Suprimentos para meus homens.", e: { comida: 8, bens: 4 }, rel: 4 },
@@ -684,7 +714,7 @@ const FAV_EVENTS = {
           { t: "Só me assusta a fatura da guerra.", e: { gold: 25 }, rel: -5 }] },
     { id: "q3", s: "A Rainha organiza um sarau em plena guerra. Você é convidado.", q: "A arte morre quando paramos de dançar. Vem?",
       c: [{ t: "Uma dança, apenas.", e: { morale: 10 }, rel: 6 },
-          { t: "Tenho uma muralha para segurar.", e: { hits: 1 }, rel: -6 },
+          { t: "Tenho muralhas para segurar.", e: { hits: 1 }, rel: -6 },
           { t: "Mando meus soldados descansarem lá.", e: { morale: 6, comida: -3 }, rel: 3 }] },
     { id: "q4", s: "Você flagra a Rainha alimentando corvos na torre norte.", q: "Eles contam segredos. Quer ouvir um?",
       c: [{ t: "Sempre, majestade.", e: { hearts: 2 }, rel: 5 },
@@ -699,7 +729,7 @@ const FAV_EVENTS = {
           { t: "Corte. Com cerimônia.", e: { gold: 15 }, rel: -4 },
           { t: "Boato bom eu mesmo espalho.", e: { morale: 6 }, rel: -6 }] },
     { id: "q7", s: "A Rainha visita os feridos no hospital de campanha sem anunciar.", q: "Eles lutam por você. Por que lutam?",
-      c: [{ t: "Pelas famílias atrás da muralha.", e: { morale: 8 }, rel: 6 },
+      c: [{ t: "Pelas famílias atrás das muralhas.", e: { morale: 8 }, rel: 6 },
           { t: "Porque eu mando.", e: { maos: 1 }, rel: -7 },
           { t: "Pergunte a eles, majestade.", e: { morale: 4, comida: 3 }, rel: 4 }] },
     { id: "q8", s: "O jardim real amanheceu coberto de cinzas da horda.", q: "Nem minhas rosas escapam. Providências?",
@@ -713,7 +743,7 @@ const FAV_EVENTS = {
     { id: "q10", s: "Você a encontra sozinha na capela, de vela acesa.", q: "Reze comigo. Ou apenas fique.",
       c: [{ t: "Fico, majestade.", e: { morale: 8 }, rel: 6 },
           { t: "Rezo pelos que não voltaram.", e: { morale: 5, hearts: 1 }, rel: 4 },
-          { t: "Deuses não seguram muralha.", e: { hits: 1 }, rel: -7 }] },
+          { t: "Deuses não seguram muralhas.", e: { hits: 1 }, rel: -7 }] },
   ],
   conde: [
     { id: "c1", s: "Depois de uma longa noite...comemorando, ele te faz uma proposta indecente:", q: "Quero que case com a minha filha!",
@@ -766,12 +796,12 @@ const FAV_EVENTS = {
       c: [{ t: "Mentira. E o Oeste não cai.", e: { morale: 8 }, rel: 4 },
           { t: "Caiu. Por isso treinamos dobrado.", e: { morale: -4, maos: 2 }, rel: 5 },
           { t: "Sem perguntas. Circulando!", e: { bens: 3 }, rel: -7 }] },
-    { id: "p3", s: "As crianças do distrito fizeram uma maquete da sua muralha com sucata.", q: "Ficou igualzinha, né, comandante?",
+    { id: "p3", s: "As crianças do distrito fizeram uma maquete das suas muralhas com sucata.", q: "Ficou igualzinha, né, comandante?",
       c: [{ t: "Melhor que a original.", e: { morale: 10 }, rel: 7 },
           { t: "Faltou a torre três. Refaçam.", e: { bens: 4 }, rel: -3 },
           { t: "Contrato os engenheiros mirins.", e: { maos: 1, morale: 5 }, rel: 5 }] },
     { id: "p4", s: "Um ferreiro veterano oferece trabalhar de graça nas torres.", q: "Perdi meu filho pra horda. Deixa eu ajudar.",
-      c: [{ t: "Bem-vindo à muralha, mestre.", e: { maos: 2 }, rel: 6 },
+      c: [{ t: "Bem-vindo às muralhas, mestre.", e: { maos: 2 }, rel: 6 },
           { t: "De graça não. Salário justo.", e: { gold: -20, maos: 2, morale: 5 }, rel: 8 },
           { t: "Velho demais. Vá pra casa.", e: { comida: 3 }, rel: -8 }] },
     { id: "p5", s: "O poço central amanheceu turvo. O povo desconfia de sabotagem.", q: "Tem gosto de ferrugem! Foi a horda?",
@@ -788,13 +818,13 @@ const FAV_EVENTS = {
           { t: "Só até a lua alta. E sem cantoria.", e: { gold: 10, morale: 4 }, rel: 3 }] },
     { id: "p8", s: "Um grupo de jovens quer se alistar. Nenhum sabe segurar uma lança.", q: "A gente aprende rápido! Juro!",
       c: [{ t: "Todos pro treino. Amanhã, cedo.", e: { maos: 2 }, rel: 5 },
-          { t: "Muralha precisa de braços, não heróis.", e: { maos: 1, bens: 3 }, rel: 3 },
+          { t: "Muralhas precisam de braços, não heróis.", e: { maos: 1, bens: 3 }, rel: 3 },
           { t: "Voltem quando crescerem.", e: { morale: 3 }, rel: -6 }] },
-    { id: "p9", s: "O mercado improvisou uma feira sob a muralha. Está lotada e barulhenta.", q: "Vida que segue, né, comandante?",
+    { id: "p9", s: "O mercado improvisou uma feira sob as muralhas. Está lotada e barulhenta.", q: "Vida que segue, né, comandante?",
       c: [{ t: "Feira aberta. A vida vence.", e: { gold: 20, morale: 6 }, rel: 6 },
           { t: "Muito exposta. Mudem pra praça.", e: { bens: 5 }, rel: -3 },
           { t: "Cobro taxa de proteção.", e: { gold: 35 }, rel: -8 }] },
-    { id: "p10", s: "No fim do turno, o distrito inteiro se reúne para ver o sol se pôr da muralha.", q: "Enquanto o senhor tiver de pé, a gente fica.",
+    { id: "p10", s: "No fim do turno, o distrito inteiro se reúne para ver o sol se pôr das muralhas.", q: "Enquanto o senhor tiver de pé, a gente fica.",
       c: [{ t: "Então ficamos todos.", e: { morale: 12 }, rel: 7 },
           { t: "Subam. A vista é de vocês também.", e: { morale: 8, maos: 1 }, rel: 6 },
           { t: "Dispersar. Isso aqui não é teatro.", e: { bens: 3 }, rel: -7 }] },
@@ -859,14 +889,17 @@ function favClosedNote(k) {
   if (a[S.isNight ? "night" : "day"] === 0) return a.note;
   return `Ninguém atendeu. ${a.note}`; // Povo: tinha chance, mas não deu hoje
 }
-function favNewTurn() { S.fav.open = favRollOpen(); }
+function favNewTurn() {
+  S.fav.open = favRollOpen();
+  S.fav.used = false;  // 1 interação por TURNO (antes era por dia: dia e noite dividiam a mesma)
+}
 
 function favTryAction(k, mode) {
-  // 1 interação por dia — visitar qualquer aliança já é permitido desde o dia 1.
-  if (S.fav.used && !favFreeVisits) { toast("Você já tratou com uma aliança hoje. Volte amanhã."); return; }
+  // 1 interação por turno — visitar qualquer aliança já é permitido desde o dia 1.
+  if (S.fav.used && !favFreeVisits) { toast("Você já tratou com uma aliança neste turno. Volte no próximo."); return; }
   // Se alguém veio até você (dia 7+), essa visita tem prioridade: trava as demais.
   if (!favFreeVisits && S.fav.visitor && S.fav.visitor !== k) {
-    toast(`Hoje ${FAV_CHARS[S.fav.visitor].name.split(" ")[0]} veio até você, e só com ${FAV_CHARS[S.fav.visitor].name.split(" ")[0]} dá pra tratar hoje.`);
+    toast(`Hoje ${favShort(S.fav.visitor)} veio até você, e só com ${favShort(S.fav.visitor)} dá pra tratar hoje.`);
     return;
   }
   // Fora do horário: não é interação nenhuma, então não gasta a visita do dia.
@@ -875,7 +908,7 @@ function favTryAction(k, mode) {
     // Só a CONVERSA arrisca encontrar o personagem ocupado (e perder a visita) — e quem
     // veio até você NUNCA está ocupado: ele está literalmente na sua porta.
     if (S.fav.visitor !== k && Math.random() < favBusyChance(k)) {
-      if (!favFreeVisits) { S.fav.used = true; saveGame(); }
+      favSpend(k); saveGame();
       favView = { mode: "busy", chr: k };
       renderFavScr();
       return;
@@ -930,7 +963,7 @@ function renderFavHub(scr) {
   const prev = FAV_ORDER[(favSel + FAV_ORDER.length - 1) % FAV_ORDER.length];
   const next = FAV_ORDER[(favSel + 1) % FAV_ORDER.length];
   const punWarn = FAV_ORDER.filter(favPun).map(p => `${FAV_CHARS[p].punIc} ${FAV_CHARS[p].punDesc}`).join("<br>");
-  // Você pode VISITAR qualquer aliança (desde o dia 1); é 1 interação por dia.
+  // Você pode VISITAR qualquer aliança (desde o dia 1); é 1 interação por turno.
   // Mas se alguém VEIO até você (dia 7+), essa visita tem prioridade e trava as demais.
   const visitor = S.fav.visitor;
   const isVisitor = visitor === k;
@@ -938,14 +971,14 @@ function renderFavHub(scr) {
   const interactable = favFreeVisits || (open && !S.fav.used && (!visitor || isVisitor));
   const actDisabled = interactable ? "" : "disabled";
   const actNote = favFreeVisits ? ""
-    : S.fav.used ? `<div class="fav-used-note">Você já tratou com uma aliança hoje. Volte amanhã.</div>`
-    : visitor && !isVisitor ? `<div class="fav-used-note">Hoje ${FAV_CHARS[visitor].punIc} ${FAV_CHARS[visitor].name.split(" ")[0]} veio até você, e só com ${FAV_CHARS[visitor].name.split(" ")[0]} dá pra tratar hoje.</div>`
+    : S.fav.used ? `<div class="fav-used-note">Você já tratou com uma aliança neste turno. Volte no próximo.</div>`
+    : visitor && !isVisitor ? `<div class="fav-used-note">Hoje ${FAV_CHARS[visitor].punIc} ${favShort(visitor)} veio até você, e só com ${favShort(visitor)} dá pra tratar hoje.</div>`
     : !open ? `<div class="fav-used-note">${favClosedNote(k)}</div>`
     : "";
   scr.innerHTML = `
     <div class="laws-top"><button class="tavola-round tavola-back" id="fav-back">‹</button><button class="tavola-round" id="fav-help-btn">?</button></div>
     <h2 class="tavola-title fav-title"><span class="tt-a">— AS —</span><span class="tt-main">ALIANÇAS</span></h2>
-    <div id="fav-help" class="hidden"><b>As Alianças</b><p>Quatro figuras de Karzstak podem ajudar (ou atrapalhar) sua muralha. Você pode <b>visitar</b> qualquer uma delas <b>desde o dia 1</b>: converse, peça algo ou presenteie, <b>1 vez por dia</b>, entre os turnos. A partir do <b>dia ${FAV_VISIT_MIN_DAY}</b>, uma delas também pode <b>vir até você</b>: ignorar quem veio custa relação com todos, e quem veio está sempre disponível, fora de horário ou não.</p><p><b>Expediente:</b> o Rei atende dia e noite · a Rainha só de <b>dia</b> · o Conde só à <b>noite</b> · o Povo tem <b>70%</b> de dia e <b>30%</b> à noite. Tentar fora de horário não gasta sua visita.</p><p>Cada escolha muda a <b>relação</b> (0–100%). Relação no chão = <b>punição ativa</b>; relação no máximo = <b>bênção ativa</b>. O que você descobre nas conversas fica lembrado para sempre, entre todas as partidas.</p><button id="fav-dbg">debug: visitas infinitas ${favFreeVisits ? "✅" : "❌"}</button></div>
+    <div id="fav-help" class="hidden"><b>As Alianças</b><p>Quatro figuras de Karzstak podem ajudar (ou atrapalhar) suas muralhas. Você pode <b>visitar</b> qualquer uma delas <b>desde o dia 1</b>: converse, peça algo ou presenteie, <b>1 vez por dia</b>, entre os turnos. A partir do <b>dia ${FAV_VISIT_MIN_DAY}</b>, uma delas também pode <b>vir até você</b>: ignorar quem veio custa relação com todos, e quem veio está sempre disponível, fora de horário ou não.</p><p><b>Expediente:</b> o Rei atende dia e noite · a Rainha só de <b>dia</b> · o Conde só à <b>noite</b> · o Povo tem <b>70%</b> de dia e <b>30%</b> à noite. Tentar fora de horário não gasta sua visita.</p><p>Cada escolha muda a <b>relação</b> (0–100%). Relação no chão = <b>punição ativa</b>; relação no máximo = <b>bênção ativa</b>. O que você descobre nas conversas fica lembrado para sempre, entre todas as partidas.</p><button id="fav-dbg">debug: visitas infinitas ${favFreeVisits ? "✅" : "❌"}</button></div>
     <div class="fav-carousel">
       <button class="fav-card fav-side left" data-k="${prev}"><img src="${FAV_CHARS[prev].img}?v=1" alt=""><div class="fav-card-t">-${FAV_CHARS[prev].art}-<br>${FAV_CHARS[prev].name}</div></button>
       <div class="fav-card fav-main"><img src="${c.img}?v=1" alt=""><div class="fav-card-t">-${c.art}-<br><b>${c.name}</b><span>${c.sub}</span></div></div>
@@ -1043,7 +1076,7 @@ function renderFavEncounter(scr) {
 }
 function favChoose(k, i) {
   const v = favView;
-  S.fav.used = !favFreeVisits;
+  favSpend(k);
   let msg;
   if (v.mode === "talk") {
     const ch = v.ev.c[i];
@@ -1076,11 +1109,14 @@ function favChoose(k, i) {
 // Uma visita por dia. Com os turnos travados no automático o comandante nunca
 // desce da muralha: não há visita (e, portanto, nada a ignorar).
 const FAV_IGNORE_REL = 5;   // relação perdida com TODOS ao ignorar a visita do dia
-function favVisitPending() { return !!S.fav && !!S.fav.visitor && !S.fav.used && !S.autoTurn; }
+// `visitDay !== S.day`: a visita ainda não foi resolvida hoje, nem atendida nem ignorada.
+// A cobrança é UMA por dia mesmo com dois turnos, senão virar as costas custaria o dobro.
+function favVisitPending() { return !!S.fav && !!S.fav.visitor && S.fav.visitDay !== S.day && !S.fav.used && !S.autoTurn; }
 // o comandante virou as costas para a corte: todos sentem
 function favIgnoreVisit() {
   if (!favVisitPending()) return;
   S.fav.used = true;
+  S.fav.visitDay = S.day;   // resolvida (mal) por hoje: não cobra de novo no outro turno
   for (const k of FAV_ORDER) favGainRel(k, -FAV_IGNORE_REL);
   toast(`🚪 Visita ignorada: −${FAV_IGNORE_REL}% de relação com todos.`);
   saveGame();
@@ -1093,20 +1129,21 @@ function favPickVisitor() {
   return pool[Math.floor(Math.random() * pool.length)] || FAV_ORDER[0];
 }
 function favNewDay() {
-  S.fav.used = false; // a visita nasce disponível; o automático apenas a esconde (favVisitPending)
+  // O `used` já foi zerado pelo favNewTurn deste amanhecer: a visita é por turno.
+  // O VISITANTE continua sendo do dia: quem veio à muralha fica lá o dia inteiro.
   S.fav.visitor = favPickVisitor(); // UM visitante que vem até você (null antes do dia 7)
   for (const k of FAV_ORDER) {
     if (favPun(k)) toast(`${FAV_CHARS[k].punIc} ${FAV_CHARS[k].punDesc}`);
     else if (favBless(k)) toast(`${FAV_CHARS[k].punIc} ${FAV_CHARS[k].blessDesc}`);
   }
-  if (S.fav.visitor) toast(`${FAV_CHARS[S.fav.visitor].punIc} ${FAV_CHARS[S.fav.visitor].name.split(" ")[0]} veio visitar a muralha.`);
-  if (favBless("conde") && S.hits < maxHits()) { S.hits++; addFloat(2, 0.52, "🐀 Os ratos remendaram a muralha: +1 🧱", "#eecd5c"); }
+  if (S.fav.visitor) toast(`${FAV_CHARS[S.fav.visitor].punIc} ${favShort(S.fav.visitor)} veio visitar as muralhas.`);
+  if (favBless("conde") && S.hits < maxHits()) { S.hits++; addFloat(2, 0.52, "🐀 Os ratos remendaram as muralhas: +1 🧱", "#eecd5c"); }
 }
 // Efeitos por turno das punições/bênçãos (Rei / Conde). Rainha e Povo são multiplicadores.
 function favPunishTick() {
   if (favPun("rei")) { gainMorale(-6); addFloat(2, 0.45, "👑 O Rei retirou o apoio: −6 moral", "#e0705f"); }
   else if (favBless("rei")) { gainMorale(3); addFloat(2, 0.45, "👑 O Rei exalta seu nome: +3 moral", "#eecd5c"); }
-  if (favPun("conde")) { S.hits = Math.max(1, S.hits - 1); addFloat(2, 0.52, "🐀 Os ratos roem a muralha: −1 🧱", "#e0705f"); }
+  if (favPun("conde")) { S.hits = Math.max(1, S.hits - 1); addFloat(2, 0.52, "🐀 Os ratos roem as muralhas: −1 🧱", "#e0705f"); }
 }
 
 // ---------- SEU DISTRITO (resumo da run) ----------
@@ -1141,8 +1178,13 @@ function randomSectorDir() { return SECTOR_DIRS[Math.floor(Math.random() * SECTO
 // Resumo de recursos dos dois campos, em uma linha: Cidade (🪙💎✋) + Feudo (recursos brutos).
 // Fica fora do openDistrict porque o loop reusa isso para manter a linha ao vivo.
 function distResHTML() {
-  const cidade = `🪙 ${Math.floor(S.gold)}&nbsp;💎 ${Math.floor(S.hearts)}&nbsp;✋ ${Math.floor(S.maos)}/${maosCap()}`;
-  const feudo = Object.entries(RESOURCES).map(([k, r]) => `${r.icon}&nbsp;${Math.floor(S.res[k] || 0)}`).join("&nbsp;");
+  // "Seu Setor" marca a dívida igual à barra: as duas leem o mesmo estado, e um
+  // saldo negativo em vermelho só na barra faria o jogador duvidar de qual vale.
+  const n = (v, txt) => `<span class="dr-v${v < 0 ? " neg" : ""}">${txt}</span>`;
+  const cidade = `🪙 ${n(S.gold, Math.trunc(S.gold))}&nbsp;💎 ${n(S.hearts, Math.trunc(S.hearts))}`
+    + `&nbsp;✋ ${n(S.maos, `${Math.trunc(S.maos)}/${maosCap()}`)}`;
+  const feudo = Object.entries(RESOURCES)
+    .map(([k, r]) => `${r.icon}&nbsp;${n(S.res[k] || 0, Math.trunc(S.res[k] || 0))}`).join("&nbsp;");
   return `${cidade}&nbsp;&nbsp;${feudo}`;
 }
 
@@ -1246,6 +1288,23 @@ let litLanes = new Set();    // recalculado a cada update, a partir dos holofote
 // Não consome munição — consome VIDAS, que custaram ouro no Portão. Expira no fim do turno.
 const GRIND_EVERY = 30, GRIND_DUR = 25, GRIND_MULT = 0.5;
 
+// ---------- Estoque de Munições ----------
+// Não atira. Fica na muralha entre duas torres e resolve o problema da esteira: o
+// abastecimento chega de DEPOT_FEED_SEC em DEPOT_FEED_SEC contra os ~4,2s do ciclo de
+// caixas, então a vizinha de um Estoque quase nunca fica seca no meio de uma horda.
+// A capacidade é um BOLO ÚNICO dividido por até DEPOT_TYPES tipos: guardar três
+// munições diferentes não dá mais espaço, só reparte o mesmo espaço em três.
+const DEPOT_CAP_BASE = 30;      // munição guardada, somando todos os tipos
+const DEPOT_CAP_MAX = 50;       // teto absoluto, mesmo com o caminho de armazém no fim
+const DEPOT_TYPES = 3;          // tipos diferentes que cabem ao mesmo tempo
+const DEPOT_FEED_SEC = 1.2;     // intervalo entre empurrões para as vizinhas
+const DEPOT_FEED = 4;           // munição entregue por empurrão, por vizinha e por tipo
+// Suportes leves das vizinhas: recarregam mais rápido e desperdiçam menos munição.
+// São pequenos de propósito — o valor do Estoque é a logística, não o buff.
+const DEPOT_RATE = 0.12;        // +12% de cadência
+const DEPOT_SAVE = 0.10;        // 10% de chance de o tiro não gastar munição
+let depotTimer = 0;             // relógio do empurrão (vive fora de S: é ritmo, não estado)
+
 // ---------- Torres — 3 categorias (Básicas 1 munição / Avançadas 2 / Icônicas 3) ----------
 // Cada torre exige TODAS as munições de `ammos` (estoque por tipo). Força ∝ categoria; custo em ouro 1×/2×/3×.
 const TOWER_TYPES = {
@@ -1270,6 +1329,7 @@ const TOWER_TYPES = {
   escolamagos: { name: "Escola de Magos",    tier: "adv", icon: "🎓", cost: 55, dmg: 0,  rate: 2.8, range: 999,  aoe: 0,   ptime: 0.4,  ammos: ["essencia", "quimicos"], support: "mage", locked: true, medalCost: 30 },
   propaganda:  { name: "Máquina de Propaganda", tier: "adv", icon: "📢", cost: 55, dmg: 0, rate: 3.2, range: 999, aoe: 0,   ptime: 0.4,  ammos: ["condutores", "essencia"], support: "charm", locked: true, medalCost: 30 },
   moedor:      { name: "Moedor de Plebe",    tier: "adv", icon: "⚙️", cost: 60, dmg: 0,  rate: GRIND_EVERY, range: 999, aoe: 0, ptime: 0.4, ammos: [], support: "grind", locked: true, medalCost: 30 },
+  estoque:     { name: "Estoque de Munições", tier: "adv", icon: "🗃️", cost: 50, dmg: 0, rate: 2.0, range: 999, aoe: 0, ptime: 0.4, ammos: [], support: "depot", locked: true, medalCost: 25 },
   // ===== ICÔNICAS (custo 3×, 3 munições) — desbloqueáveis =====
   mortenegra:  { name: "Morte Negra",        tier: "legend", icon: "💀", cost: 100, dmg: 45, rate: 2.4, range: 999, aoe: 0.8, ptime: 0.6, ammos: ["virotes", "quimicos", "essencia"], magic: true, locked: true, medalCost: 40 },
   apagador:    { name: "Apagador",           tier: "legend", icon: "🕳️", cost: 110, dmg: 60, rate: 3.4, range: 999, aoe: 1.5, ptime: 1.0, ammos: ["pedras", "oleo", "quimicos"], locked: true, medalCost: 45 },
@@ -1287,12 +1347,13 @@ const TIER_LABEL = { basic: "Básica", adv: "Avançada", legend: "Icônica" }; /
 const TOWER_LORE = {
   holofote:    "Uma lente de Argamato montada sobre engrenagens pesadas. Onde o facho cai, o vigia enxerga a emenda da armadura, e o tiro seguinte encontra ela.",
   moedor:      "A engrenagem come um soldado e devolve coragem para os outros. Ninguem pergunta de onde vem o cheiro, e a fila continua se formando.",
-  besta:       "A primeira arma erguida nas ameias de Karzstak. Cada virote leva gravado o nome de um vigia que tombou na muralha.",
+  estoque:     "Um galpão de madeira encostado no parapeito, cheio até o teto de caixotes. Não mata ninguém, mas as torres ao lado nunca param para esperar a esteira.",
+  besta:       "A primeira arma erguida nas ameias de Karzstak. Cada virote leva gravado o nome de um vigia que tombou nas muralhas.",
   catapulta:   "Madeira velha, contrapeso e ódio acumulado. Arremessa pedregulhos sobre a horda desde o primeiro cerco desta cidade.",
   caldeirao:   "Óleo fervente despejado do alto dos portões. A sopa que ninguém quer provar borbulha dia e noite à espera da carne fria.",
   tesla:       "Presente das oficinas a vapor da cidade baixa. Relâmpago engarrafado em bobinas de cobre que salta de morto em morto.",
   canalizador: "Um pilar de runas alimentado por um fio do Turbilhão Nexus. Destila a magia bruta em raios que ignoram carne e selo.",
-  acido:       "Os alquimistas juram que a chuva verde não corrói a muralha. Mentem. Contra os mortos, porém, ela dissolve tudo que se move.",
+  acido:       "Os alquimistas juram que a chuva verde não corrói as muralhas. Mentem. Contra os mortos, porém, ela dissolve tudo que se move.",
   balista:     "Virotes do tamanho de lanças, untados em óleo do reino. Atravessam três cadáveres e ainda acendem o quarto no caminho.",
   canhao:      "Pólvora e ferro fundido nas velhas forjas reais. O rugido que responde ao rugido da horda, calando lanes inteiras.",
   cospefogo:   "Construído sobre a boca de uma antiga forja. O fogo aqui nunca dorme, apenas espera a próxima leva de carne seca.",
@@ -1302,7 +1363,7 @@ const TOWER_LORE = {
   aquatico:    "Água canalizada a uma pressão impossível, afiada como aço. Corta fileiras inteiras antes que a lane sequer perceba.",
   cacadores:   "Os últimos batedores das florestas mortas montam guarda. Suas lâminas curvas sempre voltam, às vezes com mais de uma cabeça.",
   serras:      "Discos dentados arrancados de serrarias abandonadas. Giram pela lane inteira sem nunca perder o fio nem a fome por carne.",
-  escolamagos: "Os últimos eruditos de Karzstak dão aula sob cerco. Rompem os selos dos mortos e sussurram força aos vivos na muralha.",
+  escolamagos: "Os últimos eruditos de Karzstak dão aula sob cerco. Rompem os selos dos mortos e sussurram força aos vivos nas muralhas.",
   propaganda:  "Alto-falantes de latão que cospem promessas antigas. Às vezes um morto escuta, hesita, e vira a lâmina contra os seus.",
   mortenegra:  "Dizem que o próprio rei negativo recua quando este sino dobra. A peste que ele espalha não distingue morto de morto.",
   apagador:    "Onde ele dispara, o cronista escreve só uma linha: 'não sobrou nada'. Nem pó, nem nome, nem lembrança de quem marchava ali.",
@@ -1310,7 +1371,7 @@ const TOWER_LORE = {
   midas:       "O tesouro do reino refundido em arma. Cada disparo custa uma fortuna, e cada morto tombado devolve um pouco do brilho.",
   baladeira:   "Um estilingue abençoado que arremessa cristais vivos. Ricocheteiam entre os mortos como uma prece que nunca erra o alvo.",
   trabuco:     "Karzstak arremessa os próprios escombros de volta ao inimigo. Entulho, ferro-velho e desespero caindo do céu sobre a horda.",
-  prisioneiros:"Quando faltam pedras, sobram condenados. A muralha os devolve à horda como aríetes de carne que ainda gritam ao voar.",
+  prisioneiros:"Quando faltam pedras, sobram condenados. As muralhas os devolvem à horda como aríetes de carne que ainda gritam ao voar.",
   ritualcura:  "Cânticos antigos costuram os vivos enquanto a batalha ruge. Aqui a fé vira bandagem, e a esperança, sutura de última hora.",
   infusor:     "Verte magia pura nas armas dos aliados, gota a gota, como vinho raro servido à tropa na véspera de uma execução.",
 };
@@ -1328,13 +1389,97 @@ function fuelPool(k) {
   return 0;
 }
 function spendFuel(f) {
-  if (f.k === "gold") { S.gold = Math.max(0, S.gold - f.cost); }
-  else if (f.k === "hearts") { S.hearts = Math.max(0, S.hearts - f.cost); }
-  else if (f.k === "maos") { S.maos = Math.max(0, S.maos - f.cost); }
+  // Torre a combustível paga o preço cheio mesmo virando o cofre. O towerFed já exige
+  // saldo antes do tiro, então isto só morde quando o saldo caiu entre o teste e o
+  // disparo — e aí o certo é dever, não ganhar o tiro de graça.
+  if (f.k === "gold") { S.gold -= f.cost; }
+  else if (f.k === "hearts") { S.hearts -= f.cost; }
+  else if (f.k === "maos") { S.maos -= f.cost; }
   else if (f.k === "res") {
     // atira 5 de UM recurso bruto aleatório que tenha estoque suficiente
     const opts = Object.keys(RESOURCES).filter(k => (S.res[k] || 0) >= f.cost);
     if (opts.length) { const k = opts[Math.floor(Math.random() * opts.length)]; S.res[k] -= f.cost; }
+  }
+}
+
+// ---------- Estoque de Munições: capacidade, tipos e vizinhança ----------
+function isDepot(t) { return !!t && TOWER_TYPES[t.type] && TOWER_TYPES[t.type].support === "depot"; }
+function depotCap(t) { return Math.min(DEPOT_CAP_MAX, DEPOT_CAP_BASE + (towerFx(t).stock || 0)); }
+function depotTotal(t) { return Object.values(t.stock || {}).reduce((s, n) => s + n, 0); }
+// Tipos que ESTE Estoque aceita. O que já está guardado vem primeiro: se o jogador
+// trocar a torre vizinha, a munição antiga continua servindo até acabar, em vez de
+// virar espaço morto. Depois entram os tipos das vizinhas, até o limite de DEPOT_TYPES.
+function depotTypes(slot) {
+  const t = S.towers[slot];
+  if (!t) return [];
+  const out = Object.keys(t.stock || {}).filter(a => (t.stock[a] || 0) > 0);
+  // Reparte as vagas em RODADAS entre as duas vizinhas. Varrer a lista de uma antes
+  // da outra deixava uma torre de 3 munições ocupar as 3 vagas e a do outro lado
+  // seca — justamente o contrário do que um depósito entre duas torres serve para.
+  const filas = [slot - 1, slot + 1]
+    .map(j => S.towers[j])
+    .filter(n => n && !isDepot(n) && !TOWER_TYPES[n.type].fuel)
+    .map(n => towerAmmos(n.type).slice());
+  let mexeu = true;
+  while (mexeu && out.length < DEPOT_TYPES) {
+    mexeu = false;
+    for (const f of filas) {
+      while (f.length && out.includes(f[0])) f.shift();
+      if (!f.length || out.length >= DEPOT_TYPES) continue;
+      out.push(f.shift());
+      mexeu = true;
+    }
+  }
+  return out.slice(0, DEPOT_TYPES);
+}
+function depotRoom(t) { return Math.max(0, depotCap(t) - depotTotal(t)); }
+// Crédito na CHEGADA da caixa, igual às torres. Guardar no despacho adiantaria a
+// munição em ~1s de esteira e faria o número do painel discordar da caixa na tela.
+function depotReceive(t, type, amount) {
+  const put = Math.min(depotRoom(t), amount);
+  if (put <= 0) return;   // sem isto, uma caixa que não cabe cria a chave em zero
+  t.stock = t.stock || {};
+  t.stock[type] = (t.stock[type] || 0) + put;
+}
+// Suporte leve que os Estoques ao lado dão a esta torre. Procura o slot pelo indexOf
+// porque towerRate e consumeTowerAmmo recebem a torre, não a posição dela na muralha.
+function depotAdjFx(t) {
+  const slot = S.towers.indexOf(t);
+  if (slot < 0) return null;
+  let rate = 0, save = 0;
+  for (const j of [slot - 1, slot + 1]) {
+    const d = S.towers[j];
+    if (!isDepot(d)) continue;
+    const fx = towerFx(d);
+    rate += DEPOT_RATE + (fx.adjRate || 0);
+    save += DEPOT_SAVE + (fx.adjSave || 0);
+  }
+  return rate || save ? { rate, save } : null;
+}
+// Empurra munição guardada para as vizinhas secas. Roda no planejamento E no combate,
+// que é o ponto: entre dois ciclos de esteira a vizinha já recebeu três vezes.
+function tickDepots(dt) {
+  depotTimer -= dt;
+  if (depotTimer > 0) return;
+  depotTimer = DEPOT_FEED_SEC;
+  for (let i = 0; i < LANES; i++) {
+    const d = S.towers[i];
+    if (!isDepot(d) || !depotTotal(d)) continue;
+    const fx = towerFx(d);
+    const perPush = DEPOT_FEED + (fx.feed || 0);
+    for (const j of [i - 1, i + 1]) {
+      const n = S.towers[j];
+      if (!n || isDepot(n) || TOWER_TYPES[n.type].fuel) continue;
+      for (const a of towerAmmos(n.type)) {
+        const falta = ammoCap() - ammoOf(n, a);
+        const tem = (d.stock && d.stock[a]) || 0;
+        if (falta <= 0 || tem <= 0) continue;
+        const move = Math.min(perPush, falta, tem);
+        d.stock[a] -= move;
+        n.ammoBy = n.ammoBy || {};
+        n.ammoBy[a] = ammoOf(n, a) + move;
+      }
+    }
   }
 }
 function towerFed(t, cost) {
@@ -1349,7 +1494,8 @@ function fillTowerAmmo(t) { t.ammoBy = t.ammoBy || {}; for (const a of towerAmmo
 function consumeTowerAmmo(t, cost, fx) {
   const tt = TOWER_TYPES[t.type];
   if (tt.fuel) { spendFuel(tt.fuel); return; } // combustível global, não usa esteira
-  const saveCh = (fx.save || 0) + towerTypeFx(t.type, "typeSave");
+  const adj = depotAdjFx(t);
+  const saveCh = (fx.save || 0) + towerTypeFx(t.type, "typeSave") + (adj ? adj.save : 0);
   if (Math.random() < saveCh) return; // munição poupada: não gasta nada
   if (!t.ammoBy) t.ammoBy = {};
   for (const a of towerAmmos(t.type)) t.ammoBy[a] = Math.max(0, ammoOf(t, a) - cost);
@@ -1393,6 +1539,21 @@ const MAOS_CAP_MAX = 50;      // teto real do limite de Mãos
 const CORTICO_PER = 8;        // +Mãos de teto por nível de Cortiço
 // Recursos do Feudo têm um teto generoso, só p/ evitar acúmulo/overflow no end-game.
 const RES_CAP = 500;
+// ---------- Dívida: saldo negativo ----------
+// Todo recurso pode ficar negativo. Travar em zero parecia proteger o jogador, mas na
+// prática perdoava a cobrança — e quem descobrisse isso zerava o cofre de propósito
+// antes de cada desconto. O preço de dever é a moral, cobrada no fim do turno, e é por
+// resource: fechar no vermelho em quatro frentes não pode custar o mesmo que em uma.
+const NEG_MORALE_EACH = 12;   // por recurso no vermelho
+const NEG_MORALE_CAP = 40;    // teto: sem isto, dever tudo de uma vez seria sentença
+function negativeRes() {
+  const out = [];
+  if (S.gold < 0) out.push("🪙");
+  if (S.hearts < 0) out.push("💎");
+  if (S.maos < 0) out.push("✋");
+  for (const [k, r] of Object.entries(RESOURCES)) if ((S.res[k] || 0) < 0) out.push(r.icon);
+  return out;
+}
 // (maosCap() usa groupLvlSum/mioloLvl — funções hoisted — e MIOLO, já declarado acima.)
 function maosCap() {
   return Math.min(MAOS_CAP_MAX, MAOS_CAP_BASE + CORTICO_PER * groupLvlSum("cortico") + MIOLO.guilda.per * mioloLvl("guilda") + (law("L9") ? 8 : 0));
@@ -1449,7 +1610,7 @@ const BUILDINGS = {
   templo:         { name: "Templo da Fé",             icon: "🛐", cost: 40, shape: [[0,0],[1,0]],             zones: ["1","0"],
                     desc: "+3 de moral por turno por nível" },
   oficina:        { name: "Oficina de Muros",         icon: "🧱", cost: 45, shape: [[0,0],[1,0],[1,1]],       zones: ["1","0"],
-                    desc: "repara +1 de vida da muralha a cada 30s (acelera por nível)", locked: true, medalCost: 30 },
+                    desc: "repara +1 de vida das muralhas a cada 30s (acelera por nível)", locked: true, medalCost: 30 },
   refinaria:      { name: "Refinaria de Argamato",    icon: "💎", cost: 50, shape: [[0,0],[0,1]],             zones: ["2","0"],
                     desc: "+1 💎 por turno por nível", locked: true, medalCost: 30 },
   bastiao:        { name: "Bastião de Guerra",        icon: "🏯", cost: 70, shape: [[0,0],[1,0],[0,1],[1,1]], zones: ["1","0"],
@@ -1666,12 +1827,18 @@ function allyDmgMult() {
   return (1 + cityFxScan(c => c.built === "quartel", "tD") + 0.08 * groupLvlSum("praca_militar") + infusor + moedor + laws) * favAllyMult();
 }
 
+// Convocar com a horda em campo custa mais: ninguém corre para a muralha pelo preço de
+// tempo de paz. Vale para o Arco E para a reposição automática — se valesse só para o
+// automático, bastava desligar a chave e convocar na mão para furar a sobretaxa.
+const GATE_WAR_MULT = 1.5;
+function allyCost(a) { return S.waveActive ? Math.ceil(a.cost * GATE_WAR_MULT) : a.cost; }
 function summonAlly(type, fac) {
   const a = ALLY_TYPES[type];
   if (S.allies.length >= ALLY_LIMIT) return false;
+  const cost = allyCost(a);
   const wallet = a.cur === "gold" ? S.gold : S.hearts;
-  if (wallet < a.cost) return false;
-  if (a.cur === "gold") S.gold -= a.cost; else S.hearts -= a.cost;
+  if (wallet < cost) return false;
+  if (a.cur === "gold") S.gold -= cost; else S.hearts -= cost;
   fac = allyFacList().includes(fac) ? fac : allyFacList()[0];
   const hp = Math.round(a.hp * allyHpMult() * allyFacHpMult({ fac }));
   // sem acumular: sorteia entre as lanes com MENOS aliados (5 tropas = 1 por lane)
@@ -1695,7 +1862,7 @@ const LAW_LINES = {
   profano:     { name: "Profano",     angle: -45 },
   arcano:      { name: "Arcano",      angle: 0,   ldy: -40 }, // spoke horizontal: sobe o rótulo p/ não cair sobre o nó
   cajado:      { name: "Cajado",      angle: 45 },
-  muralha:     { name: "Muralha",     angle: 90 },
+  muralha:     { name: "Muralhas",    angle: 90 },
   resistencia: { name: "Resistência", angle: 135 },
   tech:        { name: "Tech",        angle: 180, ldy: -40 },
   inovacao:    { name: "Inovação",    angle: -135 },
@@ -1718,7 +1885,7 @@ const LAWS = {
   L11: { line: "arcano", pos: 1, name: "Licença Arcana",        desc: "Torres mágicas +10% de dano.",              cost: 60,  gem: 2,  moral: 0 },
   L12: { line: "arcano", pos: 2, name: "Círculo de Aprendizes", desc: "✨ essência alimenta +1 munição por caixa.", cost: 120, gem: 4,  moral: 0 },
   L13: { line: "arcano", pos: 3, name: "Sangria de Argamato",   desc: "+1 💎 por turno; o ritual assusta.",        cost: 200, gem: 6,  moral: -2 },
-  L14: { line: "arcano", pos: 4, name: "Runas de Contenção",    desc: "+1 hit máximo da muralha.",                 cost: 300, gem: 9,  moral: 1 },
+  L14: { line: "arcano", pos: 4, name: "Runas de Contenção",    desc: "+1 hit máximo das muralhas.",                 cost: 300, gem: 9,  moral: 1 },
   L15: { line: "arcano", pos: 5, name: "Pacto do Véu",          desc: "Torres mágicas +25% de dano.",              cost: 440, gem: 13, moral: -3 },
   // CAJADO — linhas de poder do cetro (também exige Cristais 💎)
   L16: { line: "cajado", pos: 1, name: "Foco do Cetro",      desc: "Auras duram +3s.",                                cost: 80,  gem: 2,  moral: 0 },
@@ -1729,7 +1896,7 @@ const LAWS = {
   // MURALHA — defesa e pedra
   L21: { line: "muralha", pos: 1, name: "Argamassa Reforçada", desc: "+1 hit máximo.",                                cost: 30,  moral: 0 },
   L22: { line: "muralha", pos: 2, name: "Vigias Dobrados",     desc: "Avisos de horda +1s.",                          cost: 60,  moral: 1 },
-  L23: { line: "muralha", pos: 3, name: "Requisição de Pedra", desc: "Casas viram muralha: reparo +1 por turno.",     cost: 100, moral: -2 },
+  L23: { line: "muralha", pos: 3, name: "Requisição de Pedra", desc: "Casas viram muralhas: reparo +1 por turno.",     cost: 100, moral: -2 },
   L24: { line: "muralha", pos: 4, name: "Lei do Machado",      desc: "Tropas +10% de dano.",                          cost: 150, moral: 1 },
   L25: { line: "muralha", pos: 5, name: "Bastião Eterno",      desc: "+2 hits máximos.",                              cost: 220, moral: 2 },
   // RESISTÊNCIA — sobreviver a qualquer custo
@@ -1890,7 +2057,7 @@ const VTREES = {
            { id: "lanc",     n: "Lanceiros",     d: "Bloqueia +1 e tropas +10% vida", fx: { block: 1, tHp: .1 } }],
       l4: [{ id: "escudos",  n: "Escudos Altos", d: "Bloqueia +1 por turno",       fx: { block: 1 } },
            { id: "contra",   n: "Contra-ataque", d: "Bloqueios rendem 🪙 normal",  fx: { block: 1, bGold: 1 } }],
-      l5: [{ id: "falange",  n: "Falange Eterna",d: "+1 hit máximo da muralha",    fx: { hitMax: 1 } },
+      l5: [{ id: "falange",  n: "Falange Eterna",d: "+1 hit máximo das muralhas",    fx: { hitMax: 1 } },
            { id: "ving",     n: "Vingança",      d: "Bloqueia +2 por turno",       fx: { block: 2 } }],
     },
     arq: {
@@ -2386,6 +2553,25 @@ const TOWER_PATHS = {
       { n: "Alimentação Rápida", d: "Mói 40% mais rápido",              fx: { r: .4 } },
       { n: "Funil Largo",   d: "Mói 70% mais rápido",                   fx: { r: .7 } },
       { n: "Linha Contínua", d: "Mói 120% mais rápido e cura as tropas", fx: { r: 1.2, heal: 6 } },
+    ] },
+  ] },
+  estoque: { paths: [
+    // Armazém: o único caminho que sobe a capacidade, e o tier 3 bate exatamente nos
+    // 50 do DEPOT_CAP_MAX — passar disso não faz nada, o teto trava por cima.
+    { key: "armazem", name: "Armazém", tiers: [
+      { n: "Prateleiras Altas", d: "Guarda 38 de munição",              fx: { stock: 8 } },
+      { n: "Porão Escavado",  d: "Guarda 44 de munição",                fx: { stock: 14 } },
+      { n: "Arsenal do Setor", d: "Guarda 50, o máximo do depósito",    fx: { stock: 20 } },
+    ] },
+    { key: "carregadores", name: "Carregadores", tiers: [
+      { n: "Mais Braços",   d: "Entrega +2 de munição por vez",         fx: { feed: 2 } },
+      { n: "Turno Dobrado", d: "Entrega +4 de munição por vez",         fx: { feed: 4 } },
+      { n: "Corrente Humana", d: "Entrega +7 de munição por vez",       fx: { feed: 7 } },
+    ] },
+    { key: "disciplina", name: "Disciplina", tiers: [
+      { n: "Munição Contada", d: "Vizinhas poupam +8% de munição",      fx: { adjSave: .08 } },
+      { n: "Carga Ensaiada", d: "Vizinhas recarregam +10% mais rápido", fx: { adjRate: .1 } },
+      { n: "Manual de Guerra", d: "Vizinhas: +18% de cadência e +15% de munição poupada", fx: { adjRate: .18, adjSave: .15 } },
     ] },
   ] },
   escolamagos: { paths: [
@@ -3310,16 +3496,16 @@ function renderResBar() {
     mid = document.createElement("div");
     mid.className = "fres-mid";
     el.appendChild(mid);
-    for (const [key, r] of Object.entries(RESOURCES)) item(r.icon, Math.floor(S.res[key]));
+    for (const [key, r] of Object.entries(RESOURCES)) item(r.icon, Math.trunc(S.res[key] || 0));
     tog("Sobrecarga", "feudOverdrive", "Extratores produzem +50%, mas o povo perde muita moral enquanto ativo");
   } else {
     tog("Ajudar Reino", "helpKingdom", "Envia a munição excedente para outros setores: 100 munições ▸ 1 🎖️ Medalha");
     mid = document.createElement("div");
     mid.className = "fres-mid";
     el.appendChild(mid);
-    item("🪙", S.gold, "res-gold");
-    item("💎", S.hearts, "res-hearts");
-    item("✋", `${Math.floor(S.maos)}/${maosCap()}`, "res-maos");
+    item("🪙", Math.trunc(S.gold), "res-gold");
+    item("💎", Math.trunc(S.hearts), "res-hearts");
+    item("✋", `${Math.trunc(S.maos)}/${maosCap()}`, "res-maos");
     tog("Ativar Capataz", "capataz", "Acelera toda a produção da cidade, mas o povo perde moral a cada turno");
   }
 }
@@ -3339,17 +3525,27 @@ function setText(el, txt) {
       { duration: 240, easing: "ease-out" });
   }
 }
+// Número de recurso com marca de dívida. O saldo negativo precisa ser LIDO, não
+// deduzido: sem o vermelho o jogador só descobre que devia quando a moral despenca.
+// Math.trunc e não floor: floor(-3.2) = -4 mostraria uma dívida maior que a real.
+function setResText(el, val, txt) {
+  setText(el, txt);
+  if (el) el.classList.toggle("neg", val < 0);
+}
 function syncLiveRes() {
   syncCloudShade(); // a camada de nuvens acompanha clima, ciclo e tamanho do layout
   const bar = $("res-bar");
   if (bar) {
     if (S.field === "feud") {
       const ns = bar.querySelectorAll(".fres-mid .fres-n");
-      Object.keys(RESOURCES).forEach((k, i) => setText(ns[i], String(Math.floor(S.res[k] || 0))));
+      Object.keys(RESOURCES).forEach((k, i) => {
+        const v = S.res[k] || 0;
+        setResText(ns[i], v, String(Math.trunc(v)));
+      });
     } else {
-      setText($("res-gold"), String(Math.floor(S.gold)));
-      setText($("res-hearts"), String(Math.floor(S.hearts)));
-      setText($("res-maos"), `${Math.floor(S.maos)}/${maosCap()}`);
+      setResText($("res-gold"), S.gold, String(Math.trunc(S.gold)));
+      setResText($("res-hearts"), S.hearts, String(Math.trunc(S.hearts)));
+      setResText($("res-maos"), S.maos, `${Math.trunc(S.maos)}/${maosCap()}`);
     }
   }
   if ($("modal").classList.contains("hidden")) return;
@@ -3480,7 +3676,7 @@ const BUILD_FLAVOR = {
   fab_condutores: "Bobinas e fios trançados canalizam o trovão da Tesla.",
   fab_quimicos:   "Vapores verdes escapam das frestas. O cheiro avisa antes da placa.",
   quartel:        "Beliches apertados e aço afiado: aqui dorme a linha de frente.",
-  cortico:        "Apertado, barulhento e cheio de vida: braços novos para a muralha.",
+  cortico:        "Apertado, barulhento e cheio de vida: braços novos para as muralhas.",
   praca_publica:  "O coração do distrito: feiras, fofocas e impostos.",
   praca_trabalho: "Sinos marcam os turnos; as construções vizinhas rendem mais.",
   praca_vigia:    "Do alto da torre, o vigia enxerga a horda antes de todos.",
@@ -3496,7 +3692,7 @@ const BUILD_FLAVOR = {
   tesouraria:     "Cofres trancados a sete chaves rendem juros de guerra.",
   laboratorio:    "Engrenagens, retortas e ideias perigosas: a produção agradece.",
   templo:         "A fé sobe em cânticos e volta em coragem, turno após turno.",
-  oficina:        "Andaimes permanentes: a muralha se remenda sem parar.",
+  oficina:        "Andaimes permanentes: as muralhas se remendam sem parar.",
   refinaria:      "Prensa o pó de Argamato em cristais que pulsam como corações.",
   // Feudo
   mina:           "Picaretas ecoam no escuro atrás do minério que vira munição.",
@@ -3724,7 +3920,15 @@ function renderTowers() {
       // estrelas = nível; COR = prestígio (0 amarela · 1 vermelha · 2 roxa · 3 dourada)
       const pc = PRESTIGE_STAR[prestigeOf(t)];
       const stars = t.lvl > 1 ? `<span class="stars" style="color:${pc};text-shadow:0 0 6px ${pc}">${"★".repeat(Math.min(5, t.lvl - 1))}</span>` : "";
-      const parts = tt.fuel
+      // Estoque: mostra o que está GUARDADO por tipo, não o que consome (não consome
+      // nada). O total aparece junto do teto, senão o jogador não sabe quanto ainda cabe.
+      const parts = tt.support === "depot"
+        ? (() => {
+            const st = Object.entries(t.stock || {}).filter(([, n]) => n > 0);
+            const tot = `<span class="ammo dep-tot">🗃️${depotTotal(t)}/${depotCap(t)}</span>`;
+            return tot + st.map(([a, n]) => `<span class="ammo">${AMMO[a].icon}${n}</span>`).join("");
+          })()
+        : tt.fuel
         ? `<span class="ammo${fuelPool(tt.fuel.k) < tt.fuel.cost ? " empty" : ""}">${FUEL_ICON[tt.fuel.k]}${Math.floor(fuelPool(tt.fuel.k))}</span>`
         : tt.ammos.map(a => {
             const am = AMMO[a];
@@ -3806,11 +4010,24 @@ function supplyInfo(t) {
     return { label: `Recebendo ${FUEL_ICON[tt.fuel.k]} ${FUEL_LABEL[tt.fuel.k]} · ${Math.floor(pool)} em caixa`,
              rate: pool >= need ? fireRate : 0, staticFrac: Math.min(1, pool / Math.max(1, need)) };
   }
+  // Estoque: a barra mostra o que está GUARDADO, não o que consome. Ele não dispara,
+  // então o ritmo do ciclo é o do empurrão para as vizinhas.
+  if (tt.support === "depot") {
+    const cap = depotCap(t), tot = depotTotal(t);
+    const st = Object.entries(t.stock || {}).filter(([, n]) => n > 0);
+    return {
+      label: `Guardado · ${tot}/${cap}${st.length ? " · " + st.map(([a, n]) => `${AMMO[a].icon}${n}`).join("  ") : " · vazio"}`,
+      rate: tot > 0 ? 1 / DEPOT_FEED_SEC : 0,
+      staticFrac: Math.min(1, tot / cap),
+    };
+  }
   const cap = ammoCap();
   const parts = tt.ammos.map(a => ({ a, n: ammoOf(t, a), noFab: prodOfType(a) === 0 }));
   const halted = parts.some(p => p.noFab); // sem a fábrica daquela munição = não recebe
   const label = `Recebendo · ${parts.map(p => `${AMMO[p.a].icon}${p.noFab ? " ⚠️" : ""}`).join("  ")}`;
-  return { label, rate: halted ? 0 : fireRate, staticFrac: Math.min(...parts.map(p => p.n / cap)) };
+  // `parts.length ?` protege as torres sem munição (Moedor): Math.min() sem argumento
+  // devolve Infinity, e a barra vinha desenhando uma fração impossível.
+  return { label, rate: halted ? 0 : fireRate, staticFrac: parts.length ? Math.min(...parts.map(p => p.n / cap)) : 1 };
 }
 // Prestígio via botão-estrela: valida e aplica (mesmos bônus de antes).
 function onPrestigeClick(t, i) {
@@ -3965,7 +4182,7 @@ function openGate() {
     const seg = document.createElement("div");
     seg.className = "gate-seg";
     for (const [mode, ic, name, d] of [
-      ["protect", "🛡️", "Proteger", "Seguram a linha à frente da muralha, sem avançar."],
+      ["protect", "🛡️", "Proteger", "Seguram a linha à frente das muralhas, sem avançar."],
       ["attack", "⚔️", "Atacar", "Avançam até o inimigo da lane e voltam quando ela esvazia."],
     ]) {
       const b = document.createElement("button");
@@ -3979,7 +4196,7 @@ function openGate() {
     wrap.insertAdjacentHTML("beforeend",
       `<div class="gate-note">${S.gateMode === "attack"
         ? "⚔️ Avançam até o inimigo da lane e voltam quando ela esvazia."
-        : "🛡️ Seguram a linha à frente da muralha, sem avançar."}</div>`);
+        : "🛡️ Seguram a linha à frente das muralhas, sem avançar."}</div>`);
 
     // 3) Ideologia da tropa: a cor soma um bônus sobre os stats base
     wrap.insertAdjacentHTML("beforeend", `<div class="gate-sec-t">IDEOLOGIA DA TROPA</div>`);
@@ -4001,6 +4218,8 @@ function openGate() {
 
     // 4) Tropas: cartas com os stats já somados com quartel + ideologia
     wrap.insertAdjacentHTML("beforeend", `<div class="gate-sec-t">CONVOCAR</div>`);
+    if (S.waveActive) wrap.insertAdjacentHTML("beforeend",
+      `<div class="gate-war">⚔️ <b>PREÇO DE GUERRA:</b> com a horda em campo, convocar custa +${Math.round((GATE_WAR_MULT - 1) * 100)}%. Vale também para a reposição automática.</div>`);
     const grid = document.createElement("div");
     grid.className = "gate-grid";
     const fake = { fac: S.gateFac };
@@ -4008,7 +4227,8 @@ function openGate() {
       if (a.spectral) continue; // Sombra vem do pacto roxo, não do Arco
       const curIcon = a.cur === "gold" ? "🪙" : "💎";
       const wallet = a.cur === "gold" ? S.gold : S.hearts;
-      const can = S.allies.length < ALLY_LIMIT && wallet >= a.cost;
+      const cost = allyCost(a);
+      const can = S.allies.length < ALLY_LIMIT && wallet >= cost;
       const hp = Math.round(a.hp * allyHpMult() * allyFacHpMult(fake));
       const dps = (a.dps * allyDmgMult() * allyFacAtkMult(fake)).toFixed(1);
       const kind = a.tank ? `absorve ${Math.round(a.tank * 100)}% do dano` : a.melee ? "corpo a corpo" : "à distância";
@@ -4018,7 +4238,7 @@ function openGate() {
       b.disabled = !can;
       b.innerHTML = `<span class="gc-ic">${a.icon}</span><span class="gc-n">${a.name}</span>
         <span class="gc-s">❤️ ${hp} · ⚔️ ${dps}</span><span class="gc-k">${kind}</span>
-        <span class="gc-c">${curIcon} ${a.cost}</span>`;
+        <span class="gc-c${S.waveActive ? " war" : ""}">${curIcon} ${cost}${S.waveActive ? ` <s>${a.cost}</s>` : ""}</span>`;
       b.onclick = () => { summonAlly(key, S.gateFac); openGate(); };
       grid.appendChild(b);
     }
@@ -4035,7 +4255,7 @@ function openGate() {
       <span class="ga-txt">
         <span class="ga-t">${S.gateAuto ? "LIGADA" : "DESLIGADA"}</span>
         <span class="ga-d">${S.gateAuto
-          ? `Repõe cada baixa com <b>${pref.name}</b> (${pref.cur === "gold" ? "🪙" : "💎"} ${pref.cost}), na ideologia selecionada.`
+          ? `Repõe cada baixa com <b>${pref.name}</b> (${pref.cur === "gold" ? "🪙" : "💎"} ${allyCost(pref)}${S.waveActive ? ", preço de guerra" : ""}), na ideologia selecionada. Funciona no planejamento e durante a batalha.`
           : "As baixas só são repostas por você, aqui no Arco."}</span>
       </span>
       <span class="ga-sw"><span class="ga-knob"></span></span>`;
@@ -4226,12 +4446,12 @@ function renderDebugPanel() {
     row("Adicionar Corações de Argamato", "💎 +20", 0, true, () => { S.hearts += 20; renderAll(); renderDebugPanel(); }),
     row("Maximizar todos os recursos (🪙💎✋ + Feudo)", "⬆️ Max", 0, true, () => { S.gold = 9999; S.hearts = 999; S.maos = maosCap(); for (const k of Object.keys(RESOURCES)) S.res[k] = RES_CAP; renderAll(); renderDebugPanel(); }),
     row("Zerar todos os recursos (🪙💎✋ + Feudo)", "⬇️ Zerar", 0, true, () => { S.gold = 0; S.hearts = 0; S.maos = 0; for (const k of Object.keys(RESOURCES)) S.res[k] = 0; renderAll(); renderDebugPanel(); }),
-    row("Restaurar os hits da muralha", "🧱 Curar", 0, true, () => { S.hits = maxHits(); renderAll(); renderDebugPanel(); }),
+    row("Restaurar os hits das muralhas", "🧱 Curar", 0, true, () => { S.hits = maxHits(); renderAll(); renderDebugPanel(); }),
     row("Encher a munição de todas as torres", "🎯 Munição", 0, true, () => { S.towers.forEach(t => { if (t) fillTowerAmmo(t); }); renderAll(); renderDebugPanel(); }),
     row("Eliminar todos os inimigos em campo", "☠️ Limpar", 0, true, () => { S.enemies.forEach(e => e.hp = 0); closePause(); }),
     row("Invocar 5 mortos-vivos extras", "🧟 Invocar", 0, true, () => { if (S.waveActive) spawnQueue.push(...pickWave(5)); closePause(); }),
     row("Passar para o próximo turno (fora de turno)", "⏭ Passar turno", 0, !S.waveActive, () => { if (S.isNight) { S.isNight = false; S.day++; } else { S.isNight = true; } S.gold += 15 + S.day * 3; buildNextWave(); renderAll(); renderDebugPanel(); }),
-    row(`Muralha invencível ${S.debug.god ? "✅" : "❌"}`, "🛡 God", 0, true, () => { S.debug.god = !S.debug.god; renderDebugPanel(); }),
+    row(`Muralhas invencíveis ${S.debug.god ? "✅" : "❌"}`, "🛡 God", 0, true, () => { S.debug.god = !S.debug.god; renderDebugPanel(); }),
     row(`Velocidade do jogo: ${S.debug.speed}x`, "⏩ Alternar", 0, true, () => { const i = SPEEDS.indexOf(S.debug.speed); S.debug.speed = SPEEDS[(i + 1) % SPEEDS.length]; renderHUD(); renderDebugPanel(); }),
     // Circula Céu Aberto ▸ Turvo ▸ Tempestade ▸ Perfeito. O clima é só desenho, então
     // trocar aqui vale na hora: o próximo frame já pinta o céu novo.
@@ -4388,7 +4608,7 @@ $("pause").onclick = (e) => { if (e.target === $("pause")) closePause(); };
 const COMBAT_MSGS = {
   start: [
     "Eles estão vindo.|Resista.",
-    "A horda avança.|Segurem a muralha.",
+    "A horda avança.|Segurem as muralhas.",
     "Que venham.|Karzstak não deve cair.",
   ],
   half: [
@@ -4406,7 +4626,7 @@ const COMBAT_MSGS = {
   bloodmoon: [
     "Não vamos|conseguir.",
     "Para que resistir?|Eles nunca param.",
-    "A muralha vai cair.|Como sempre foi.",
+    "As muralhas vão cair.|Como sempre foi.",
   ],
 };
 function pickMsg(pool) { const a = COMBAT_MSGS[pool]; return a[Math.floor(Math.random() * a.length)]; }
@@ -4623,7 +4843,7 @@ function addFloat(x, y, txt, color) {
 
 // Modos de mira configuráveis por torre (clique na torre). "near" = neutro/padrão.
 const AIM_MODES = {
-  near:   { icon: "🎯", name: "Mais próximo", desc: "mira o inimigo mais perto da muralha (padrão)" },
+  near:   { icon: "🎯", name: "Mais próximo", desc: "mira o inimigo mais perto das muralhas (padrão)" },
   weak:   { icon: "🩸", name: "Mais fraco",   desc: "mira quem tem menos vida (finaliza)" },
   strong: { icon: "💪", name: "Mais forte",   desc: "mira quem tem mais vida (foca os tanques)" },
   far:    { icon: "🌫️", name: "Mais novo",    desc: "mira o inimigo mais longe que alcança (recém-chegado)" },
@@ -4647,7 +4867,9 @@ function sortByAim(targets, aim) {
 
 function towerRate(t) {
   const fx = towerFx(t);
-  return TOWER_TYPES[t.type].rate / ((1 + rateBonus() + moralBoost()) * (1 + (fx.r || 0)) * prestigeRateMult(t));
+  const adj = depotAdjFx(t);   // Estoque ao lado: recarrega mais rápido
+  return TOWER_TYPES[t.type].rate
+    / ((1 + rateBonus() + moralBoost()) * (1 + (fx.r || 0)) * prestigeRateMult(t) * (1 + (adj ? adj.rate : 0)));
 }
 // Dano global das torres contra as tropas — subido para acompanhar hordas maiores/mais densas.
 const TROOP_DMG_MULT = 1.3;
@@ -4746,6 +4968,7 @@ function tickSupplyChain(dt) {
   tickExtractProd(dt);
   tickTanks(dt);
   tickProduction(dt);
+  tickDepots(dt);     // Estoque de Munições reabastece as vizinhas entre as caixas
   supplyTimer -= dt;
   if (supplyTimer <= 0) { dispatchCrates(); supplyTimer = supplyInterval(); }
 }
@@ -4783,7 +5006,7 @@ function feudBeltTick() {
 }
 
 function dispatchCrates() {
-  const jobs = [], overflow = [];
+  const jobs = [], overflow = [], reserva = {};
   let excess = 0;
   for (const type of Object.keys(AMMO)) {
     let pool = Math.floor(prodCarry[type] || 0);
@@ -4793,6 +5016,21 @@ function dispatchCrates() {
       if (!t || !TOWER_TYPES[t.type].ammos.includes(type) || ammoOf(t, type) >= ammoCap()) continue;
       const amount = Math.min(crateSize() + ammoTypeFx(type, "crate") + lawCrateBonus(type), pool, ammoCap() - ammoOf(t, type));
       pool -= amount;
+      jobs.push({ slot: i, amount, type });
+    }
+    // Estoques de Munições enchem DEPOIS das torres: o depósito é para a sobra, não
+    // para competir com quem está atirando. Vem antes do "Ajudar o Reino" porque
+    // guardar munição para a horda vale mais que trocá-la por Medalha.
+    for (let i = LANES - 1; i >= 0 && pool > 0; i--) {
+      const d = S.towers[i];
+      if (!isDepot(d) || !depotTypes(i).includes(type)) continue;
+      // `reserva` existe porque a capacidade é UM bolo dividido entre os tipos: sem
+      // ela, dois tipos no mesmo ciclo prometeriam o mesmo espaço vazio.
+      const room = depotRoom(d) - (reserva[i] || 0);
+      if (room <= 0) continue;
+      const amount = Math.min(pool, room);
+      pool -= amount;
+      reserva[i] = (reserva[i] || 0) + amount;
       jobs.push({ slot: i, amount, type });
     }
     // Sobra que as torres não comportam: com "Ajudar o Reino" desce a esteira e
@@ -4876,8 +5114,11 @@ function sendCrate(slot, amount, type) {
       cratesInFlight--;
       const t = S.towers[slot];
       if (t) {
-        if (!t.ammoBy) t.ammoBy = {};
-        t.ammoBy[type] = Math.min(ammoCap(), ammoOf(t, type) + amount);
+        if (isDepot(t)) depotReceive(t, type, amount);
+        else {
+          if (!t.ammoBy) t.ammoBy = {};
+          t.ammoBy[type] = Math.min(ammoCap(), ammoOf(t, type) + amount);
+        }
         renderTowers();
         const el = $("towers").children[slot];
         if (el) { el.classList.add("resupply"); setTimeout(() => el.classList.remove("resupply"), 400); }
@@ -4947,7 +5188,7 @@ function chipWall(dmg, lane) {
   S.wallChip -= WALL_CHIP_PER_HIT;
   S.hits--;
   S.turnHitsLost++;
-  addFloat(lane, 0.95, "🧱 MURALHA ATINGIDA", "#e05f5f");
+  addFloat(lane, 0.95, "🧱 MURALHAS ATINGIDAS", "#e05f5f");
   renderHUD();
   if (S.hits <= 0) gameOver();
 }
@@ -5149,6 +5390,9 @@ function update(dt) {
   for (let i = 0; i < LANES; i++) {
     const t = S.towers[i];
     if (!t) continue;
+    // O Estoque não tem ciclo de tiro: ele trabalha no tickDepots, que roda também no
+    // planejamento. Sair aqui evita o pulso de "disparo" a cada 2s num galpão parado.
+    if (TOWER_TYPES[t.type].support === "depot") continue;
     t.cd = (t.cd ?? 0) - dt;
     if (t.cd > 0) continue;
     const tt = TOWER_TYPES[t.type];
@@ -5324,7 +5568,7 @@ function update(dt) {
       // Perdão da muralha: a pedra aguenta. Vem ANTES do selo de propósito — se viesse
       // depois, o selo seria consumido numa batida que a muralha ia aparar de graça.
       if (!S.debug.god && Math.random() < WALL_FORGIVE) {
-        addFloat(e.lane, 0.92, "🧱 A MURALHA AGUENTOU", "#c8b088");
+        addFloat(e.lane, 0.92, "🧱 AS MURALHAS AGUENTARAM", "#c8b088");
         S.effects.push({ x: e.lane, y: 0.95, life: 0.35, max: 0.35, type: "forgive" });
         e.hp = -999;
         continue;
@@ -5471,8 +5715,9 @@ function endWave() {
   S.hearts += heartsPerTurn();
   // Procissão/Dia Sagrado: 💎 por turno perfeito
   if (S.turnHitsLost === 0) S.hearts += cityFxScan(null, "hNoHit");
-  // Motor de Argamato consome 💎; Autômato Reparador conserta a muralha
-  S.hearts = Math.max(0, S.hearts - cityFxScan(null, "hUp"));
+  // Motor de Argamato consome 💎; Autômato Reparador conserta as muralhas.
+  // Sem trava: a manutenção cobra mesmo sem saldo e o setor fecha o turno devendo.
+  S.hearts -= cityFxScan(null, "hUp");
   let rep = cityFxScan(null, "repair") + (law("L23") ? 1 : 0); // Autômato Reparador + Requisição de Pedra (Oficina repara em tempo real)
   if (rep) {
     rep += (law("L27") ? 1 : 0) + (law("L46") ? 1 : 0); // Muros Modulares / Cidadela de Ferro rendem mais
@@ -5491,6 +5736,15 @@ function endWave() {
   if (S.feudOverdrive) { // Sobrecarga: extratores no limite, trabalhadores exaustos
     gainMorale(-FEUD_TOGGLE_MORALE);
     addFloat(2, 0.69, `⚙️ Sobrecarga: -${FEUD_TOGGLE_MORALE} moral`, "#e0705f");
+  }
+  // Fechou o turno devendo: a tropa descobre que não há com que pagar nem com que
+  // trabalhar. Cobrado DEPOIS da renda do turno, senão puniria quem já se acertou.
+  const devendo = negativeRes();
+  if (devendo.length) {
+    const perda = Math.min(NEG_MORALE_CAP, NEG_MORALE_EACH * devendo.length);
+    gainMorale(-perda);
+    addFloat(2, 0.45, `📉 No vermelho (${devendo.join(" ")}): -${perda} moral`, "#e0705f");
+    toast(`📉 O setor fechou o turno no vermelho em ${devendo.join(" ")} · -${perda} de moral.`);
   }
   // Praça Estranha: bônus caótico por nível (ouro / moral / 💎)
   for (let k = 0; k < groupLvlSum("praca_estranha"); k++) {
@@ -5577,7 +5831,7 @@ function endWave() {
     saveGame();
     if (S.autoTurn) { addFloat(2, 0.15, `+${income} 🪙 · 🌙`, "#eecd5c"); scheduleAuto(); }
     else showOverlay("A noite se aproxima 🌙",
-      `A muralha resistiu (${S.hits}/${maxHits()} hits).\n+${income} 🪙 do conselho da cidade.${evento}\n\nO vigia observa o horizonte, toque no astro da noite para ver o que vem.`);
+      `As muralhas resistiram (${S.hits}/${maxHits()} hits).\n+${income} 🪙 do conselho da cidade.${evento}\n\nO vigia observa o horizonte, toque no astro da noite para ver o que vem.`);
   }
   renderAll();
 }
@@ -5621,7 +5875,7 @@ function gameOver() {
 function showDefeat() {
   $("def-text").textContent =
     `As brechas se abriram e os mortos alcançaram o cristal no dia ${Math.max(1, S.day)}. ` +
-    `Os registros da guarda arderam com a muralha, e o silêncio tomou o Distrito.\n\n` +
+    `Os registros da guarda arderam com as muralhas, e o silêncio tomou o Distrito.\n\n` +
     `Seu nome se apaga dos arquivos, mas a resistência que você ergueu não foi em vão. O conselho nomeará um novo comandante.`;
   $("def-score").textContent = `Pontuação ${runScore()}`;
   $("def-breakdown").innerHTML = scoreLines();
@@ -6350,8 +6604,16 @@ function ensureGroundTex(w, h) {
 // ---------- Sangue fresco ----------
 // Cada morto deixa uma poça que seca e some. Vive fora de S: é puramente decorativo,
 // não entra no save nem no update (some pelo relógio visual, então acelera no 5x).
-const BLOOD_LIFE = 6;      // segundos de vida da poça
-const BLOOD_MAX = 60;      // teto: no dia 30 morrem centenas por turno
+const BLOOD_LIFE = 24;     // segundos de vida da poça (era 6)
+// Vive 4x mais, então 4x mais poças coexistem no mesmo ritmo de mortes: o teto sobe
+// junto, senão o campo voltaria a limpar sozinho e a duração maior não apareceria.
+const BLOOD_MAX = 150;     // teto: no dia 30 morrem centenas por turno
+// Fração da vida em que a poça COMEÇA a secar. Antes o fade nascia no instante zero,
+// então esticar a duração só deixaria a mancha pálida por mais tempo, em vez de
+// realmente presente no chão. Mas segurar opacidade cheia a vida toda também não
+// serve: numa noite de dezenas de mortes o campo virava um tapete vermelho liso.
+// Em 0.35 o sangue fresco é vivo e o antigo vira resíduo seco — dá leitura de camadas.
+const BLOOD_DRY_AT = 0.35;
 let bloodPools = [];
 const BLOOD_BURST = 0.2;   // 1 em 5 mortos estoura em vez de só sangrar
 function addBloodPool(lane, y) {
@@ -6384,8 +6646,9 @@ function drawBloodPools(laneW, h) {
   for (const p of bloodPools) {
     const age = Math.max(0, Math.min(1, (vClock - p.born) / BLOOD_LIFE));
     // cresce depressa no primeiro instante e depois seca devagar
-    const spread = Math.max(0, Math.min(1, age * 6));
-    const a = (1 - age) * (1 - age) * (p.burst ? 0.72 : 0.58);
+    const spread = Math.max(0, Math.min(1, age * 24));
+    const dry = Math.max(0, (age - BLOOD_DRY_AT) / (1 - BLOOD_DRY_AT));
+    const a = (1 - dry) * (1 - dry) * (p.burst ? 0.72 : 0.58);
     const cx = p.lane * laneW + laneW / 2, cy = p.y * h + 4;
     ctx.fillStyle = `rgba(${p.burst ? "124,18,16" : "104,16,14"},${a.toFixed(3)})`;
     for (const s of p.spots) {
@@ -6895,10 +7158,15 @@ function draw() {
     ctx.font = (t.armor < 1 ? 24 : 20) + "px sans-serif";
     ctx.fillText(e.burn > 0 ? "🔥" : t.icon, x, y);
     if (e._targeted) {
-      // alvo de torre: só o círculo de mira ao redor (sem transparência no sprite)
-      ctx.strokeStyle = "rgba(255,210,122,.9)";
-      ctx.lineWidth = 2;
+      // Alvo de torre: anel tracejado e fino. O círculo cheio e opaco competia com o
+      // sprite do inimigo e com os selos; tracejado ainda lê como "mira" de longe.
+      // save/restore obrigatório: sem ele o tracejado vazaria para a aura e o HP.
+      ctx.save();
+      ctx.strokeStyle = "rgba(255,210,122,.42)";
+      ctx.lineWidth = 1.2;
+      ctx.setLineDash([3, 4]);
       ctx.beginPath(); ctx.arc(x, y - 6, 14, 0, 7); ctx.stroke();
+      ctx.restore();
     }
     if (e.pz) { ctx.fillStyle = "rgba(120,200,80,.8)"; ctx.beginPath(); ctx.arc(x + 10, y - 8, 3, 0, 7); ctx.fill(); }
     if (e.aura) {
@@ -7059,7 +7327,7 @@ const LORE_COMMAND =
 // o jogo, as instruções passam SOBRE o campo, já com tudo à vista. Enquanto rodam, um
 // anel dourado pulsa no botão de troca de campo, que é o controle menos óbvio da tela.
 const TUTORIAL_TIPS = [
-  "Construa Torres no topo da muralha.",
+  "Construa Torres no topo das muralhas.",
   "Construa Fábricas para alimentar as Torres.",
   "Alimente as Fábricas com Extratores no Feudo.",
   "Praças e Edifícios melhoram a produtividade e fornecem recursos.",
@@ -7108,7 +7376,7 @@ function setupMenu() {
   if (hasSave) {
     try {
       const d = JSON.parse(localStorage.getItem(SAVE_KEY));
-      $("menu-note").textContent = `Registro da guarda: dia ${d.day}, muralha ${d.hits} hit(s).`;
+      $("menu-note").textContent = `Registro da guarda: dia ${d.day}, muralhas ${d.hits} hit(s).`;
     } catch { /* registro ilegível, segue sem nota */ }
   } else {
     $("menu-note").textContent = "Nenhum registro da guarda encontrado.";
@@ -7288,12 +7556,13 @@ const ARS_LORE = {
   // Torres — Básicas
   holofote:    "Não fere: aponta. E o que ela aponta, morre.",
   moedor:      "Uma vida moída por vez, e a tropa inteira avança.",
+  estoque:     "Caixotes até o teto. As vizinhas nunca ficam secas.",
   besta:       "A primeira arma das ameias, fiel desde o início.",
   catapulta:   "Madeira velha e ódio, desde o primeiro cerco.",
   caldeirao:   "Sopa fervente que ninguém quer provar.",
   tesla:       "Relâmpago engarrafado em bobinas de cobre.",
   canalizador: "Um fio do Turbilhão Nexus corre por este pilar.",
-  acido:       "Chuva verde que, juram, não mancha a muralha.",
+  acido:       "Chuva verde que, juram, não mancha as muralhas.",
   // Torres — Avançadas
   balista:     "Virotes que atravessam três mortos de uma vez.",
   canhao:      "Pólvora e ferro: o rugido que responde à horda.",
@@ -7308,14 +7577,14 @@ const ARS_LORE = {
   ritualcura:  "Cânticos antigos costuram os vivos na batalha.",
   infusor:     "Verte magia pura nas armas vizinhas, gota a gota.",
   // Edifícios
-  quartel:     "Aqui o povo vira guarnição da muralha.",
-  cortico:     "O lar possível atrás da muralha.",
+  quartel:     "Aqui o povo vira guarnição das muralhas.",
+  cortico:     "O lar possível atrás das muralhas.",
   capela:      "Uma vela por cada tropa que voltou viva.",
   estabulo:    "Cavalos criados no cerco não temem nada.",
   tesouraria:  "Cofres do reino: até o ouro vai à guerra.",
   laboratorio: "Vapores e teorias proibidas: o amanhã às pressas.",
   templo:      "Erguido em lua vermelha; a fé é argamassa.",
-  oficina:     "A muralha se recusa a morrer, tijolo a tijolo.",
+  oficina:     "As muralhas se recusam a morrer, tijolo a tijolo.",
   refinaria:   "Tritura Corações de Argamato até restar o brilho.",
   bastiao:     "Do alto do bastião, a artilharia inteira aprende a mirar.",
   // Praças — Distrito do Povo
@@ -7363,6 +7632,7 @@ function towerTrait(tt) {
     tt.support === "buff" ? "fortalece as tropas" :
     tt.support === "mage" ? "rompe selos e reforça tropas" :
     tt.support === "charm" ? "vira inimigos contra os seus" :
+    tt.support === "depot" ? `guarda ${DEPOT_CAP_BASE} de munição (até ${DEPOT_TYPES} tipos) e reabastece as torres vizinhas a cada ${DEPOT_FEED_SEC}s: +${Math.round(DEPOT_RATE*100)}% de cadência e +${Math.round(DEPOT_SAVE*100)}% de munição poupada nelas` :
     tt.boomerang ? "bumerangue atravessa a lane" :
     tt.pierce >= 99 ? "atravessa toda a lane" :
     tt.pierce ? `perfura ${tt.pierce} atrás` :
@@ -7651,8 +7921,8 @@ $("btn-load").onclick = () => {
 $("menu-help").onclick = () => {
   openModal("Karzstak Must Not Fall", (m) => {
     const d = document.createElement("div"); d.className = "panel-hint";
-    d.innerHTML = "Há cento e vinte anos os mortos marcham, e <b>Karzstak não pode cair</b>. Você é o novo comandante de um dos setores da muralha: o rei lhe confiou o <b>Cetro Real</b>.<br><br>"
-      + "<b>Como jogar:</b> aperte <b>▶ Turno</b> e sobreviva à horda. Construa <b>fábricas</b> no distrito para abastecer as <b>torres</b> nos portões; erga <b>edifícios</b> para fortalecer a cidade. A muralha aguenta alguns <b>hits</b>. Se zerar, a run acaba.<br><br>"
+    d.innerHTML = "Há cento e vinte anos os mortos marcham, e <b>Karzstak não pode cair</b>. Você é o novo comandante de um dos setores das muralhas: o rei lhe confiou o <b>Cetro Real</b>.<br><br>"
+      + "<b>Como jogar:</b> aperte <b>▶ Turno</b> e sobreviva à horda. Construa <b>fábricas</b> no distrito para abastecer as <b>torres</b> nos portões; erga <b>edifícios</b> para fortalecer a cidade. As muralhas aguentam alguns <b>hits</b>. Se zerar, a run acaba.<br><br>"
       + "<b>Infinito</b> = sobreviva o máximo que puder. <b>História</b> = campanhas (em breve). <b>Miolo / Conselho / Arsenal</b> = progressão persistente entre runs.";
     m.appendChild(d);
   });

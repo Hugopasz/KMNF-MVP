@@ -334,6 +334,9 @@ html, body {
 .tower-slot .ammo-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 1px 4px; line-height: 1.1; }
 .tower-slot .ammo { font-size: 11px; color: var(--text); opacity: .9; font-weight: 700; }
 .tower-slot .ammo.empty { color: #ff8a6a; opacity: 1; animation: ammo-blink 1s steps(2) infinite; }
+/* Estoque de Munições: o total ocupa a linha inteira e os tipos guardados vêm embaixo,
+   senão "🗃️30/30" e três munições disputariam a mesma linha de 11px. */
+.tower-slot .ammo.dep-tot { flex: 0 0 100%; color: var(--gold-hi); opacity: 1; }
 @keyframes ammo-blink { 50% { opacity: .45; } }
 .tower-slot .stars {
   position: absolute; top: 2px; left: 0; right: 0;
@@ -661,6 +664,21 @@ html, body {
 #res-bar .fres { display: flex; align-items: center; gap: 2px; color: #e8dcc0; font-size: clamp(12px, 3.1vw, 15.5px); }
 #res-bar .fres-ic { font-size: clamp(13px, 3.5vw, 17px); }
 #res-bar .fres-n { font-weight: 800; }
+/* Dívida: o número vira vermelho e pulsa de leve. O pulso é o que faz o jogador
+   OLHAR — vermelho estático se perde numa barra que já tem ícones coloridos. */
+#res-bar .fres-n.neg,
+.dist-res .dr-v.neg {
+  color: #ff6b5a;
+  text-shadow: 0 0 8px rgba(224,95,95,.55);
+}
+#res-bar .fres-n.neg { animation: resDebt 1.5s ease-in-out infinite; }
+@keyframes resDebt {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: .55; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #res-bar .fres-n.neg { animation: none; }
+}
 
 /* terrenos CONSTRUÍDOS: cheios, com relevo */
 .cell.built { border: 1px solid rgba(0,0,0,.5); box-shadow: inset 0 2px 6px rgba(0,0,0,.45), inset 0 -2px 3px rgba(255,255,255,.05); }
@@ -967,6 +985,13 @@ html, body {
 .gate-sec-t::after { content: ""; flex: 1; height: 1px; background: rgba(201,162,39,.3); }
 .gate-note { font-size: 13.5px; color: var(--beige); line-height: 1.4; }
 .gate-note b { color: var(--text); }
+/* Preço de guerra: só aparece com a horda em campo, entao pode gritar um pouco */
+.gate-war {
+  font-size: 13px; line-height: 1.4; color: #ffcf8a;
+  padding: 8px 11px; border-radius: 8px;
+  background: rgba(120,40,20,.28); border: 1px solid rgba(224,95,95,.45);
+}
+.gate-war b { color: #ff9c6a; letter-spacing: .5px; }
 /* buffs do quartel */
 .gate-buffs { display: flex; flex-wrap: wrap; gap: 8px; }
 .gate-buff {
@@ -1015,6 +1040,10 @@ html, body {
 .gc-s { font-size: 12.5px; color: var(--beige); }
 .gc-k { font-size: 11.5px; color: var(--dim); line-height: 1.25; }
 .gc-c { font-size: 13.5px; color: var(--gold-hi); margin-top: 3px; }
+/* preço inflado pela batalha: o valor de paz fica riscado ao lado, para o jogador ver
+   quanto está pagando a mais em vez de só achar que o custo mudou sozinho */
+.gc-c.war { color: #ff9c6a; }
+.gc-c.war s { color: rgba(243,234,210,.4); font-size: 11.5px; margin-left: 2px; }
 /* reposição automática: carta larga com a unidade que será reposta + interruptor */
 .gate-auto {
   display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
