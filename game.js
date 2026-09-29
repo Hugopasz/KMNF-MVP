@@ -921,25 +921,57 @@ function favTryAction(k, mode) {
 }
 
 // ---- render ----
-// Arco FACETADO (segmentos retos, com losango no ápice) em vez de curva lisa
-function favArcPath() {
-  const pts = [];
-  for (let i = 0; i <= 8; i++) {
-    const t = Math.PI - (i * Math.PI / 8);
-    pts.push([50 - 46 * Math.cos(t), 88 - 78 * Math.sin(t)]);
-  }
-  let d = "";
-  pts.forEach(([x, y], i) => { d += (i ? " L " : "M ") + x.toFixed(1) + " " + y.toFixed(1); });
-  // pequenos "pés" retos nas pontas do medidor
-  d += " M 4 88 L 4 92 M 96 88 L 96 92";
-  return d;
+// MEDIDOR DE RELAÇÃO (arco atrás do retrato). Era uma polilinha facetada única: não
+// tinha parte cheia nem vazia, então o arco não dizia nada além de onde o coração
+// estava. Agora são duas camadas sobre o MESMO arco liso — trilha apagada com a escala
+// inteira e traço aceso com o quanto a relação subiu — mais marcas nos limiares dos
+// patamares (25/50/75), que são justamente onde o texto embaixo muda de nome.
+const FAV_ARC = { cx: 50, cy: 88, rx: 46, ry: 78 };
+// f: 0 = ponta "−" (direita) · 1 = ponta "+" (esquerda). Mantém a orientação de antes.
+function favArcPt(f) {
+  const t = (1 - f) * Math.PI;
+  return [FAV_ARC.cx - FAV_ARC.rx * Math.cos(t), FAV_ARC.cy - FAV_ARC.ry * Math.sin(t)];
+}
+// Meia-elipse por CIMA: sweep-flag 0, porque com 1 o arco passaria por baixo da base.
+const FAV_ARC_D = `M 96 88 A ${FAV_ARC.rx} ${FAV_ARC.ry} 0 0 0 4 88`;
+// Cor por patamar: o arco passa a dizer o humor do personagem, não só a posição dele.
+// 50 é o ponto de partida da run (NEUTRO), por isso tem um tom próprio, sem lado.
+function favArcColor(rel) {
+  if (rel >= 75) return "#f4d76a";
+  if (rel > 50) return "#e8b93a";
+  if (rel === 50) return "#cbbb92";
+  if (rel >= 25) return "#c98a52";
+  return "#e0705f";
+}
+// Marcas radiais nos limiares dos patamares. A direção sai do centro para o ponto:
+// numa elipse não é a normal exata, mas em 2px de tela a diferença não aparece.
+// O ápice (o neutro) ganha marca maior: é a referência de onde a relação partiu.
+function favArcTicks() {
+  return [[0.25, 2.6, "fa-tick"], [0.5, 4.2, "fa-tick fa-tick-mid"], [0.75, 2.6, "fa-tick"]].map(([tf, a, cls]) => {
+    const [x, y] = favArcPt(tf);
+    const dx = x - FAV_ARC.cx, dy = y - FAV_ARC.cy;
+    const L = Math.hypot(dx, dy) || 1;
+    const nx = dx / L, ny = dy / L;
+    return `<line class="${cls}" x1="${(x - nx * a).toFixed(1)}" y1="${(y - ny * a).toFixed(1)}" x2="${(x + nx * a).toFixed(1)}" y2="${(y + ny * a).toFixed(1)}"/>`;
+  }).join("");
 }
 function favPortrait(k, extra) {
   const rel = favRel(k);
-  const t = (1 - rel / 100) * Math.PI; // rel 100 → esquerda (+), rel 0 → direita (−)
-  const hx = 50 - 46 * Math.cos(t), hy = 88 - 78 * Math.sin(t); // % dentro da caixa do arco
-  return `<div class="fav-arc${extra || ""}">
-    <svg viewBox="0 0 100 92" preserveAspectRatio="none"><path d="${favArcPath()}" fill="none" stroke="rgba(232,201,92,.7)" stroke-width="1.3" stroke-linejoin="miter"/></svg>
+  const [hx, hy] = favArcPt(rel / 100);
+  // O traço aceso cresce do NEUTRO (ápice, 50) para o lado que a relação tomou. Enchendo
+  // desde a ponta "−", como era, o trecho aceso ficava justamente sobre o sinal de menos
+  // e dava a impressão de que a direita era o lado bom.
+  // pathLength="100" faz o dasharray falar em porcentagem direto, sem eu medir o arco;
+  // o dashoffset negativo empurra o início do traço para o ponto certo do caminho.
+  const ini = Math.min(rel, 50), len = Math.abs(rel - 50);
+  return `<div class="fav-arc${extra || ""}" style="--relcol:${favArcColor(rel)}">
+    <svg viewBox="0 0 100 92" preserveAspectRatio="none" aria-hidden="true">
+      <path class="fa-track" d="${FAV_ARC_D}" pathLength="100"/>
+      <g class="fa-ticks">${favArcTicks()}</g>
+      <path class="fa-fill" d="${FAV_ARC_D}" pathLength="100"
+            stroke-dasharray="${len} 100" stroke-dashoffset="-${ini}"/>
+      <path class="fa-feet" d="M 4 84.5 L 4 91.5 M 96 84.5 L 96 91.5"/>
+    </svg>
     <span class="fav-arc-plus">+</span><span class="fav-arc-minus">−</span>
     <img class="fav-face" src="${FAV_CHARS[k].img}?v=1" alt="">
     <span class="fav-heart" style="left:${hx}%;top:${hy}%">🖤<i>❤</i></span>
@@ -1047,8 +1079,8 @@ function renderFavEncounter(scr) {
     footer = "PRESENTEAR · +6% DE RELAÇÃO";
     choices = c.gifts.map((g, i) => {
       const [rk, rv] = Object.entries(g.cost)[0];
-      const meta = rk === "gold" ? { n: "Ouro" } : resMeta(rk);
-      const have = rk === "gold" ? S.gold : (rk === "maos" ? S.maos : S.res[rk] || 0);
+      const meta = giftCostMeta(rk);
+      const have = giftCostHave(rk);
       const ok = have >= rv;
       return `<button class="fav-choice fav-dark" data-i="${i}" ${ok ? "" : "disabled"}>➕ ${g.t} <span style="color:#e05f5f">(−${rv} ${meta.n})</span><span class="fav-relcost">${ok ? "+6% relação" : "recursos insuficientes"}</span></button>`;
     }).join("");
@@ -1097,7 +1129,12 @@ function favChoose(k, i) {
   } else { // gift
     const g = FAV_CHARS[k].gifts[i];
     const [rk, rv] = Object.entries(g.cost)[0];
-    if (rk === "gold") S.gold -= rv; else if (rk === "maos") S.maos -= rv; else S.res[rk] -= rv;
+    // Mesmo furo do lado do desenho: sem o caso de 💎 isto fazia `S.res.hearts -= 3`
+    // com S.res.hearts inexistente, ou seja, gravava NaN no save em vez de cobrar.
+    if (rk === "gold") S.gold -= rv;
+    else if (rk === "hearts") S.hearts -= rv;
+    else if (rk === "maos") S.maos -= rv;
+    else S.res[rk] = (S.res[rk] || 0) - rv;
     favGainRel(k, 6);
     msg = `Presente entregue · relação +6%`;
   }
@@ -1645,6 +1682,18 @@ const RESOURCES = {
 };
 const MAOS = { name: "Mãos", icon: "✋" };
 function resMeta(k) { return k === "maos" ? MAOS : RESOURCES[k]; }
+// Custo de presente nas Alianças: pode ser recurso do Feudo, Mãos, 🪙 ou 💎. Tinha dois
+// furos aqui, e o primeiro escondia o segundo:
+//   · 💎 não está em RESOURCES, então resMeta devolvia undefined e ler `.n` derrubava a
+//     tela INTEIRA ao abrir "Presentear" na Rainha, cujo presente custa 💎;
+//   · RESOURCES guarda o rótulo em `name`, não em `n`, então TODO presente de recurso
+//     do Feudo vinha escrito "(−8 undefined)" — só não dava para ver por causa do crash.
+// FAV_FX_META já é a tabela com o campo `n` para todos eles, inclusive 💎 e Mãos; só o
+// ouro não mora lá. E o `have` lia S.res.hearts (inexistente), então a opção de 💎
+// ficava travada em "recursos insuficientes" mesmo com cristais no bolso.
+const GIFT_COST_META = { gold: { n: "Ouro" } };
+function giftCostMeta(k) { return GIFT_COST_META[k] || FAV_FX_META[k] || { n: (resMeta(k) || {}).name || k }; }
+function giftCostHave(k) { return k === "hearts" ? S.hearts : resAmount(k); }
 // Quanto o setor tem de um recurso ("maos" vive na moeda de topo, o resto no Feudo).
 function resAmount(k) { return k === "maos" ? S.maos : (k === "gold" ? S.gold : S.res[k] || 0); }
 // roteia produção: "maos" vai pra moeda de topo; o resto pro estoque do Feudo
