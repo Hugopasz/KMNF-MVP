@@ -507,13 +507,26 @@ function randomSector() {
 // contador de eventos persistem entre TODAS as runs (localStorage próprio).
 // 1 interação por TURNO (conversar OU pedir OU presentear), só ENTRE turnos.
 const FAV_KEY = "mknf-favores";
-const FAV_EV_GOAL = 50; // meta exibida no contador de eventos
 function loadFavMeta() {
   let m; try { m = JSON.parse(localStorage.getItem(FAV_KEY)) || {}; } catch { m = {}; }
   return Object.assign({ found: {}, evCount: 0 }, m);
 }
 const FAVMETA = loadFavMeta();
 function saveFavMeta() { localStorage.setItem(FAV_KEY, JSON.stringify(FAVMETA)); }
+// ---------- Contador de eventos das Alianças ----------
+// O rodapé mostrava FAVMETA.evCount, que é a SOMA de conversas tidas, contra uma meta de
+// 50. Dois problemas: não existem 50 eventos (são 4 personagens × 10 = 40), e repetir o
+// mesmo evento inflava o número, então ele podia passar do total possível. Além disso o
+// rótulo dizia "EVENTO REI" com "0/50" embaixo, ou seja, prometia o número DAQUELE evento
+// e entregava uma contagem global — e um "Evento 0" que não existe.
+function favEvTotal() { return FAV_ORDER.reduce((s, k) => s + FAV_EVENTS[k].length, 0); }
+// Número do evento dentro da lista do personagem, começando em 1. É o que o rótulo pede.
+function favEvNum(k, id) { return FAV_EVENTS[k].findIndex(e => e.id === id) + 1; }
+// Eventos DISTINTOS já vistos: as chaves de `found` são "personagem:evento:escolha",
+// então basta descartar a escolha e contar os pares únicos.
+function favEvSeen() {
+  return new Set(Object.keys(FAVMETA.found).map(key => key.split(":").slice(0, 2).join(":"))).size;
+}
 // VISITAR (você vai até eles, escolhendo quem): liberado desde o dia 1.
 // RECEBER VISITA (um visitante fixo aparece sozinho e cobra atenção): só a partir
 // deste dia. De qualquer forma, é 1 interação por turno.
@@ -1026,7 +1039,7 @@ function renderFavHub(scr) {
       </div>
       ${actNote}
     </div>
-    <div class="fav-count">EVENTOS REALIZADOS: ${Math.min(FAVMETA.evCount, FAV_EV_GOAL)}/${FAV_EV_GOAL}</div>
+    <div class="fav-count">EVENTOS DESCOBERTOS: ${favEvSeen()}/${favEvTotal()}</div>
     ${isVisitor && !S.fav.used && !favFreeVisits ? `<div class="fav-visit-banner">🔔 Está te visitando hoje</div>` : ""}
     ${punWarn && !favPun(k) ? `<div class="fav-pun-mini">${punWarn}</div>` : ""}`;
   $("fav-back").onclick = closeFavores;
@@ -1059,7 +1072,8 @@ function renderFavEncounter(scr) {
     choices = `<button class="fav-choice fav-ok" id="fav-done">Entendido...</button>`;
   } else if (v.mode === "talk") {
     intro = v.ev.s; quote = v.ev.q;
-    footer = `${evCountLbl}<br>${Math.min(FAVMETA.evCount, FAV_EV_GOAL)}/${FAV_EV_GOAL}`;
+    // Agora o número é o DESTE evento, na lista deste personagem, a partir de 1.
+    footer = `${evCountLbl}<br>${favEvNum(k, v.ev.id)}/${FAV_EVENTS[k].length}`;
     choices = v.ev.c.map((ch, i) => {
       const key = `${k}:${v.ev.id}:${i}`;
       const known = !!FAVMETA.found[key];
@@ -1117,6 +1131,9 @@ function favChoose(k, i) {
     S.fav.last[k] = v.ev.id;
     const key = `${k}:${v.ev.id}:${i}`;
     if (!FAVMETA.found[key]) { FAVMETA.found[key] = true; }
+    // evCount não aparece mais no rodapé (virou "eventos distintos"), mas segue somando:
+    // é o total de conversas da vida do jogador e já está gravado no localStorage de quem
+    // joga há tempo. Apagar o incremento jogaria esse histórico fora.
     FAVMETA.evCount++; saveFavMeta();
     msg = `${favFxText(ch.e)} · relação ${ch.rel >= 0 ? "+" : ""}${ch.rel}%`;
   } else if (v.mode === "ask") {
