@@ -1324,7 +1324,10 @@ const TOWER_TYPES = {
   prisma:      { name: "Prisma Arcano",      tier: "adv", icon: "💠", cost: 55, dmg: 16, rate: 2.0, range: 999,  aoe: 0,   ptime: 0.6,  ammos: ["essencia", "pedras"],  magic: true, chain: 2, locked: true, medalCost: 30 },
   lancaacido:  { name: "Lança-Ácido",        tier: "adv", icon: "☣️", cost: 55, dmg: 20, rate: 2.2, range: 999,  aoe: 0.5, ptime: 0.5,  ammos: ["oleo", "quimicos"],    locked: true, medalCost: 25 },
   aquatico:    { name: "Cortador Aquático",  tier: "adv", icon: "💧", cost: 55, dmg: 30, rate: 2.0, range: 0.4,  aoe: 0.5, ptime: 0.3,  ammos: ["essencia", "condutores"], locked: true, medalCost: 25 },
-  cacadores:   { name: "Torre dos Caçadores",tier: "adv", icon: "🪃", cost: 55, dmg: 16, rate: 2.4, range: 999,  aoe: 0,   ptime: 0.5,  ammos: ["virotes", "quimicos"], pierce: 9, boomerang: true, locked: true, medalCost: 25 },
+  // Caçadores: pierce 9 + bumerangue varre a lane na ida e na volta, então ela valia
+  // muito mais que as outras avançadas pelo mesmo preço. Custo 55 -> 70 (a mais caras
+  // das avançadas) e cadência 2,4 -> 2,8s, que é ~14% menos tiro por segundo.
+  cacadores:   { name: "Torre dos Caçadores",tier: "adv", icon: "🪃", cost: 70, dmg: 16, rate: 2.8, range: 999,  aoe: 0,   ptime: 0.5,  ammos: ["virotes", "quimicos"], pierce: 9, boomerang: true, locked: true, medalCost: 25 },
   serras:      { name: "Lançador de Serras", tier: "adv", icon: "🪚", cost: 60, dmg: 45, rate: 4.6, range: 999,  aoe: 0,   ptime: 0.6,  ammos: ["pedras", "virotes"], pierce: 99, locked: true, medalCost: 30 },
   escolamagos: { name: "Escola de Magos",    tier: "adv", icon: "🎓", cost: 55, dmg: 0,  rate: 2.8, range: 999,  aoe: 0,   ptime: 0.4,  ammos: ["essencia", "quimicos"], support: "mage", locked: true, medalCost: 30 },
   propaganda:  { name: "Máquina de Propaganda", tier: "adv", icon: "📢", cost: 55, dmg: 0, rate: 3.2, range: 999, aoe: 0,   ptime: 0.4,  ammos: ["condutores", "essencia"], support: "charm", locked: true, medalCost: 30 },
@@ -3165,7 +3168,10 @@ function cellProd(i) {
 
 const CAPATAZ_MULT = 1.5;       // Capataz: produção da cidade acelerada...
 const CAPATAZ_MORALE = 4;       // ...ao custo de moral por turno (≈8 por dia)
-const HELP_RATE = 100;          // Ajudar o Reino: munição excedente → medalhas (100 ▸ 1)
+// Ajudar o Reino: munição excedente → medalhas. Era 100 ▸ 1 e rendia Medalha demais —
+// um setor com fábricas sobrando comprava o Arsenal inteiro sem jogar bem. Os textos da
+// interface leem esta constante, senão voltam a divergir dela no próximo ajuste.
+const HELP_RATE = 1000;
 // Toggles do Feudo (campo 2): custam MUITA moral por turno ativo
 const FEUD_AID_RES = 5;         // Pedir Ajuda: +5 de cada recurso bruto por turno
 const OVERDRIVE_MULT = 1.5;     // Sobrecarga: extratores rendem +50%
@@ -3483,7 +3489,7 @@ function renderResBar() {
   // toggles de política (Cidade e Feudo): pill com bolinha, tudo ancorado no centro
   const TOG_MSG = {
     capataz:       ["👊 Capataz ativo: produção acelerada, o povo sofre (-moral por turno).", "O Capataz foi dispensado."],
-    helpKingdom:   ["🎖️ Ajudando o Reino: munição excedente vira Medalhas (100 ▸ 1).", "O setor voltou a guardar seu excedente."],
+    helpKingdom:   [`🎖️ Ajudando o Reino: munição excedente vira Medalhas (${HELP_RATE} ▸ 1).`, "O setor voltou a guardar seu excedente."],
     feudAid:       [`🆘 Pedindo ajuda ao Reino: +${FEUD_AID_RES} de cada material bruto por turno, mas o povo perde muita moral.`, "O setor dispensou a ajuda do Reino."],
     feudOverdrive: ["⚙️ Sobrecarga: os extratores rendem +50%, mas o povo perde muita moral por turno.", "Os extratores voltaram ao ritmo normal."],
   };
@@ -3513,7 +3519,7 @@ function renderResBar() {
     for (const [key, r] of Object.entries(RESOURCES)) item(r.icon, Math.trunc(S.res[key] || 0));
     tog("Sobrecarga", "feudOverdrive", "Extratores produzem +50%, mas o povo perde muita moral enquanto ativo");
   } else {
-    tog("Ajudar Reino", "helpKingdom", "Envia a munição excedente para outros setores: 100 munições ▸ 1 🎖️ Medalha");
+    tog("Ajudar Reino", "helpKingdom", `Envia a munição excedente para outros setores: ${HELP_RATE} munições ▸ 1 🎖️ Medalha`);
     mid = document.createElement("div");
     mid.className = "fres-mid";
     el.appendChild(mid);
@@ -5059,7 +5065,7 @@ function dispatchCrates() {
   // Libera as caixas em FILEIRA (uma atrás da outra na esteira), não empilhadas
   jobs.forEach((j, k) => setTimeout(() => sendCrate(j.slot, j.amount, j.type), k * CRATE_GAP_MS));
   // Ajudar o Reino: o excedente atravessa a esteira inteira e some no fim.
-  // A Medalha (100 ▸ 1) só é creditada quando a caixa chega ao fim.
+  // A Medalha (HELP_RATE ▸ 1) só é creditada quando a caixa chega ao fim.
   overflow.forEach((o, k) => setTimeout(() => sendOverflowCrate(o.amount, o.type), (jobs.length + k) * CRATE_GAP_MS));
 }
 // crédito do excedente ao fim da esteira
