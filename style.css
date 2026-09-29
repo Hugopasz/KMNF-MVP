@@ -1717,6 +1717,26 @@ html, body {
   text-shadow: 0 0 14px rgba(201,162,39,.5);
 }
 #overlay-box p { color: var(--text); font-size: 16px; line-height: 1.55; margin-bottom: 18px; white-space: pre-line; }
+/* Trechos marcados da abertura: dourado, maior e com um respiro lento.
+   `display: block` não é enfeite: transform não pega em elemento inline, e dando a linha
+   inteira ao realce o movimento não empurra as palavras vizinhas do parágrafo. */
+#overlay-text .lore-hi {
+  display: block;
+  margin: 17px 0;   /* a respiração do destaque vem daqui, não das quebras do texto */
+  color: var(--gold-hi, #e8c95c);
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 1.15em;
+  letter-spacing: .6px;
+  animation: lore-breathe 3.4s ease-in-out infinite;
+}
+@keyframes lore-breathe {
+  0%, 100% { transform: translateY(0) scale(1);        text-shadow: 0 0 8px rgba(232,201,92,.28); }
+  50%      { transform: translateY(-2px) scale(1.015); text-shadow: 0 0 17px rgba(232,201,92,.62); }
+}
+@media (prefers-reduced-motion: reduce) {
+  #overlay-text .lore-hi { animation: none; text-shadow: 0 0 12px rgba(232,201,92,.5); }
+}
 /* Rodapé FORA da caixa, sobre o fundo escurecido: substitui o antigo "Continuar" */
 #overlay {
   flex-direction: column;

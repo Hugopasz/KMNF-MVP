@@ -4,7 +4,7 @@
 
 ## Introdução
 
-Há cento e vinte anos, o mundo mudou para sempre.
+Há cento e vinte anos, o mundo de **Estta** mudou para sempre.
 
 Sem qualquer explicação, hordas intermináveis de mortos-vivos começaram a surgir. Ninguém conhece sua verdadeira origem. Alguns acreditam que sejam uma punição divina; outros culpam um antigo ritual proibido. A lenda mais aceita conta que um grupo de aventureiros invadiu a tumba errada: o descanso eterno de um rei necromante. Ao profanarem seu túmulo, libertaram uma maldição que condenou toda a humanidade. Desde então, os mortos jamais deixaram de marchar.
 
@@ -16,7 +16,7 @@ Todos os dias, homens, mulheres e crianças trabalham até a exaustão para mant
 
 Você é o novo comandante de uma das centenas de setores defensivos que cercam Karzstak. Sua responsabilidade é proteger um trecho das muralhas, onde incontáveis trincheiras enfrentam ataques contínuos. Os mortos jamais param de chegar.
 
-Acima de todos governa o rei, soberano absoluto de Karzstak e único detentor do **Turbilhão Nexus**, uma poderosa fonte de magia que abastece todo o reino. Graças a esse artefato, a cidade ainda permanece viva.
+Acima de todos governa o rei, soberano absoluto de Karzstak e único detentor do **Turbilhão Narxis**, uma poderosa fonte de magia que abastece todo o reino. Graças a esse artefato, a cidade ainda permanece viva.
 
 Mas a magia sozinha nunca foi suficiente. A necessidade obrigou a humanidade a acelerar seu desenvolvimento tecnológico, alcançando uma versão precoce da Primeira Revolução Industrial em plena era medieval. Vapor, pólvora, máquinas e engenharia passaram a disputar espaço com feitiços, runas e artefatos arcanos. Em Karzstak, ciência e magia evoluem lado a lado, cada uma tentando superar a outra na luta pela sobrevivência.
 

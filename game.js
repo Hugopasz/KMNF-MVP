@@ -104,7 +104,7 @@ const EVENTS = [
   { id: "p10", ic: "🍞", ty: "pos", t: "Rações Extras", s: "O conselho liberou os estoques. Ninguém luta de barriga vazia.", e: { gold: 15, morale: 10 } },
   { id: "p11", ic: "🛡️", ty: "pos", t: "Reforços do Interior", s: "Um pelotão da guarda real reforça a linha por hoje.", e: { mods: { enemyDmg: 0.8 }, morale: 6 } },
   { id: "p12", ic: "💰", ty: "pos", t: "Dízimo de Guerra", s: "As paróquias arrecadaram para a defesa do setor.", e: { gold: 30, hearts: 2 } },
-  { id: "p13", ic: "🌟", ty: "pos", t: "Bênção do Cristal", s: "O Turbilhão Nexus pulsa forte hoje. A cidade inteira sente.", e: { morale: 14, hits: 1 }, w: EV_W_HEAL },
+  { id: "p13", ic: "🌟", ty: "pos", t: "Bênção do Cristal", s: "O Turbilhão Narxis pulsa forte hoje. A cidade inteira sente.", e: { morale: 14, hits: 1 }, w: EV_W_HEAL },
   { id: "p14", ic: "🧰", ty: "pos", t: "Peças Sobressalentes", s: "Recuperaram material de um posto abandonado.", e: { gold: 25, mods: { prod: 1.2 } } },
   { id: "p15", ic: "🎯", ty: "pos", t: "Treino da Aurora", s: "Os artilheiros treinaram ao amanhecer. A mira está afiada.", e: { mods: { towerDmg: 1.2 }, morale: 4 } },
   { id: "p16", ic: "🐴", ty: "pos", t: "Cavalaria de Passagem", s: "Cavaleiros a caminho de outro setor deixam suprimentos.", e: { gold: 22, hearts: 3 } },
@@ -1416,7 +1416,7 @@ const TOWER_LORE = {
   catapulta:   "Madeira velha, contrapeso e ódio acumulado. Arremessa pedregulhos sobre a horda desde o primeiro cerco desta cidade.",
   caldeirao:   "Óleo fervente despejado do alto dos portões. A sopa que ninguém quer provar borbulha dia e noite à espera da carne fria.",
   tesla:       "Presente das oficinas a vapor da cidade baixa. Relâmpago engarrafado em bobinas de cobre que salta de morto em morto.",
-  canalizador: "Um pilar de runas alimentado por um fio do Turbilhão Nexus. Destila a magia bruta em raios que ignoram carne e selo.",
+  canalizador: "Um pilar de runas alimentado por um fio do Turbilhão Narxis. Destila a magia bruta em raios que ignoram carne e selo.",
   acido:       "Os alquimistas juram que a chuva verde não corrói as muralhas. Mentem. Contra os mortos, porém, ela dissolve tudo que se move.",
   balista:     "Virotes do tamanho de lanças, untados em óleo do reino. Atravessam três cadáveres e ainda acendem o quarto no caminho.",
   canhao:      "Pólvora e ferro fundido nas velhas forjas reais. O rugido que responde ao rugido da horda, calando lanes inteiras.",
@@ -6135,9 +6135,21 @@ function fadeOutScreen(id, then) {
   }, SCREEN_FADE_MS);
 }
 
-function showOverlay(title, text, cb) {
+// Realce da abertura: *entre asteriscos* vira <b class="lore-hi">. Escapo o HTML ANTES
+// de injetar a tag — se um texto futuro trouxer "<", ele tem que aparecer como "<" e não
+// virar marcação. Só a sequência de lore pede isso; o resto do jogo segue em textContent.
+function loreHTML(txt) {
+  return txt
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    // Consome os \n que cercam o realce: ele é um BLOCO e já quebra a linha sozinho.
+    // Com o pre-line ainda somando as duas quebras do texto, cada destaque ganhava três
+    // e o miolo da tela ficava esparramado. A separação passa a vir da margem do bloco.
+    .replace(/\n*\*([^*]+)\*\n*/g, '<b class="lore-hi">$1</b>');
+}
+function showOverlay(title, text, cb, rich) {
   $("overlay-title").textContent = title;
-  $("overlay-text").textContent = text;
+  if (rich) $("overlay-text").innerHTML = loreHTML(text);
+  else $("overlay-text").textContent = text;
   overlayCb = cb || null;
   overlaySkipCb = null;                          // só sequências (re)armam o "Pular"
   $("overlay-skip").classList.add("hidden");
@@ -6166,7 +6178,7 @@ function showOverlaySeq(screens, done) {
   const step = () => {
     if (i >= screens.length) { done && done(); return; }
     const [title, text] = screens[i++];
-    showOverlay(title, text, step);
+    showOverlay(title, text, step, true);   // rich: a abertura tem trechos em destaque
     overlaySkipCb = () => { i = screens.length; done && done(); };
     $("overlay-skip").classList.remove("hidden");
   };
@@ -7394,26 +7406,28 @@ $("btn-speed").onclick = () => {
 
 // ---------- Menu inicial ----------
 // Abertura em três telas: o decreto → o mundo que sobrou → você. Depois vêm as regras.
+// Abertura. Os trechos entre *asteriscos* viram destaque dourado com respiro lento
+// (ver loreHTML e .lore-hi): são as batidas que o texto quer que o jogador leia devagar.
 const LORE_DECREE =
-  "Dois bilhões de anos atrás, o rei negativo cansou-se deste planeta. De cada prece, de cada pedido, de cada guerra travada em seu nome.\n\n"
-  + "Então fechou os olhos e dormiu.\n\n"
-  + "Cento e vinte anos atrás, um bando de aventureiros irresponsáveis abriu a tumba errada.\n\n"
-  + "Ele acordou num mundo vibrante. Criaturas, reinos, lendas, canções. Vivo.\n\nE insuportavelmente barulhento.\n\n"
-  + "Seu decreto coube numa linha:\n\n«Se eu não vou dormir, então ninguém vai.»";
+  "Dois mil anos atrás, o rei negativo cansou-se deste planeta. De cada prece sem sentido, de cada pedido egoísta, de cada guerra vazia travada em seu nome. Então resolveu fechar os olhos e dormir, esperando que o planeta definhasse sem a sua ajuda.\n\n"
+  + "*Mas isso não aconteceu.*\n\n"
+  + "Estta prosperou e evoluiu. Até que, cento e vinte anos atrás, uma equipe de aventureiros irresponsáveis abriu a tumba errada em busca de tesouros.\n\n"
+  + "*Eles foram pulverizados instantaneamente.*\n\n"
+  + "O rei negativo acordou num mundo vibrante, repleto de criaturas, reinos, lendas e canções. E, acima de tudo, insuportavelmente barulhento. Então ele disse:\n\n"
+  + "*Se eu não vou dormir, então ninguém vai.*";
 
 const LORE_WORLD =
-  "Os mortos se levantaram. A peste fez o resto, e mudou TUDO em questão de estações.\n\n"
-  + "Desde então a humanidade se encolheu em punhados de metrópoles muradas, espalhadas pelo globo como brasas num campo queimado. Lá fora marcham os restos: homens, animais e criaturas mágicas corrompidas pela vontade do inimigo, que só quer silêncio.\n\n"
-  + "Eles nunca param de chegar.\n\n"
-  + "De todas essas cidades, nenhuma importa mais que Karzstak. Ela resiste há cento e vinte anos.\n\n"
-  + "Hoje, finalmente, escolheram você.";
+  "Os mortos se levantaram, cova atrás de cova. Em poucos anos, o mundo de Estta mudou por completo. A humanidade, desesperada para sobreviver, se encolheu em um punhado de metrópoles muradas, cada vez mais lotadas. Lá fora marcham os restos: homens, animais e criaturas mágicas corrompidos pela vontade de um inimigo que só vai descansar quando a última cidade cair.\n\n"
+  + "*Eles nunca param de chegar. Dia e noite.*\n\n"
+  + "Você é de Karzstak. A cidade imensa resiste há mais de um século, e hoje você finalmente foi escolhido para proteger um dos setores das muralhas.\n\n"
+  + "*Ha! Comandante-arquimago. Nada mal.*";
 
 const LORE_COMMAND =
-  "Vinte anos treinando para comandante-arquimago. Vinte anos para chegar a esta manhã.\n\n"
-  + "Seu setor acaba de ser reerguido, reconquistado pedra por pedra depois que o comandante anterior tombou. Muitas vidas pagaram por este chão, e seus superiores esperam que o investimento renda.\n\n"
-  + "Da mão do rei você recebeu o Cetro Real, forjado direto na torrente do Turbilhão Nexus. Não desperdice.\n\n"
-  + "Proteja seu setor. Atravesse a noite. Talhe seu nome nos tijolos das muralhas da realeza.\n\n"
-  + "Nosso lema é um só: Karzstak NÃO deve cair. Não importa o custo.";
+  "Vinte anos treinando para este momento. Você sacrificou muito para chegar aqui, e vai ter que sacrificar ainda mais para se manter.\n\n"
+  + "Seu setor acaba de ser reerguido, reconquistado pedra por pedra depois que o comandante anterior tombou. Muitas vidas pagaram por este chão, e seus superiores esperam que a aposta tenha valido a pena.\n\n"
+  + "Direto da mão do rei você recebeu um Cetro Real, forjado nas chamas do Turbilhão Narxis, a única fonte mágica do reino. Não desperdice esta dádiva.\n\n"
+  + "Proteja seu setor. Atravesse os turnos. Sobreviva 30 dias para talhar seu nome nos tijolos das muralhas internas. Nosso juramento é um só:\n\n"
+  + "*Karzstak NÃO deve cair. Não importa o custo.*";
 
 
 // ---------- Tutorial rápido no campo ----------
@@ -7655,7 +7669,7 @@ const ARS_LORE = {
   catapulta:   "Madeira velha e ódio, desde o primeiro cerco.",
   caldeirao:   "Sopa fervente que ninguém quer provar.",
   tesla:       "Relâmpago engarrafado em bobinas de cobre.",
-  canalizador: "Um fio do Turbilhão Nexus corre por este pilar.",
+  canalizador: "Um fio do Turbilhão Narxis corre por este pilar.",
   acido:       "Chuva verde que, juram, não mancha as muralhas.",
   // Torres — Avançadas
   balista:     "Virotes que atravessam três mortos de uma vez.",
