@@ -1516,6 +1516,20 @@ const CRIT_BASE = 0.2, CRIT_MULT = 2;
 // uma edição dos `hp` abaixo — assim os números de ENEMY_TYPES seguem sendo o design base
 // (e os cortes de peso do pickWave, como `hp >= 40`, continuam valendo o que valiam).
 const ENEMY_TOUGHNESS = 3.6;
+// ---------- Escalada de vida por DIA ----------
+// O problema medido: numa partida boa o inimigo morre no terço de cima do campo, longe
+// da muralha, e a horda perde o impacto — o jogador não VÊ o que ele está matando. A
+// causa é que a horda escalava só em QUANTIDADE, então o dano do jogador crescia mais
+// rápido que a vida individual do morto e a fila ia morrendo cada vez mais longe.
+// A correção é por dia, não na base: quem não passa do dia HP_RAMP_FROM nunca sente,
+// e esse é justamente o jogador iniciante. Sobreviver ao dia 10 já é a peneira.
+const HP_RAMP_FROM = 10;    // antes disso, nada muda
+const HP_RAMP_EVERY = 5;    // um degrau a cada 5 dias
+const HP_RAMP_STEP = 0.1;   // +10% por degrau, composto
+function enemyHpDayMult() {
+  const steps = Math.max(0, Math.ceil((S.day - HP_RAMP_FROM) / HP_RAMP_EVERY));
+  return Math.pow(1 + HP_RAMP_STEP, steps);
+}
 const ENEMY_TYPES = {
   rastejante: { name: "Rastejante",  icon: "🧟", hp: 14, spd: 0.040, armor: 1,  gold: 2, heart: .25, period: "day",   minDay: 1 },
   corredor:   { name: "Corredor",    icon: "🏃", hp: 8,  spd: 0.105, armor: 1,  gold: 2, heart: .20, period: "day",   minDay: 2 },
@@ -4820,10 +4834,11 @@ function startWave() {
 
 function spawnEnemy(lane, type) {
   const t = ENEMY_TYPES[type];
-  // REGRA: inimigos NÃO escalam HP com o dia. HP base é fixo por tipo; a escalada vem de
-  // QUANTIDADE (waveSize) e de NOVOS TIPOS (minDay). Só modificadores EXTERNOS mexem no HP:
-  // lua sangrenta (evento celeste), Medo (moral) e dayMods (eventos diários).
-  const hp = Math.round(t.hp * ENEMY_TOUGHNESS * (bloodMoon() ? 1.5 : 1) * moraleEnemyHpMult() * dm("enemyHp"));
+  // O HP base segue fixo por tipo; a partir do dia HP_RAMP_FROM entra a escalada por
+  // DIA (enemyHpDayMult), somada à escalada por QUANTIDADE (waveSize) e por NOVOS
+  // TIPOS (minDay). Modificadores externos continuam por cima: lua sangrenta, Medo
+  // (moral) e dayMods (eventos diários).
+  const hp = Math.round(t.hp * ENEMY_TOUGHNESS * enemyHpDayMult() * (bloodMoon() ? 1.5 : 1) * moraleEnemyHpMult() * dm("enemyHp"));
   S.enemies.push({
     lane, y: -0.05, type,
     hp, maxHp: hp,

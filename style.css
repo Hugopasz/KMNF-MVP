@@ -644,13 +644,16 @@ html, body {
   display: inline-flex; align-items: center; gap: 3px;
   background: rgba(0,0,0,.35); color: var(--beige);
   border: 1px solid rgba(243,234,210,.35); border-radius: 999px;
-  font-family: var(--display); font-size: clamp(8px, 2.15vw, 10px); letter-spacing: .2px;
-  padding: 2px 4px 2px 6px; cursor: pointer; flex-shrink: 0;
+  /* Um pouco maiores: são os quatro controles de política do turno e viviam pequenos
+     demais para o peso da decisão (e para o dedo, na barra estreita do celular).
+     O ganho vai principalmente na ALTURA, que é o alvo do toque: 19px -> 24px. */
+  font-family: var(--display); font-size: clamp(9px, 2.5vw, 11.5px); letter-spacing: .2px;
+  padding: 4px 6px 4px 9px; cursor: pointer; flex-shrink: 0;
   white-space: nowrap;
   transition: border-color .15s, color .15s;
 }
 .fres-toggle .tg-dot {
-  width: 11px; height: 11px; border-radius: 50%;
+  width: 12px; height: 12px; border-radius: 50%;
   background: #3a352b; border: 1px solid rgba(243,234,210,.35);
   transition: background .15s, box-shadow .15s;
 }
@@ -2220,7 +2223,32 @@ body.fac-pink  .cell.built.b-quartel { box-shadow: inset 0 0 0 1px rgba(214,96,1
 }
 .dist-res .dr-sep { color: var(--dim, #9b8f77); margin: 0 4px; font-weight: 400; }
 .dist-chron-h { text-align: center; font-style: italic; color: #cfc6b0; font-size: 14px; margin-bottom: 8px; }
-.dist-chron { display: flex; flex-direction: column; gap: 8px; max-height: 220px; overflow-y: auto; }
+/* Crônicas do Setor: a barra nativa do sistema é cinza e quadrada, e cortava o
+   acabamento do painel. Trilha escura embutida e polegar dourado, na mesma linguagem
+   do resto da tela. O mask-image desbota a última linha, que é o sinal de que ainda
+   há crônica embaixo — sem ele a lista parece simplesmente terminar ali. */
+.dist-chron {
+  display: flex; flex-direction: column; gap: 8px;
+  max-height: 220px; overflow-y: auto;
+  padding-right: 8px;
+  scrollbar-width: thin;                              /* Firefox */
+  scrollbar-color: var(--gold, #c9a227) rgba(0,0,0,.35);
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;                     /* não arrasta o modal atrás */
+  mask-image: linear-gradient(180deg, #000 0, #000 calc(100% - 22px), transparent 100%);
+}
+.dist-chron::-webkit-scrollbar { width: 8px; }
+.dist-chron::-webkit-scrollbar-track {
+  background: rgba(0,0,0,.4);
+  border-radius: 999px;
+  box-shadow: inset 0 0 3px rgba(0,0,0,.6);
+}
+.dist-chron::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--gold-hi, #e8b93a), var(--gold, #c9a227));
+  border-radius: 999px;
+  border: 1px solid rgba(0,0,0,.45);
+}
+.dist-chron::-webkit-scrollbar-thumb:hover { background: var(--gold-hi, #e8b93a); }
 .dist-none { text-align: center; color: var(--dim, #9b8f77); font-style: italic; font-size: 13px; }
 .dist-ev { display: flex; gap: 10px; align-items: stretch; }
 .dist-ev.today { background: rgba(201,162,39,.07); border-radius: 8px; }
