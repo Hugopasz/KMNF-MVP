@@ -201,7 +201,7 @@ const OUTCAST = ["purple", "green"];
 function isOutcast(f) { return OUTCAST.includes(f); }
 // Meta persistente: combos, roxo, Medalhas de Comando, desbloqueios, loadout e ranking
 const META_KEY = "mknf-meta";
-const META_DEFAULTS = { purple: false, green: false, medals: 0, unlocked: [], loadout: null, ranking: [], miolo: {}, counselor: null, council: null, councilLv: {}, brasao: 0 };
+const META_DEFAULTS = { purple: false, green: false, medals: 0, unlocked: [], loadout: null, ranking: [], miolo: {}, counselor: null, council: null, councilLv: {}, brasao: 0, fieldVar: 0 };
 function loadMeta() {
   let m; try { m = JSON.parse(localStorage.getItem(META_KEY)) || {}; } catch { m = {}; }
   return Object.assign({}, META_DEFAULTS, m);
@@ -6268,15 +6268,100 @@ $("vic-menu").onclick = () => {
 };
 
 // ---------- Render do campo ----------
-const PEBBLES = Array.from({ length: 70 }, () => ({
-  x: Math.random(), y: Math.random(),
-  r: Math.random() * 2.2 + 0.6,
-  dark: Math.random() < 0.5,
-}));
-const PATCHES = Array.from({ length: 12 }, () => ({
-  x: Math.random(), y: Math.random(),
-  rx: Math.random() * 40 + 22, ry: Math.random() * 14 + 8,
-}));
+// VARIAÇÕES DO TERRENO: os detalhes do chão (pedras, manchas, fendas, grama, raízes,
+// flores, sangue seco) circulam entre FIELD_VARIANTS desenhos e trocam a cada partida
+// nova. Antes eram sorteados no carregamento da página: variavam entre recarregamentos,
+// mas duas partidas seguidas na mesma aba pisavam exatamente no mesmo chão.
+// O sorteio é SEMEADO, não aleatório: a variação 2 é sempre a mesma variação 2. Sem isso
+// não seriam três desenhos que circulam, seriam infinitos desenhos aleatórios.
+const FIELD_VARIANTS = 3;
+// mulberry32: gerador pequeno e determinístico. Math.random() não aceita semente.
+function seededRng(seed) {
+  let a = (seed >>> 0) || 1;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function fieldVariant() { return ((META.fieldVar || 0) % FIELD_VARIANTS + FIELD_VARIANTS) % FIELD_VARIANTS; }
+// Avança para o próximo desenho. Chamado só onde a partida REALMENTE começa, não no
+// resetGame: ele também roda ao voltar da derrota para o menu, e aí uma variação seria
+// queimada sem ninguém ver o campo.
+function nextFieldVariant() {
+  META.fieldVar = (fieldVariant() + 1) % FIELD_VARIANTS;
+  saveMeta(META);
+  buildFieldDetails();
+}
+
+let PEBBLES = [], PATCHES = [], CRACKS = [], GRIT = [], TUFTS = [], ROOTS = [], FLOWERS = [], OLD_BLOOD = [];
+function buildFieldDetails() {
+  // Semente derivada da variação. O offset por lista evita que duas listas do mesmo
+  // tamanho saiam com as MESMAS coordenadas (as pedras caindo sobre o cascalho).
+  const v = fieldVariant();
+  const rng = (off) => seededRng(0x4b4d4e46 + v * 7919 + off * 104729);
+
+  let r = rng(1);
+  PEBBLES = Array.from({ length: 70 }, () => ({
+    x: r(), y: r(),
+    r: r() * 2.2 + 0.6,
+    dark: r() < 0.5,
+  }));
+  r = rng(2);
+  PATCHES = Array.from({ length: 12 }, () => ({
+    x: r(), y: r(),
+    rx: r() * 40 + 22, ry: r() * 14 + 8,
+  }));
+  // Fendas de terra seca: traço quebrado que caminha a partir de um ponto.
+  r = rng(3);
+  CRACKS = Array.from({ length: 10 }, () => {
+    const pts = [{ x: r(), y: r() }];
+    let a = r() * 6.283, x = pts[0].x, y = pts[0].y;
+    for (let i = 0, segs = 3 + Math.floor(r() * 4); i < segs; i++) {
+      a += (r() - 0.5) * 1.1;
+      const len = 0.03 + r() * 0.06;
+      x += Math.cos(a) * len; y += Math.sin(a) * len * 0.55;
+      pts.push({ x, y });
+    }
+    return pts;
+  });
+  r = rng(4);
+  GRIT = Array.from({ length: 240 }, () => ({
+    x: r(), y: r(), r: r() * 0.9 + 0.3, light: r() < 0.42,
+  }));
+  // Vida teimando em nascer num chão de guerra.
+  r = rng(5);
+  TUFTS = Array.from({ length: 26 }, () => ({              // grama rala e raízes
+    x: r(), y: r(),
+    blades: 2 + Math.floor(r() * 3),
+    h: 0.018 + r() * 0.026,
+    lean: (r() - 0.5) * 0.9,
+    dry: r() < 0.45,                                       // metade puxa para o palha
+  }));
+  r = rng(6);
+  ROOTS = Array.from({ length: 7 }, () => ({               // raízes rastejando no chão
+    x: r(), y: 0.1 + r() * 0.8,
+    len: 0.06 + r() * 0.1,
+    ang: (r() - 0.5) * 1.2,
+  }));
+  r = rng(7);
+  FLOWERS = Array.from({ length: 22 }, () => ({            // microflores azuis e amarelas
+    x: r(), y: r(),
+    blue: r() < 0.5,
+    r: 0.9 + r() * 0.8,
+  }));
+  // Sangue SECO: só perto da muralha (y alto), que é onde a horda chega e morre.
+  r = rng(8);
+  OLD_BLOOD = Array.from({ length: 14 }, () => ({
+    x: r(), y: 0.72 + r() * 0.26,
+    rx: 5 + r() * 13, ry: 3 + r() * 7,
+    rot: r() * 3.14,
+    spots: 1 + Math.floor(r() * 3),
+  }));
+}
+buildFieldDetails();
 // Partículas de ambiente: poeira à deriva de dia, brasas subindo à noite. Posição é
 // calculada a partir do relógio (sem estado a atualizar), então isto não entra no update.
 const MOTES = Array.from({ length: 24 }, () => ({
@@ -6302,48 +6387,8 @@ function airTone() {
   return { haze: "226,186,116", mote: "255,238,200", up: false };
 }
 
-// Fendas de terra seca e cascalho fino: sorteados uma vez, em coordenadas normalizadas,
-// para o terreno não "reembaralhar" a cada redimensionamento.
-const CRACKS = Array.from({ length: 10 }, () => {
-  const pts = [{ x: Math.random(), y: Math.random() }];
-  let a = Math.random() * 6.283, x = pts[0].x, y = pts[0].y;
-  for (let i = 0, segs = 3 + Math.floor(Math.random() * 4); i < segs; i++) {
-    a += (Math.random() - 0.5) * 1.1;
-    const len = 0.03 + Math.random() * 0.06;
-    x += Math.cos(a) * len; y += Math.sin(a) * len * 0.55;
-    pts.push({ x, y });
-  }
-  return pts;
-});
-const GRIT = Array.from({ length: 240 }, () => ({
-  x: Math.random(), y: Math.random(), r: Math.random() * 0.9 + 0.3, light: Math.random() < 0.42,
-}));
-// Vida teimando em nascer num chão de guerra. Tudo em coordenadas normalizadas e
-// sorteado uma vez, para o terreno não reembaralhar a cada redimensionamento.
-const TUFTS = Array.from({ length: 26 }, () => ({          // grama rala e raízes
-  x: Math.random(), y: Math.random(),
-  blades: 2 + Math.floor(Math.random() * 3),
-  h: 0.018 + Math.random() * 0.026,
-  lean: (Math.random() - 0.5) * 0.9,
-  dry: Math.random() < 0.45,                                // metade puxa para o palha
-}));
-const ROOTS = Array.from({ length: 7 }, () => ({           // raízes rastejando no chão
-  x: Math.random(), y: 0.1 + Math.random() * 0.8,
-  len: 0.06 + Math.random() * 0.1,
-  ang: (Math.random() - 0.5) * 1.2,
-}));
-const FLOWERS = Array.from({ length: 22 }, () => ({        // microflores azuis e amarelas
-  x: Math.random(), y: Math.random(),
-  blue: Math.random() < 0.5,
-  r: 0.9 + Math.random() * 0.8,
-}));
-// Sangue SECO: só perto da muralha (y alto), que é onde a horda chega e morre.
-const OLD_BLOOD = Array.from({ length: 14 }, () => ({
-  x: Math.random(), y: 0.72 + Math.random() * 0.26,
-  rx: 5 + Math.random() * 13, ry: 3 + Math.random() * 7,
-  rot: Math.random() * 3.14,
-  spots: 1 + Math.floor(Math.random() * 3),
-}));
+// (As listas de detalhe do chão vivem em buildFieldDetails, acima: são semeadas pela
+// variação da partida em vez de sorteadas no carregamento.)
 
 // ---------- Clima do turno (100% cosmético) ----------
 // Sorteado a cada turno. NADA aqui toca alcance, mira, dano ou spawn: são só camadas de
@@ -6699,7 +6744,9 @@ function buildGroundTex(w, h, dpr) {
 }
 function ensureGroundTex(w, h) {
   const dpr = devicePixelRatio || 1;
-  const key = `${Math.round(w)}x${Math.round(h)}@${dpr}`;
+  // A variação entra na CHAVE em vez de alguém ter que invalidar a textura na mão:
+  // trocar de desenho e esquecer o invalidate deixaria o chão antigo assado em cache.
+  const key = `${Math.round(w)}x${Math.round(h)}@${dpr}#${fieldVariant()}`;
   if (!groundTex || groundKey !== key) { groundTex = buildGroundTex(w, h, dpr); groundKey = key; }
   return groundTex;
 }
@@ -7998,6 +8045,7 @@ $("btn-infinito").onclick = () => {
     return;
   }
   resetGame();
+  nextFieldVariant();   // partida nova pisa no próximo desenho do terreno
   $("menu").classList.add("hidden");
   showFactionChoose((pick) => {
     S.factions = [pick];
