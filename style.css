@@ -1528,6 +1528,32 @@ html, body {
 .menu-btn:disabled { opacity: .4; cursor: default; }
 #menu-note { display: none; } /* registro da guarda ocultado na home */
 
+/* "Reset" no pé da home. Apaga TUDO, então é de propósito o elemento mais apagado da
+   tela: quem procura acha, quem não procura não esbarra. Só ganha contraste no hover,
+   e em vermelho, para o dedo saber o que está prestes a tocar. */
+#home-reset {
+  display: block; margin: 26px auto 0; padding: 4px 10px;
+  background: none; border: 0; cursor: pointer;
+  font-family: var(--display); font-size: 11px; letter-spacing: 2.5px;
+  color: rgba(243,234,210,.2);
+  transition: color .15s;
+}
+#home-reset:hover, #home-reset:focus-visible { color: rgba(224,95,95,.9); }
+/* Confirmação: a lista do que se perde é o que faz isto ser uma confirmação de verdade
+   em vez de um "tem certeza?" que todo mundo aperta no automático. */
+.reset-warn { color: var(--beige); font-size: 14px; line-height: 1.5; }
+.reset-warn b { color: #ff8a7a; }
+.reset-list { margin: 10px 0 4px; padding-left: 18px; color: var(--dim, #9b8f77); font-size: 13.5px; line-height: 1.7; text-align: left; }
+.reset-actions { display: flex; gap: 10px; margin-top: 16px; }
+.reset-btn {
+  flex: 1; padding: 10px 12px; border-radius: 8px; cursor: pointer;
+  font-family: var(--display); font-size: 14px; letter-spacing: 1px;
+  background: rgba(0,0,0,.35); border: 1px solid rgba(243,234,210,.28); color: var(--text);
+}
+.reset-btn:hover { border-color: var(--gold-hi); }
+.reset-btn.danger { border-color: rgba(224,95,95,.6); color: #ff8a7a; }
+.reset-btn.danger:hover { background: rgba(120,30,20,.35); border-color: #e05f5f; }
+
 /* ===== Home hub / roteador de telas ===== */
 .menu-screen.hidden { display: none; }
 #menu-box { width: 100%; }

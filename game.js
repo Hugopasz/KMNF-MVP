@@ -8073,6 +8073,49 @@ $("btn-continue").onclick = () => {
 $("btn-load").onclick = () => {
   openSavesList(() => { renderAll(); $("menu").classList.add("hidden"); });
 };
+// ---------- Reset total (rodapé da home) ----------
+// Apaga SÓ as chaves deste jogo, uma por uma. localStorage.clear() seria mais curto e
+// erraria feio: no GitHub Pages todos os projetos da conta dividem o mesmo domínio, e o
+// clear levaria junto o que qualquer outro deles tivesse guardado.
+function wipeAllProgress() {
+  const keys = [META_KEY, SETTINGS_KEY, FAV_KEY, SAVE_KEY, SAVES_KEY];
+  for (const s of loadSlots()) keys.push(slotDataKey(s.id));
+  for (const k of keys) { try { localStorage.removeItem(k); } catch { /* storage bloqueado */ } }
+  // Varredura dos slots órfãos: se o índice se perdeu antes, os dados dele continuariam
+  // ocupando espaço e reapareceriam num "Carregar Jogo" futuro.
+  try {
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith("mknf-slot-")) localStorage.removeItem(k);
+    }
+  } catch { /* storage bloqueado */ }
+  location.reload();
+}
+$("home-reset").onclick = () => {
+  openModal("⚠ Apagar tudo", (m) => {
+    const d = document.createElement("div");
+    d.className = "reset-warn";
+    d.innerHTML = "Isto zera o jogo por completo e <b>não tem volta</b>. Você vai perder:"
+      + `<ul class="reset-list">`
+      + `<li>🎖️ Medalhas (${META.medals || 0}) e tudo que foi desbloqueado no Arsenal</li>`
+      + `<li>Níveis do Miolo e o progresso da Távola</li>`
+      + `<li>O Ranking e as partidas salvas</li>`
+      + `<li>Os resultados já descobertos nas Alianças</li>`
+      + `<li>Configurações</li>`
+      + `</ul>`;
+    const acts = document.createElement("div");
+    acts.className = "reset-actions";
+    const no = document.createElement("button");
+    no.className = "reset-btn"; no.textContent = "Cancelar";
+    no.onclick = closeModal;
+    const yes = document.createElement("button");
+    yes.className = "reset-btn danger"; yes.textContent = "Apagar tudo";
+    yes.onclick = wipeAllProgress;
+    acts.append(no, yes);
+    m.append(d, acts);
+  });
+};
+
 // ---------- Atalhos de teclado (desktop) ----------
 // Espaço = passar turno · 1–5 = portão · Esc = fecha o que estiver aberto (ou abre Configurações).
 function isTyping(el) {
