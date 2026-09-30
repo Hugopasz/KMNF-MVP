@@ -7544,7 +7544,6 @@ function showScreen(name) {
   document.querySelectorAll("#menu-box .menu-screen").forEach(s => s.classList.add("hidden"));
   const el = $("scr-" + name);
   if (el) el.classList.remove("hidden");
-  $("menu-help").style.display = name === "home" ? "" : "none"; // "?" da home só na home
   if (name === "ranking") renderRanking(rankTab);
   if (name === "arsenal") renderArsenal();
   if (name === "miolo") renderMiolo();
@@ -8074,16 +8073,6 @@ $("btn-continue").onclick = () => {
 $("btn-load").onclick = () => {
   openSavesList(() => { renderAll(); $("menu").classList.add("hidden"); });
 };
-$("menu-help").onclick = () => {
-  openModal("Karzstak Must Not Fall", (m) => {
-    const d = document.createElement("div"); d.className = "panel-hint";
-    d.innerHTML = "Há cento e vinte anos os mortos marcham, e <b>Karzstak não pode cair</b>. Você é o novo comandante de um dos setores das muralhas: o rei lhe confiou o <b>Cetro Real</b>.<br><br>"
-      + "<b>Como jogar:</b> aperte <b>▶ Turno</b> e sobreviva à horda. Construa <b>fábricas</b> no distrito para abastecer as <b>torres</b> nos portões; erga <b>edifícios</b> para fortalecer a cidade. As muralhas aguentam alguns <b>hits</b>. Se zerar, a run acaba.<br><br>"
-      + "<b>Infinito</b> = sobreviva o máximo que puder. <b>História</b> = campanhas (em breve). <b>Miolo / Conselho / Arsenal</b> = progressão persistente entre runs.";
-    m.appendChild(d);
-  });
-};
-
 // ---------- Atalhos de teclado (desktop) ----------
 // Espaço = passar turno · 1–5 = portão · Esc = fecha o que estiver aberto (ou abre Configurações).
 function isTyping(el) {

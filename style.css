@@ -1331,17 +1331,6 @@ html, body {
 #menu-box { position: relative; z-index: 1; text-align: center; padding: 24px; max-width: 440px; }
 #menu-logo { display: block; width: min(82%, 350px); height: auto; margin: 4px auto 30px; filter: drop-shadow(0 6px 20px rgba(0,0,0,.85)); }
 
-/* Botão de ajuda "?" no canto superior esquerdo */
-#menu-help {
-  position: absolute; top: 16px; left: 16px; z-index: 2;
-  width: 46px; height: 46px; border-radius: 50%;
-  background: rgba(8,7,6,.35); border: 1.5px solid rgba(201,162,39,.3); color: rgba(232,205,92,.6);
-  font-family: var(--display); font-weight: 800; font-size: 22px; line-height: 1; cursor: pointer;
-  box-shadow: 0 4px 14px rgba(0,0,0,.3);
-  transition: background .15s, border-color .15s, color .15s;
-}
-#menu-help:hover { background: rgba(8,7,6,.72); border-color: var(--gold-hi); color: #fff; }
-
 /* Grade de botões principais (2×2) */
 #home-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; max-width: 400px; margin: 0 auto; }
 .hbtn {
