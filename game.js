@@ -2282,9 +2282,12 @@ const TOWER_PATHS = {
       { n: "Constelação", d: "+4 ricochetes",                           fx: { extra: 4 } },
     ] },
     { key: "umbral", name: "Umbral", tiers: [
-      { n: "Umbral",    d: "+5% da vida máx. do alvo por tiro",         fx: { maxhp: .05 } },
+      // O texto precisa dizer "tira" e "furando armadura": o bônus é somado DEPOIS da
+      // redução por armadura (ver projectileHit), e é justamente isso que faz alguém
+      // escolher este caminho em vez do Focalizador, que é dano puro e apanha da armadura.
+      { n: "Umbral",    d: "Tira 5% da vida máx. do alvo, furando armadura", fx: { maxhp: .05 } },
       { n: "Maldição",  d: "Marcados tomam +30% de tudo",              fx: { mark: .3 } },
-      { n: "Devorador de Almas", d: "+5% vida máx. e +15% de 💎",       fx: { maxhp: .05, kh: .15 } },
+      { n: "Devorador de Almas", d: "Mais 5% da vida máx. (10% no total) e +15% de 💎", fx: { maxhp: .05, kh: .15 } },
     ] },
   ] },
   acido: { paths: [
