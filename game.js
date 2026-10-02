@@ -3348,6 +3348,12 @@ function efficiencyAt(i) {
   return 1 + bonus * globalAdjM();
 }
 
+// Munição por BLOCO por ciclo de esteira, no nível 1. Era 1,0 (o próprio FEED_FREE), e a
+// fábrica mínima de virotes (2 blocos) rendia 0,48 munição/s contra os 0,63/s de uma Besta
+// base: o jogador abria a partida no vermelho de munição mesmo com o tanque cheio. Entra
+// SÓ na produção, não no consumo de recurso (que segue em cellGated): o que melhorou é a
+// munição por tonelada de recurso, não a fome do Feudo.
+const BLOCK_PROD = 1.7;
 // Produção por célula (munição por ciclo de esteira), com todos os mults.
 // `gated` (padrão true) aplica a cobertura do tanque (0 se vazio); passe false
 // para o POTENCIAL a pleno abastecimento.
@@ -3359,7 +3365,7 @@ function cellProdFull(i) {
   let m = 1 + (fx.pM || 0) + globalProdBonus() + (type ? ammoTypeFx(type, "typeP") : 0);
   if (S.isNight && fx.night) m += fx.night;
   const eff = fx.bsun ? 1 : cityEff(); // Automatizada ignora o Sol Negro
-  return cellGated(c) * efficiencyAt(i) * factoryMult() * eff * m * mioloProdMult() * lawTypeProdMult(type);
+  return cellGated(c) * BLOCK_PROD * efficiencyAt(i) * factoryMult() * eff * m * mioloProdMult() * lawTypeProdMult(type);
 }
 function cellProd(i) {
   const c = S.city[i];
@@ -5362,12 +5368,25 @@ function dispatchCrates() {
   for (const type of Object.keys(AMMO)) {
     let pool = Math.floor(prodCarry[type] || 0);
     prodCarry[type] = (prodCarry[type] || 0) - pool;
-    for (let i = LANES - 1; i >= 0 && pool > 0; i--) {
+    // COTA do ciclo: o bolo produzido dividido entre os postos que querem este tipo,
+    // nunca menor que o tamanho da caixa. Antes a caixa era um teto FIXO de 2 por posto
+    // por ciclo, ou 0,48 munição/s, enquanto uma Besta base gasta 0,63/s e com o caminho
+    // de cadência no máximo gasta 1,56/s. O posto passava fome com a fábrica transbordando,
+    // e produzir mais não mudava nada: o excedente voltava para o carry. Era também o que
+    // tornava o caminho das caixas o único que valia a pena, porque era o único que
+    // levantava o teto de verdade. Agora quem manda na vazão é a fábrica.
+    const famintos = [];
+    for (let i = LANES - 1; i >= 0; i--) {
       const t = S.towers[i];
       if (!t || !TOWER_TYPES[t.type].ammos.includes(type)) continue;
-      const room = towerRoom(t, i, type);
-      if (room <= 0) continue;
-      const amount = Math.min(crateSize() + ammoTypeFx(type, "crate") + lawCrateBonus(type), pool, room);
+      if (towerRoom(t, i, type) > 0) famintos.push(i);
+    }
+    const caixa = crateSize() + ammoTypeFx(type, "crate") + lawCrateBonus(type);
+    const cota = famintos.length ? Math.max(caixa, Math.ceil(pool / famintos.length)) : caixa;
+    for (const i of famintos) {
+      if (pool <= 0) break;
+      const amount = Math.min(cota, pool, towerRoom(S.towers[i], i, type));
+      if (amount <= 0) continue;
       pool -= amount;
       addPending(i, type, amount);
       jobs.push({ slot: i, amount, type });
