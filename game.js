@@ -1487,7 +1487,11 @@ let depotTimer = 0;             // relógio do empurrão (vive fora de S: é rit
 // Cada torre exige TODAS as munições de `ammos` (estoque por tipo). Força ∝ categoria; custo em ouro 1×/2×/3×.
 const TOWER_TYPES = {
   // ===== BÁSICAS (custo 1×, 1 munição) — sempre disponíveis =====
-  besta:       { name: "Besta",              tier: "basic", icon: "🏹", cost: 20, dmg: 6,  rate: 1.6, range: 999,  aoe: 0,   ptime: 0.7,  ammos: ["virotes"] },
+  // `loaded`: nasce com a munição cheia. Só a Besta tem isso. É a primeira torre que
+  // todo mundo ergue, e descobrir a logística de munição com a horda já em campo é o
+  // tropeço número um de quem começa. A partir do segundo turno ela se alimenta como
+  // qualquer outra, então o empurrão não acompanha a run.
+  besta:       { name: "Besta",              tier: "basic", icon: "🏹", cost: 20, dmg: 6,  rate: 1.6, range: 999,  aoe: 0,   ptime: 0.7,  ammos: ["virotes"], loaded: true },
   catapulta:   { name: "Catapulta",          tier: "basic", icon: "🪨", cost: 35, dmg: 14, rate: 3.4, range: 999,  aoe: 1,   ptime: 1.2,  ammos: ["pedras"] },
   caldeirao:   { name: "Caldeirão",          tier: "basic", icon: "🍲", cost: 30, dmg: 22, rate: 2.6, range: 0.35, aoe: 0.6, ptime: 0.45, ammos: ["oleo"] },
   tesla:       { name: "Torre Tesla",        tier: "basic", icon: "⚡", cost: 45, dmg: 7,  rate: 2.8, range: 999,  aoe: 0,   ptime: 0.25, ammos: ["condutores"], chain: 3 },
@@ -4145,8 +4149,11 @@ function renderTowers() {
         ? `<span class="ammo${fuelPool(tt.fuel.k) < tt.fuel.cost ? " empty" : ""}">${FUEL_ICON[tt.fuel.k]}${Math.floor(fuelPool(tt.fuel.k))}</span>`
         : tt.ammos.map(a => {
             const am = AMMO[a];
-            if (prodOfType(a) === 0) return `<span class="ammo empty">${am.icon}⚠️</span>`;
             const n = ammoOf(t, a);
+            // ⚠️ quer dizer "sem munição E sem fábrica que a faça": o aviso tem que ser
+            // acionável. Com estoque na torre o número manda, porque ela AINDA dispara.
+            // A Besta nasce carregada e cairia aqui, anunciada como vazia.
+            if (n === 0 && prodOfType(a) === 0) return `<span class="ammo empty">${am.icon}⚠️</span>`;
             return `<span class="ammo${n === 0 ? " empty" : ""}">${am.icon}${n}</span>`;
           }).join("");
       if (t.lvl > 1) d.classList.add("upgraded");
@@ -4200,6 +4207,7 @@ function onTowerClick(i) {
             if (S.gold < tt.cost) return;
             S.gold -= tt.cost;
             S.towers[i] = { type: key, ammoBy: {}, lvl: 1, path: [], tiers: [0, 0, 0] };
+            if (tt.loaded) fillTowerAmmo(S.towers[i]);   // Besta: já sobe carregada
             closeModal(); renderAll();
           };
           grid.appendChild(card);
