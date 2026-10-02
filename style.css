@@ -1731,7 +1731,7 @@ html, body {
   font-size: 21px;
   text-shadow: 0 0 14px rgba(201,162,39,.5);
 }
-#overlay-box p { color: var(--text); font-size: 16px; line-height: 1.55; margin-bottom: 18px; white-space: pre-line; }
+#overlay-box p { color: var(--text); font-size: 16px; line-height: 1.34; margin-bottom: 18px; white-space: pre-line; }
 /* Trechos marcados da abertura: dourado, maior e com um respiro lento.
    `display: block` não é enfeite: transform não pega em elemento inline, e dando a linha
    inteira ao realce o movimento não empurra as palavras vizinhas do parágrafo. */
@@ -1742,6 +1742,7 @@ html, body {
   font-family: var(--display);
   font-weight: 700;
   font-size: 1.15em;
+  line-height: 1.2;   /* fonte de display em caixa alta: a entrelinha do corpo abre demais aqui */
   letter-spacing: .6px;
   animation: lore-breathe 3.4s ease-in-out infinite;
 }
