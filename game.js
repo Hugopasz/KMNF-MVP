@@ -1682,7 +1682,11 @@ function consumeTowerAmmo(t, cost, fx) {
   const tt = TOWER_TYPES[t.type];
   if (tt.fuel) { spendFuel(tt.fuel); return; } // combustível global, não usa esteira
   const adj = depotAdjFx(t);
-  const saveCh = (fx.save || 0) + towerTypeFx(t.type, "typeSave") + (adj ? adj.save : 0);
+  // Teto de 60%: a poupança soma por GRUPO de fábrica (ver cityFxScan), e com o ramo
+  // Artesanal em quatro fábricas do mesmo tipo a conta passaria de 1 e a munição ficaria
+  // de graça. A cadeia de suprimentos é o jogo; ela não pode ser desligada por upgrade.
+  const SAVE_CAP = 0.6;
+  const saveCh = Math.min(SAVE_CAP, (fx.save || 0) + towerTypeFx(t.type, "typeSave") + (adj ? adj.save : 0));
   if (Math.random() < saveCh) return; // munição poupada: não gasta nada
   if (!t.ammoBy) t.ammoBy = {};
   for (const a of towerAmmos(t.type)) t.ammoBy[a] = Math.max(0, ammoOf(t, a) - cost);
@@ -2223,26 +2227,33 @@ function heartsPerTurn() { return (law("L13") ? 1 : 0) + groupLvlSum("refinaria"
 // Lv2: escolha entre 3 caminhos. Lv3/4/5: escolha entre 2, dentro do caminho.
 // fx: efeitos somados ao longo do path.
 const VTREES = {
+  // Três eixos de verdade: massa = VOLUME (a esteira entrega o que a fábrica fizer),
+  // artes = QUALIDADE (cada munição vale mais e dura mais), auto = INFRAESTRUTURA.
+  // Os nós de "caixa maior" saíram do ramo artes: enquanto a caixa era o TETO de entrega
+  // eles eram o único caminho que valia a pena; agora que a cota segue a produção, caixa
+  // maior virou só um PISO e não sustentava um ramo inteiro. Os nomes do ramo sempre
+  // falaram de ofício (Elite, Selo Real, Obra-prima, Forja, Perfeição), e é isso que ele
+  // faz agora. A chave `crate` segue viva nas leis (L39, L12).
   fabrica: { l2: [
     { id: "massa", n: "Produção em Massa", d: "Produção +50%",                    fx: { pM: .5 } },
-    { id: "artes", n: "Artesanal",         d: "Caixas levam +1 munição",          fx: { crate: 1 } },
-    { id: "auto",  n: "Automatizada",      d: "Imune ao Sol Negro",               fx: { bsun: 1 } },
+    { id: "artes", n: "Artesanal",         d: "Torres deste tipo: +12% de dano",  fx: { typeDmg: .12 } },
+    { id: "auto",  n: "Automatizada",      d: "Produção +20% · imune ao Sol Negro", fx: { bsun: 1, pM: .2 } },
   ], br: {
     massa: {
-      l3: [{ id: "turnos", n: "Turnos Dobrados",     d: "Produção +25%",           fx: { pM: .25 } },
-           { id: "expans", n: "Expansão",            d: "Produção +15%",           fx: { pM: .15 } }],
+      l3: [{ id: "turnos", n: "Turnos Dobrados",     d: "Produção +25% nesta fábrica", fx: { pM: .25 } },
+           { id: "expans", n: "Expansão",            d: "TODAS as fábricas deste tipo +10%", fx: { typeP: .1 } }],
       l4: [{ id: "linha",  n: "Linha Contínua",      d: "Produção +20%",           fx: { pM: .2 } },
            { id: "oper",   n: "Exército de Operários", d: "Evoluir custa metade",  fx: { disc: .5 } }],
       l5: [{ id: "mega",   n: "Megafábrica",         d: "Produção +100%",          fx: { pM: 1 } },
            { id: "sind",   n: "Sindicato",           d: "TODAS as fábricas deste tipo +20%", fx: { typeP: .2 } }],
     },
     artes: {
-      l3: [{ id: "qual",  n: "Controle de Qualidade", d: "Caixas +1 de novo",      fx: { crate: 1 } },
-           { id: "elite", n: "Munição de Elite",      d: "Torres deste tipo: +10% dano", fx: { typeDmg: .1 } }],
-      l4: [{ id: "obra",  n: "Obra-prima",            d: "Caixas +1 de novo",      fx: { crate: 1 } },
-           { id: "selo",  n: "Selo Real",             d: "Torres deste tipo: +15% dano", fx: { typeDmg: .15 } }],
-      l5: [{ id: "forja", n: "Forja Lendária",        d: "Torres deste tipo: 10% de não gastar munição", fx: { typeSave: .1 } },
-           { id: "perf2", n: "Perfeição",             d: "Caixas enchem a torre",  fx: { crate: 9 } }],
+      l3: [{ id: "qual",  n: "Controle de Qualidade", d: "Torres deste tipo: 10% de não gastar munição", fx: { typeSave: .1 } },
+           { id: "elite", n: "Munição de Elite",      d: "Torres deste tipo: +12% de dano", fx: { typeDmg: .12 } }],
+      l4: [{ id: "obra",  n: "Obra-prima",            d: "Torres deste tipo: +18% de dano", fx: { typeDmg: .18 } },
+           { id: "selo",  n: "Selo Real",             d: "Torres deste tipo: 15% de não gastar munição", fx: { typeSave: .15 } }],
+      l5: [{ id: "forja", n: "Forja Lendária",        d: "Torres deste tipo: +30% de dano", fx: { typeDmg: .3 } },
+           { id: "perf2", n: "Perfeição",             d: "Torres deste tipo: 20% de não gastar munição", fx: { typeSave: .2 } }],
     },
     auto: {
       l3: [{ id: "golem",   n: "Golem de Carga", d: "Esteira 15% mais rápida",     fx: { belt: .15 } },
@@ -2291,14 +2302,18 @@ const VTREES = {
     mercado: {
       l3: [{ id: "feira", n: "Feira Livre",  d: "+1 🪙 por FÁBRICA vizinha",      fx: { gFab: 1 } },
            { id: "banco", n: "Banco",        d: "Renda do conselho +10%",         fx: { incM: .1 } }],
+      // Antes os dois davam +1 🪙 por vizinho: dois botões, nenhuma escolha. O Leilão
+      // paga mais, mas só por FÁBRICA vizinha, então depende de onde a praça foi posta.
       l4: [{ id: "rota",  n: "Rota Comercial", d: "+1 🪙 por vizinho",            fx: { gN: 1 } },
-           { id: "leilao",n: "Leilão",         d: "+1 🪙 por vizinho",            fx: { gN: 1 } }],
+           { id: "leilao",n: "Leilão",         d: "+2 🪙 por FÁBRICA vizinha",    fx: { gFab: 2 } }],
       l5: [{ id: "tesouro",n: "Tesouro Real",  d: "+3 🪙 por vizinho",            fx: { gN: 3 } },
            { id: "monop", n: "Monopólio",      d: "Renda do conselho +25%",       fx: { incM: .25 } }],
     },
     oficina: {
-      l3: [{ id: "eng",    n: "Engenheiros",   d: "+1% por vizinho",              fx: { eN: .01 } },
-           { id: "ferram", n: "Ferramentaria", d: "+2% por vizinho",              fx: { eN: .02 } }],
+      // Eram +1% contra +2% por vizinho: o segundo dominava o primeiro e a escolha era
+      // falsa. Agora um aprofunda a vizinhança e o outro acelera a esteira de todo o setor.
+      l3: [{ id: "eng",    n: "Engenheiros",   d: "+2% de eficiência por vizinho", fx: { eN: .02 } },
+           { id: "ferram", n: "Ferramentaria", d: "Esteira 12% mais rápida",       fx: { belt: .12 } }],
       l4: [{ id: "manut",  n: "Manutenção",    d: "Esteira 15% mais rápida",      fx: { belt: .15 } },
            { id: "inov",   n: "Inovação",      d: "+1% por vizinho",              fx: { eN: .01 } }],
       l5: [{ id: "distrito",n: "Distrito Industrial", d: "TODAS as fábricas +5%", fx: { gProd: .05 } },
