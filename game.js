@@ -160,10 +160,9 @@ function effectText(ev) {
 // Um multiplicador é bom ou ruim conforme o que ele multiplica: produção ×0.7 é perda,
 // mas ataque inimigo ×0.8 é ganho. Por isso cada linha diz explicitamente o seu sinal
 // em vez de deduzir pelo ">1".
-function effectChips(ev, income) {
+function effectChips(ev) {
   const e = ev.e, m = e.mods || {}, out = [];
   const chip = (txt, bom) => out.push(`<span class="ev-chip ${bom ? "up" : "down"}">${txt}</span>`);
-  if (typeof income === "number") chip(`+${income} 🪙 do conselho`, true);
   if (e.gold) chip(`${e.gold > 0 ? "+" : ""}${e.gold} 🪙`, e.gold > 0);
   if (e.hearts) chip(`${e.hearts > 0 ? "+" : ""}${e.hearts} 💎`, e.hearts > 0);
   if (e.hits) chip(`${e.hits > 0 ? "+" : ""}${e.hits} 🧱 muralhas`, e.hits > 0);
@@ -5130,6 +5129,7 @@ function startWave() {
   for (const t of S.towers) if (t) { t.spot = null; t.spotT = 0; } // holofotes reapontam
   S.groundFires = [];
   S.turnHitsLost = 0;
+  openTurnSum();   // abre o livro-caixa do turno (ver turnChips)
   qCd = {};
   blockPool = cityFxScan(c => c.built === "quartel", "block");
   waveTotal = S.nextWave.length; waveHalfShown = false; waveCritShown = false; // rastreio da metade da horda
@@ -5644,7 +5644,10 @@ function update(dt) {
     }
     if (a.aura) { a.aura.t -= dt; if (a.aura.t <= 0) clearAura(a); } // aura some sozinha
     if (a.ttl != null) { a.ttl -= dt; if (a.ttl <= 0) { a.hp = 0; addFloat(a.lane, a.y, "👻 dissipou", "#c89aff"); } }
-    if (a.hp <= 0 && a.type !== "sombra") addFloat(a.lane, a.y, "☠ tombou", "#c8b088");
+    if (a.hp <= 0 && a.type !== "sombra") {
+      addFloat(a.lane, a.y, "☠ tombou", "#c8b088");
+      if (turnSum) turnSum.allyLost++;   // o filtro abaixo tira o corpo: conta aqui, uma vez
+    }
   }
   S.allies = S.allies.filter(a => a.hp > 0);
 
@@ -5939,10 +5942,12 @@ function update(dt) {
     const g = loot + (e.bountyG || 0);
     if (g > 0) {
       earnGold(g);
+      if (turnSum) turnSum.loot += g;
       addFloat(e.lane, e.y, `+${g} 🪙`, "#eecd5c");
     }
     if (Math.random() < (t.heart + mioloHeartBonus() + (e.bountyH || 0)) * heartChanceMult()) {
       S.hearts++;
+      if (turnSum) turnSum.hGain++;
       addFloat(e.lane, e.y - 0.06, "+1 💎", "#8ac6f0");
     }
     // peste: veneno espalha para os próximos
@@ -6023,6 +6028,54 @@ function tickStructs() {
   }
 }
 
+// ---------- Balanço do turno ----------
+// Livro-caixa aberto em startWave e fechado em endWave. O que o turno DEU é anotado na
+// hora em que acontece, não medido por diferença de saldo: ouro e 💎 também são gastos
+// durante o combate (cajado, habilidades), e uma subtração de saldo misturaria o que o
+// turno rendeu com o que o jogador escolheu queimar. Só a moral vem por diferença, que
+// ali é exatamente a leitura certa: importa onde o distrito amanhece, não cada parcela.
+let turnSum = null;
+function openTurnSum() {
+  turnSum = { m0: S.morale, kills0: S.kills, loot: 0, hGain: 0, hCost: 0, rep: 0, allyLost: 0 };
+}
+function turnChips(income) {
+  const t = turnSum, out = [];
+  const chip = (txt, bom) => out.push(`<span class="ev-chip ${bom ? "up" : "down"}">${txt}</span>`);
+  const lost = S.turnHitsLost;
+  // A muralha vem primeiro: é o número que decide a run. Estado e desgaste na mesma
+  // ficha, porque "intactas" sozinho esconderia que o setor já está em 3 de 5.
+  chip(`🧱 ${S.hits}/${maxHits()} · ${lost ? `${lost} ${lost === 1 ? "hit perdido" : "hits perdidos"}` : "nenhum hit perdido"}`, !lost);
+  if (t && t.rep) chip(`+${t.rep} 🧱 remendado`, true);
+  const mortos = t ? S.kills - t.kills0 : 0;
+  if (mortos) chip(`🗡 ${mortos} ${mortos === 1 ? "criatura abatida" : "criaturas abatidas"}`, true);
+  if (t && t.allyLost) chip(`☠ ${t.allyLost} ${t.allyLost === 1 ? "tropa tombou" : "tropas tombaram"}`, false);
+  if (typeof income === "number") chip(`+${income} 🪙 do conselho`, true);
+  if (t && t.loot) chip(`+${t.loot} 🪙 de saque`, true);
+  if (t && t.hGain) chip(`+${t.hGain} 💎`, true);
+  if (t && t.hCost) chip(`-${t.hCost} 💎 de manutenção`, false);
+  const dmoral = t ? Math.round(S.morale - t.m0) : 0;   // `dm` é função global (dayMods): não sombrear
+  if (dmoral) chip(`${dmoral > 0 ? "+" : ""}${dmoral} de moral`, dmoral > 0);
+  return out.join("");
+}
+// Card do fim do turno de dia (ao anoitecer). Mesmo desenho do evento diário: prosa,
+// régua, e o balanço em fichas.
+function showTurnEnd(income) {
+  const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const aviso = bloodMoon() ? ["blood", "🩸 LUA SANGRENTA se aproxima: a horda virá mais forte e mais numerosa."]
+    : blackSun() ? ["", "🌑 SOL NEGRO: a eficiência da cidade caiu pela metade neste turno."]
+    : null;
+  const neg = negativeRes();
+  showOverlay("A noite se aproxima 🌙",
+    `<span class="ev-story">${esc(pickMsg("dusk"))}</span>`
+    + (aviso ? `<span class="ev-warn ${aviso[0]}">${esc(aviso[1])}</span>` : "")
+    + `<span class="ev-rule"></span>`
+    + `<span class="ev-sum-t">O BALANÇO DO TURNO</span>`
+    + `<span class="ev-chips">${turnChips(income)}</span>`
+    + `<span class="ev-tier">O distrito está em ${esc(moraleName(moraleTier(S.morale)))}.</span>`
+    + (neg.length ? `<span class="ev-tier bad">Fechou no vermelho em ${neg.join(" ")}.</span>` : ""),
+    null, "html");
+}
+
 function endWave() {
   S.waveActive = false;
   // Fala de onda limpa. Antes do overlay de fim de turno, senão ela apareceria atrás da
@@ -6038,16 +6091,26 @@ function endWave() {
   income += 5 * groupLvlSum("praca_chique") + 4 * groupLvlSum("praca_abandonada"); // Praça Chique / Abandonada
   income -= cityFxScan(c => c.built === "quartel", "gUp"); // soldo da Guarda Real
   earnGold(Math.max(0, income));
-  S.hearts += heartsPerTurn();
+  const hTurn = heartsPerTurn();
+  S.hearts += hTurn;
+  if (turnSum) turnSum.hGain += hTurn;
   // Procissão/Dia Sagrado: 💎 por turno perfeito
-  if (S.turnHitsLost === 0) S.hearts += cityFxScan(null, "hNoHit");
+  if (S.turnHitsLost === 0) {
+    const hNo = cityFxScan(null, "hNoHit");
+    S.hearts += hNo;
+    if (turnSum) turnSum.hGain += hNo;
+  }
   // Motor de Argamato consome 💎; Autômato Reparador conserta as muralhas.
   // Sem trava: a manutenção cobra mesmo sem saldo e o setor fecha o turno devendo.
-  S.hearts -= cityFxScan(null, "hUp");
+  const hUp = cityFxScan(null, "hUp");
+  S.hearts -= hUp;
+  if (turnSum) turnSum.hCost += hUp;
   let rep = cityFxScan(null, "repair") + (law("L23") ? 1 : 0); // Autômato Reparador + Requisição de Pedra (Oficina repara em tempo real)
   if (rep) {
     rep += (law("L27") ? 1 : 0) + (law("L46") ? 1 : 0); // Muros Modulares / Cidadela de Ferro rendem mais
+    const antes = S.hits;
     S.hits = Math.min(maxHits(), S.hits + rep);
+    if (turnSum) turnSum.rep = S.hits - antes;   // o que a muralha de fato absorveu, não o que foi oferecido
   }
   if (groupLvlSum("templo")) gainMorale(3 * groupLvlSum("templo")); // Templo da Fé
   if (groupLvlSum("praca_festival")) gainMorale(2 * groupLvlSum("praca_festival")); // Praça do Festival
@@ -6077,7 +6140,7 @@ function endWave() {
     const r = Math.random();
     if (r < 0.34) { earnGold(10); addFloat(2, 0.5, "🌀 +10 🪙", "#eecd5c"); }
     else if (r < 0.67) { gainMorale(3); addFloat(2, 0.5, "🌀 +3 moral", "#8ac6f0"); }
-    else { S.hearts += 1; addFloat(2, 0.5, "🌀 +1 💎", "#c89aff"); }
+    else { S.hearts += 1; if (turnSum) turnSum.hGain++; addFloat(2, 0.5, "🌀 +1 💎", "#c89aff"); }
   }
   // Capelas + Praça Jardim + leis (Casas de Banho / Medicina Moderna) curam as tropas
   const heal = 3 * groupLvlSum("capela") + 2 * groupLvlSum("praca_jardim") + (law("L3") ? 2 : 0) + (law("L38") ? 3 : 0);
@@ -6151,13 +6214,9 @@ function endWave() {
     else showDailyEvent(ev, income);
   } else {
     // ANOITECEU: a noite se aproxima.
-    const evento = bloodMoon() ? "\n\n🩸 LUA SANGRENTA se aproxima: a horda virá mais forte e mais numerosa!"
-      : blackSun() ? "\n\n🌑 SOL NEGRO: a eficiência da cidade caiu pela metade neste turno."
-      : "";
     saveGame();
     if (S.autoTurn) { addFloat(2, 0.15, `+${income} 🪙 · 🌙`, "#eecd5c"); scheduleAuto(); }
-    else showOverlay("A noite se aproxima 🌙",
-      `As muralhas resistiram (${S.hits}/${maxHits()} hits).\n+${income} 🪙 do conselho da cidade.${evento}\n\n${pickMsg("dusk")}`);
+    else showTurnEnd(income);
   }
   renderAll();
 }
@@ -6170,12 +6229,23 @@ function showDailyEvent(ev, income, cb) {
   // Tudo em <span> com display:block, não <hr>/<div>: o container é um <p>, que só aceita
   // conteúdo de frase. O Chrome tolera o inválido aqui, mas se esse HTML for lido e
   // reescrito em outro lugar o parser parte o parágrafo no primeiro bloco.
-  const tier = S.moraleLocked ? `<span class="ev-tier">O distrito está em ${esc(moraleName(S.moraleLocked))}.</span>` : "";
+  // `!= null` e não truthy: o nível NEUTRO é o número 0, e um teste de verdade engolia
+  // justamente a faixa onde a maioria das runs vive.
+  const tier = S.moraleLocked != null ? `<span class="ev-tier">O distrito está em ${esc(moraleName(S.moraleLocked))}.</span>` : "";
+  // Duas contas, duas réguas: o turno da NOITE que acabou de fechar e o DIA que começa.
+  // A renda do conselho mora na primeira, porque é o pagamento do turno vencido, não um
+  // efeito do evento de hoje. No dia 1 não há turno anterior e a primeira seção não sai.
+  const doTurno = typeof income === "number"
+    ? `<span class="ev-rule"></span>`
+      + `<span class="ev-sum-t">O BALANÇO DO TURNO</span>`
+      + `<span class="ev-chips">${turnChips(income)}</span>`
+    : "";
   showOverlay(`${ev.ic} Dia ${S.day}: ${ev.t}`,
     `<span class="ev-story">${esc(ev.s)}</span>`
+    + doTurno
     + `<span class="ev-rule"></span>`
-    + `<span class="ev-sum-t">O BALANÇO DO DIA</span>`
-    + `<span class="ev-chips">${effectChips(ev, income)}</span>`
+    + `<span class="ev-sum-t">O DIA QUE COMEÇA</span>`
+    + `<span class="ev-chips">${effectChips(ev)}</span>`
     + tier,
     cb || null, "html");
 }

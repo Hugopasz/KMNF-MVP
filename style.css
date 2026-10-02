@@ -1772,7 +1772,17 @@ html, body {
 }
 #overlay-text .ev-chip.up { border-color: rgba(143,220,122,.5); color: #a8e89a; }
 #overlay-text .ev-chip.down { border-color: rgba(224,95,95,.5); color: #ff9d8a; }
+/* Aviso do que vem na noite (lua sangrenta / sol negro). Fica junto da prosa, acima da
+   régua: é previsão, não balanço, e não pode ser lido como resultado do turno. */
+#overlay-text .ev-warn {
+  display: block; margin-top: 11px;
+  font-family: var(--display); font-size: 13.5px; letter-spacing: .3px;
+  color: var(--gold-hi, #e8c95c);
+}
+#overlay-text .ev-warn.blood { color: #ff9d8a; }
 #overlay-text .ev-tier { display: block; margin-top: 13px; font-size: 13.5px; color: var(--dim, #9b8f77); }
+#overlay-text .ev-tier + .ev-tier { margin-top: 3px; }
+#overlay-text .ev-tier.bad { color: #ff9d8a; }
 /* Rodapé FORA da caixa, sobre o fundo escurecido: substitui o antigo "Continuar" */
 #overlay {
   flex-direction: column;
