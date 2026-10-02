@@ -2042,6 +2042,14 @@ body.fac-pink  .cell.built.b-quartel { box-shadow: inset 0 0 0 1px rgba(214,96,1
   color: var(--gold-hi, #e8c95c); font-size: 13px; background: rgba(80,60,10,.3);
 }
 
+/* Estado da relação: os três efeitos que a relação inclina, em uma linha. Sem caixa nem
+   borda de propósito, para não competir com os avisos de punição e bênção acima. */
+.fav-econ {
+  width: min(92vw, 400px); margin: 8px auto 0; text-align: center;
+  font-size: 12px; line-height: 1.5; color: var(--dim, #9b8f77);
+}
+.fav-relcost s { opacity: .55; margin-left: 4px; }
+
 /* encontro (conversa / pedido / presente) */
 .fav-enc { width: min(92vw, 420px); margin: 0 auto; padding: 64px 0 24px; display: flex; flex-direction: column; align-items: center; }
 #fav-dbg { display: block; margin-top: 10px; background: none; border: 1px dashed rgba(201,162,39,.4); border-radius: 6px; color: var(--dim, #9b8f77); font-size: 11px; padding: 4px 8px; cursor: pointer; }

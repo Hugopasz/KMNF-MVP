@@ -874,7 +874,38 @@ function favDrawEvent(k) {
 }
 
 let favFreeVisits = false; // debug: visitas infinitas (botão discreto no "?")
-function favBusyChance(k) { return 0.3 * (1 - favRel(k) / 100); }
+// ---------- Economia da relação ----------
+// A relação deixa de ser só um número com punição nos extremos e passa a inclinar TODO o
+// trato: quem te odeia te recebe menos, cobra mais e quase não aparece; quem te adora
+// cobra menos e às vezes nem cobra. 50 é o ponto de partida da run, então é o eixo.
+// ASSIMETRIA DE PROPÓSITO (pedido do design): relação alta NÃO aumenta a chance de visita.
+// Ela só deixa de reduzir. Caso contrário, maximizar os quatro encheria a agenda do
+// comandante de visitas e a visita deixaria de ser um evento.
+const BUSY_AT_ZERO = 0.8, BUSY_AT_NEUTRAL = 0.18;   // chance de NÃO te receber
+const ASK_MULT_AT_MAX = 0.6, ASK_MULT_AT_ZERO = 2.5; // multiplicador do custo do pedido
+const ASK_BOON_CHANCE = 0.35, ASK_BOON_BONUS = 0.5;  // relação 100: dádiva (grátis +50%)
+const VISIT_W_FLOOR = 0.12;                          // peso mínimo da visita na relação 0
+// Interpola entre o valor em 0, o valor em 50 e o valor em 100.
+function relCurve(rel, atZero, atNeutral, atMax) {
+  return rel >= 50
+    ? atNeutral + (atMax - atNeutral) * (rel - 50) / 50
+    : atZero + (atNeutral - atZero) * rel / 50;
+}
+function favBusyChance(k) { return relCurve(favRel(k), BUSY_AT_ZERO, BUSY_AT_NEUTRAL, 0); }
+function askCostMult(k) { return relCurve(favRel(k), ASK_MULT_AT_ZERO, 1, ASK_MULT_AT_MAX); }
+// Custo em RELAÇÃO do pedido. Em 100 o menor pedido sai de graça (perk de sempre).
+function askCost(k, i) {
+  if (favRel(k) >= 100 && i === 0) return 0;
+  return Math.max(1, Math.round(FAV_CHARS[k].asks[i].rel * askCostMult(k)));
+}
+// Peso da visita: cai com a relação baixa, não sobe com a alta.
+function favVisitWeight(k) { return favRel(k) >= 50 ? 1 : Math.max(VISIT_W_FLOOR, favRel(k) / 50); }
+// Multiplica os números de um efeito (a dádiva rende mais recurso).
+function scaleFx(e, mult) {
+  const out = {};
+  for (const [k, v] of Object.entries(e)) out[k] = typeof v === "number" ? Math.round(v * mult) : v;
+  return out;
+}
 
 // ---------- Disponibilidade por turno ----------
 // Cada figura tem sua própria rotina: o Rei nunca dorme, a Rainha só recebe de dia, o
@@ -917,15 +948,17 @@ function favTryAction(k, mode) {
   }
   // Fora do horário: não é interação nenhuma, então não gasta a visita do dia.
   if (!favOpen(k)) { toast(`${FAV_CHARS[k].punIc} ${favClosedNote(k)}`); return; }
+  // CONVERSAR e PEDIR arriscam não ser recebido, e a chance disso sobe conforme a
+  // relação cai. PRESENTEAR nunca é recusado, e isso é regra, não esquecimento: o
+  // presente é a ÚNICA via de recuperação, e recusá-lo deixaria quem chegou a zero preso
+  // lá para sempre. Quem veio até você também nunca está ocupado: está na sua porta.
+  if (mode !== "gift" && S.fav.visitor !== k && Math.random() < favBusyChance(k)) {
+    favSpend(k); saveGame();
+    favView = { mode: "busy", chr: k };
+    renderFavScr();
+    return;
+  }
   if (mode === "talk") {
-    // Só a CONVERSA arrisca encontrar o personagem ocupado (e perder a visita) — e quem
-    // veio até você NUNCA está ocupado: ele está literalmente na sua porta.
-    if (S.fav.visitor !== k && Math.random() < favBusyChance(k)) {
-      favSpend(k); saveGame();
-      favView = { mode: "busy", chr: k };
-      renderFavScr();
-      return;
-    }
     favView = { mode: "talk", chr: k, ev: favDrawEvent(k), done: null };
   } else {
     favView = { mode, chr: k, done: null };
@@ -1003,6 +1036,23 @@ function renderFavScr() {
   if (favView === "hub" || !favView) renderFavHub(scr);
   else renderFavEncounter(scr);
 }
+// Linha de estado da relação no hub. Sem ela os três efeitos (ser recebido, preço do
+// pedido, chance de visita) ficariam invisíveis e o jogador sentiria o aperto sem
+// entender de onde vem.
+function favEconLine(k) {
+  const rel = favRel(k);
+  const atende = Math.round((1 - favBusyChance(k)) * 100);
+  const mult = askCostMult(k);
+  const visita = favVisitWeight(k);
+  const cor = v => v >= 0 ? "#8fdc7a" : "#e05f5f";
+  const partes = [
+    `<span style="color:${atende >= 80 ? "#8fdc7a" : atende >= 50 ? "#e8b93a" : "#e05f5f"}">🚪 ${atende}% de ser recebido</span>`,
+    `<span style="color:${cor(1 - mult)}">💰 pedido ×${mult.toFixed(2)}</span>`,
+  ];
+  if (visita < 1) partes.push(`<span style="color:#e05f5f">🔔 visita ×${visita.toFixed(2)}</span>`);
+  if (rel >= 100) partes.push(`<span style="color:#f4d76a">✨ ${Math.round(ASK_BOON_CHANCE * 100)}% de dádiva</span>`);
+  return `<div class="fav-econ">${partes.join(" · ")}</div>`;
+}
 function renderFavHub(scr) {
   const k = FAV_ORDER[favSel], c = FAV_CHARS[k];
   const prev = FAV_ORDER[(favSel + FAV_ORDER.length - 1) % FAV_ORDER.length];
@@ -1023,7 +1073,7 @@ function renderFavHub(scr) {
   scr.innerHTML = `
     <div class="laws-top"><button class="tavola-round tavola-back" id="fav-back">‹</button><button class="tavola-round" id="fav-help-btn">?</button></div>
     <h2 class="tavola-title fav-title"><span class="tt-a">— AS —</span><span class="tt-main">ALIANÇAS</span></h2>
-    <div id="fav-help" class="hidden"><b>As Alianças</b><p>Quatro figuras de Karzstak podem ajudar (ou atrapalhar) suas muralhas. Você pode <b>visitar</b> qualquer uma delas <b>desde o dia 1</b>: converse, peça algo ou presenteie, <b>1 vez por dia</b>, entre os turnos. A partir do <b>dia ${FAV_VISIT_MIN_DAY}</b>, uma delas também pode <b>vir até você</b>: ignorar quem veio custa relação com todos, e quem veio está sempre disponível, fora de horário ou não.</p><p><b>Expediente:</b> o Rei atende dia e noite · a Rainha só de <b>dia</b> · o Conde só à <b>noite</b> · o Povo tem <b>70%</b> de dia e <b>30%</b> à noite. Tentar fora de horário não gasta sua visita.</p><p>Cada escolha muda a <b>relação</b> (0–100%). Relação no chão = <b>punição ativa</b>; relação no máximo = <b>bênção ativa</b>. O que você descobre nas conversas fica lembrado para sempre, entre todas as partidas.</p><button id="fav-dbg">debug: visitas infinitas ${favFreeVisits ? "✅" : "❌"}</button></div>
+    <div id="fav-help" class="hidden"><b>As Alianças</b><p>Quatro figuras de Karzstak podem ajudar (ou atrapalhar) suas muralhas. Você pode <b>visitar</b> qualquer uma delas <b>desde o dia 1</b>: converse, peça algo ou presenteie, <b>1 vez por dia</b>, entre os turnos. A partir do <b>dia ${FAV_VISIT_MIN_DAY}</b>, uma delas também pode <b>vir até você</b>: ignorar quem veio custa relação com todos, e quem veio está sempre disponível, fora de horário ou não.</p><p><b>Expediente:</b> o Rei atende dia e noite · a Rainha só de <b>dia</b> · o Conde só à <b>noite</b> · o Povo tem <b>70%</b> de dia e <b>30%</b> à noite. Tentar fora de horário não gasta sua visita.</p><p>Cada escolha muda a <b>relação</b> (0–100%). Relação no chão = <b>punição ativa</b>; relação no máximo = <b>bênção ativa</b>. O que você descobre nas conversas fica lembrado para sempre, entre todas as partidas.</p><p><b>A relação inclina todo o trato:</b> quanto mais baixa, menor a chance de ser <b>recebido</b> (conversar e pedir podem dar com a porta na cara), mais <b>caro</b> fica cada pedido e menos esse personagem <b>aparece</b> na sua porta. Quanto mais alta, mais barato e mais fácil de ser recebido. No <b>máximo</b>, o pedido tem ${Math.round(ASK_BOON_CHANCE * 100)}% de sair de graça e render ${Math.round(ASK_BOON_BONUS * 100)}% a mais. <b>Presentear nunca é recusado</b>, em relação nenhuma: é sempre o caminho de volta.</p><button id="fav-dbg">debug: visitas infinitas ${favFreeVisits ? "✅" : "❌"}</button></div>
     <div class="fav-carousel">
       <button class="fav-card fav-side left" data-k="${prev}"><img src="${FAV_CHARS[prev].img}?v=1" alt=""><div class="fav-card-t">-${FAV_CHARS[prev].art}-<br>${FAV_CHARS[prev].name}</div></button>
       <div class="fav-card fav-main"><img src="${c.img}?v=1" alt=""><div class="fav-card-t">-${c.art}-<br><b>${c.name}</b><span>${c.sub}</span></div></div>
@@ -1031,6 +1081,7 @@ function renderFavHub(scr) {
     </div>
     <div class="fav-tier-row"><button id="fav-prev" class="fav-tarrow">‹</button><span class="fav-tier">${favTier(favRel(k), k)} (${favRel(k)}%)</span><button id="fav-next" class="fav-tarrow">›</button></div>
     ${favPun(k) ? `<div class="fav-punish">${c.punIc} PUNIÇÃO ATIVA: ${c.punDesc}</div>` : favBless(k) ? `<div class="fav-bless">${c.punIc} BÊNÇÃO ATIVA: ${c.blessDesc}</div>` : ""}
+    ${favEconLine(k)}
     <div class="fav-actions${(!interactable) && !favFreeVisits ? " fav-used" : ""}">
       <button class="fav-abtn wide" data-act="talk" ${actDisabled}>🗣 CONVERSAR</button>
       <div class="fav-arow">
@@ -1089,10 +1140,17 @@ function renderFavEncounter(scr) {
     }).join("");
   } else if (v.mode === "ask") {
     intro = c.askIntro; quote = c.askQuote;
-    footer = "PEDIR UM FAVOR · O PEDIDO CUSTA RELAÇÃO";
+    // O multiplicador aparece no rodapé: sem isso o jogador vê o preço subir e não tem
+    // como saber que foi a relação que encareceu, e a punição fica parecendo bug.
+    const mult = askCostMult(k);
+    const tom = mult > 1.02 ? ` · <span style="color:#e05f5f">PREÇO ×${mult.toFixed(2)} PELA RELAÇÃO</span>`
+      : mult < 0.98 ? ` · <span style="color:#8fdc7a">DESCONTO ×${mult.toFixed(2)} PELA RELAÇÃO</span>` : "";
+    footer = `PEDIR UM FAVOR · O PEDIDO CUSTA RELAÇÃO${tom}`;
     choices = c.asks.map((a, i) => {
-      const cost = (favRel(k) >= 100 && i === 0) ? 0 : a.rel;
-      return `<button class="fav-choice fav-dark" data-i="${i}">➖ ${a.t} ${favFxText(a.e)}<span class="fav-relcost">${cost ? `−${cost}% relação` : "de graça!"}</span></button>`;
+      const cost = askCost(k, i);
+      const base = a.rel;
+      const risco = cost > base ? ` <s>−${base}%</s>` : "";
+      return `<button class="fav-choice fav-dark" data-i="${i}">➖ ${a.t} ${favFxText(a.e)}<span class="fav-relcost">${cost ? `−${cost}% relação${risco}` : "de graça!"}</span></button>`;
     }).join("");
   } else { // gift
     intro = c.giftIntro; quote = c.giftQuote;
@@ -1145,10 +1203,16 @@ function favChoose(k, i) {
     msg = `${favFxText(ch.e)} · relação ${ch.rel >= 0 ? "+" : ""}${ch.rel}%`;
   } else if (v.mode === "ask") {
     const a = FAV_CHARS[k].asks[i];
-    const cost = (favRel(k) >= 100 && i === 0) ? 0 : a.rel;
-    favApplyFx(a.e);
+    // Dádiva: só com a relação no máximo. Sorteada no CLIQUE, não mostrada no botão,
+    // porque a graça é a surpresa; o botão já avisa o preço normal.
+    const boon = favRel(k) >= 100 && Math.random() < ASK_BOON_CHANCE;
+    const cost = boon ? 0 : askCost(k, i);
+    const fx = boon ? scaleFx(a.e, 1 + ASK_BOON_BONUS) : a.e;
+    favApplyFx(fx);
     favGainRel(k, -cost);
-    msg = `${favFxText(a.e)} · relação −${cost}%`;
+    msg = boon
+      ? `<span style="color:#f4d76a">✨ DÁDIVA: ${favShort(k)} não cobrou nada e mandou mais.</span><br>${favFxText(fx)} · relação −0%`
+      : `${favFxText(fx)} · relação −${cost}%`;
     if (favPun(k)) msg += `<br><span style="color:#e05f5f">${FAV_CHARS[k].punIc} A relação chegou ao fundo: ${FAV_CHARS[k].punDesc}</span>`;
   } else { // gift
     const g = FAV_CHARS[k].gifts[i];
@@ -1187,7 +1251,16 @@ function favIgnoreVisit() {
 function favPickVisitor() {
   if (S.day < FAV_VISIT_MIN_DAY) return null;
   const pool = FAV_ORDER.filter(k => k !== S.fav.visitor);
-  return pool[Math.floor(Math.random() * pool.length)] || FAV_ORDER[0];
+  if (!pool.length) return null;
+  const w = pool.map(favVisitWeight);
+  const total = w.reduce((a, b) => a + b, 0);
+  // Com a corte inteira te odiando, simplesmente ninguém bate na sua porta: a chance de
+  // HAVER visita é a média dos pesos. Sem este passo o sorteio só decidiria QUEM vem, e
+  // relação no chão continuaria rendendo uma visita por dia como se nada tivesse mudado.
+  if (Math.random() > total / pool.length) return null;
+  let r = Math.random() * total;
+  for (let i = 0; i < pool.length; i++) { r -= w[i]; if (r <= 0) return pool[i]; }
+  return pool[pool.length - 1];
 }
 function favNewDay() {
   // O `used` já foi zerado pelo favNewTurn deste amanhecer: a visita é por turno.
