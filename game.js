@@ -1059,22 +1059,42 @@ function renderFavScr() {
   if (favView === "hub" || !favView) renderFavHub(scr);
   else renderFavEncounter(scr);
 }
-// Linha de estado da relação no hub. Sem ela os três efeitos (ser recebido, preço do
-// pedido, chance de visita) ficariam invisíveis e o jogador sentiria o aperto sem
-// entender de onde vem.
+// Ícones do rodapé da relação. SVG inline em `currentColor` porque emoji colorido não
+// obedece cor: a porta e o saco de moedas vinham com a paleta deles, brigando com o
+// retrato e com o vermelho dos avisos de punição, que é o único vermelho legítimo ali.
+const FAV_ECON_IC = {
+  porta: `<path d="M2.7 1.5h6.6v9H2.7z"/><circle cx="7.9" cy="6.3" r=".6" fill="currentColor" stroke="none"/>`,
+  preco: `<circle cx="6" cy="6" r="4.3"/><circle cx="6" cy="6" r="1.5"/>`,
+  visita: `<path d="M3.1 8.7c.95-.75.95-1.6.95-3.05a1.95 1.95 0 0 1 3.9 0c0 1.45 0 2.3.95 3.05z"/><path d="M5 9.9a1.05 1.05 0 0 0 2 0"/>`,
+  dadiva: `<path d="M6 1.4 7 4.9l3.6 1.1L7 7.1l-1 3.5-1-3.5L1.4 6 5 4.9z" fill="currentColor" stroke="none"/>`,
+};
+// O número sozinho é econômico, não telepático: o título devolve o significado no hover.
+const FAV_ECON_T = {
+  porta: "Chance de ser recebido",
+  preco: "Preço dos pedidos",
+  visita: "Chance de vir te visitar",
+  dadiva: "Chance de o pedido sair de graça e render mais",
+};
+// Estado da relação, resumido ao osso no rodapé: ícone branco e o número. Sem ele os
+// três efeitos (ser recebido, preço do pedido, chance de visita) ficariam invisíveis e
+// o jogador sentiria o aperto sem entender de onde vem.
 function favEconLine(k) {
   const rel = favRel(k);
   const atende = Math.round((1 - favBusyChance(k)) * 100);
   const mult = askCostMult(k);
   const visita = favVisitWeight(k);
-  const cor = v => v >= 0 ? "#8fdc7a" : "#e05f5f";
+  const n1 = v => String(Math.round(v * 10) / 10);   // 1, 2.5, 0.6: sem zero à direita
+  const st = (ic, val, cls) =>
+    `<span class="fe-s" title="${FAV_ECON_T[ic]}">`
+    + `<svg class="fe-i" viewBox="0 0 12 12" aria-hidden="true">${FAV_ECON_IC[ic]}</svg>`
+    + `<b${cls ? ` class="${cls}"` : ""}>${val}</b></span>`;
   const partes = [
-    `<span style="color:${atende >= 80 ? "#8fdc7a" : atende >= 50 ? "#e8b93a" : "#e05f5f"}">🚪 ${atende}% de ser recebido</span>`,
-    `<span style="color:${cor(1 - mult)}">💰 pedido ×${mult.toFixed(2)}</span>`,
+    st("porta", `${atende}%`, atende >= 80 ? "" : atende >= 50 ? "warn" : "bad"),
+    st("preco", `×${n1(mult)}`, mult > 1 ? "bad" : mult < 1 ? "good" : ""),
   ];
-  if (visita < 1) partes.push(`<span style="color:#e05f5f">🔔 visita ×${visita.toFixed(2)}</span>`);
-  if (rel >= 100) partes.push(`<span style="color:#f4d76a">✨ ${Math.round(ASK_BOON_CHANCE * 100)}% de dádiva</span>`);
-  return `<div class="fav-econ">${partes.join(" · ")}</div>`;
+  if (visita < 1) partes.push(st("visita", `×${n1(visita)}`, "bad"));
+  if (rel >= 100) partes.push(st("dadiva", `${Math.round(ASK_BOON_CHANCE * 100)}%`, "good"));
+  return `<div class="fav-econ">${partes.join("")}</div>`;
 }
 function renderFavHub(scr) {
   const k = FAV_ORDER[favSel], c = FAV_CHARS[k];
@@ -1104,7 +1124,6 @@ function renderFavHub(scr) {
     </div>
     <div class="fav-tier-row"><button id="fav-prev" class="fav-tarrow">‹</button><span class="fav-tier">${favTier(favRel(k), k)} (${favRel(k)}%)</span><button id="fav-next" class="fav-tarrow">›</button></div>
     ${favPun(k) ? `<div class="fav-punish">${c.punIc} PUNIÇÃO ATIVA: ${c.punDesc}</div>` : favBless(k) ? `<div class="fav-bless">${c.punIc} BÊNÇÃO ATIVA: ${c.blessDesc}</div>` : ""}
-    ${favEconLine(k)}
     <div class="fav-actions${(!interactable) && !favFreeVisits ? " fav-used" : ""}">
       <button class="fav-abtn wide" data-act="talk" ${actDisabled}>🗣 CONVERSAR</button>
       <div class="fav-arow">
@@ -1113,7 +1132,10 @@ function renderFavHub(scr) {
       </div>
       ${actNote}
     </div>
-    <div class="fav-count">EVENTOS DESCOBERTOS: ${favEvSeen()}/${favEvTotal()}</div>
+    <div class="fav-foot">
+      ${favEconLine(k)}
+      <div class="fav-count">EVENTOS DESCOBERTOS: ${favEvSeen()}/${favEvTotal()}</div>
+    </div>
     ${isVisitor && !S.fav.used && !favFreeVisits ? `<div class="fav-visit-banner">🔔 Está te visitando hoje</div>` : ""}
     ${punWarn && !favPun(k) ? `<div class="fav-pun-mini">${punWarn}</div>` : ""}`;
   $("fav-back").onclick = closeFavores;
