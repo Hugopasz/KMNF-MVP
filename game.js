@@ -1656,7 +1656,9 @@ function tickDepots(dt) {
       const n = S.towers[j];
       if (!n || isDepot(n) || TOWER_TYPES[n.type].fuel) continue;
       for (const a of towerAmmos(n.type)) {
-        const falta = ammoCap() - ammoOf(n, a);
+        // Desconta a caixa em trânsito: o empurrão roda a cada 1,2s, muito mais rápido
+        // que o ciclo da esteira, e enchia a vizinha por baixo de uma caixa já a caminho.
+        const falta = ammoCap() - ammoOf(n, a) - pendingOf(j, a);
         const tem = (d.stock && d.stock[a]) || 0;
         if (falta <= 0 || tem <= 0) continue;
         const move = Math.min(perPush, falta, tem);
@@ -1940,9 +1942,10 @@ function factoryStarved(c) {
 // Espaço que as torres ainda comportam desta munição. 0 = ninguém aceita.
 function ammoDemand(type) {
   let d = 0;
-  for (const t of S.towers) {
+  for (let i = 0; i < S.towers.length; i++) {
+    const t = S.towers[i];
     if (!t || !TOWER_TYPES[t.type].ammos.includes(type)) continue;
-    d += Math.max(0, ammoCap() - ammoOf(t, type));
+    d += towerRoom(t, i, type);   // espaço livre MENOS o que já vem na esteira
   }
   return d;
 }
@@ -5219,6 +5222,26 @@ const CRATE_V_MS = 500, CRATE_H_MS = 900, CRATE_GAP_MS = 280;
 const CRATE_SPEED_MS_PER_PCT = 9.7; // esteira horizontal: velocidade CONSTANTE (ms por % de largura)
 const prodCarry = {};
 let cratesInFlight = 0;
+// A viagem da caixa corre em tempo de JOGO, não de parede. O ciclo da esteira é contado
+// em dt já multiplicado pela velocidade: no 3x ele cai para 1,4s reais, encostando na
+// viagem de 1,4s até o posto 1; no 5x cai para 0,84s e ficavam três ciclos no ar ao
+// mesmo tempo. Fora a leitura, que era o sintoma: a esteira em câmera lenta ao lado de
+// uma batalha acelerada.
+function beltMs(ms) { return Math.max(60, Math.round(ms / Math.max(1, S.debug.speed))); }
+// Munição que já saiu do carry e ainda está viajando na esteira, por posto e por tipo.
+// Sem esse registro, o ciclo seguinte (ou o empurrão de um Estoque vizinho) calcula o
+// tamanho da caixa olhando um estoque desatualizado, promete o mesmo espaço duas vezes,
+// e a sobra é jogada fora no `Math.min` da chegada: produção que desaparece sem rastro,
+// sem aviso e sem aparecer em lugar nenhum.
+const pending = {};
+function pendingOf(slot, type) { const p = pending[slot]; return (p && p[type]) || 0; }
+function pendingTotal(slot) { const p = pending[slot]; return p ? Object.values(p).reduce((s, n) => s + n, 0) : 0; }
+function addPending(slot, type, n) {
+  const p = (pending[slot] ||= {});
+  p[type] = Math.max(0, (p[type] || 0) + n);
+}
+// Espaço do posto NESTA munição, já descontado o que vem na esteira.
+function towerRoom(t, slot, type) { return Math.max(0, ammoCap() - ammoOf(t, type) - pendingOf(slot, type)); }
 
 // Cadeia contínua: roda no planejamento E no combate (a esteira abastece as
 // torres entre turnos também). 1) enche os tanques das fábricas com recurso do
@@ -5334,16 +5357,19 @@ function feudBeltTick() {
 }
 
 function dispatchCrates() {
-  const jobs = [], overflow = [], reserva = {};
+  const jobs = [], overflow = [];
   let excess = 0;
   for (const type of Object.keys(AMMO)) {
     let pool = Math.floor(prodCarry[type] || 0);
     prodCarry[type] = (prodCarry[type] || 0) - pool;
     for (let i = LANES - 1; i >= 0 && pool > 0; i--) {
       const t = S.towers[i];
-      if (!t || !TOWER_TYPES[t.type].ammos.includes(type) || ammoOf(t, type) >= ammoCap()) continue;
-      const amount = Math.min(crateSize() + ammoTypeFx(type, "crate") + lawCrateBonus(type), pool, ammoCap() - ammoOf(t, type));
+      if (!t || !TOWER_TYPES[t.type].ammos.includes(type)) continue;
+      const room = towerRoom(t, i, type);
+      if (room <= 0) continue;
+      const amount = Math.min(crateSize() + ammoTypeFx(type, "crate") + lawCrateBonus(type), pool, room);
       pool -= amount;
+      addPending(i, type, amount);
       jobs.push({ slot: i, amount, type });
     }
     // Estoques de Munições enchem DEPOIS das torres: o depósito é para a sobra, não
@@ -5352,13 +5378,13 @@ function dispatchCrates() {
     for (let i = LANES - 1; i >= 0 && pool > 0; i--) {
       const d = S.towers[i];
       if (!isDepot(d) || !depotTypes(i).includes(type)) continue;
-      // `reserva` existe porque a capacidade é UM bolo dividido entre os tipos: sem
-      // ela, dois tipos no mesmo ciclo prometeriam o mesmo espaço vazio.
-      const room = depotRoom(d) - (reserva[i] || 0);
+      // A capacidade do Estoque é UM bolo dividido entre os tipos, então aqui o
+      // desconto é o total pendente do posto, não o pendente daquele tipo.
+      const room = depotRoom(d) - pendingTotal(i);
       if (room <= 0) continue;
       const amount = Math.min(pool, room);
       pool -= amount;
-      reserva[i] = (reserva[i] || 0) + amount;
+      addPending(i, type, amount);
       jobs.push({ slot: i, amount, type });
     }
     // Sobra que as torres não comportam: com "Ajudar o Reino" desce a esteira e
@@ -5370,10 +5396,11 @@ function dispatchCrates() {
     }
   }
   // Libera as caixas em FILEIRA (uma atrás da outra na esteira), não empilhadas
-  jobs.forEach((j, k) => setTimeout(() => sendCrate(j.slot, j.amount, j.type), k * CRATE_GAP_MS));
+  const gap = beltMs(CRATE_GAP_MS);
+  jobs.forEach((j, k) => setTimeout(() => sendCrate(j.slot, j.amount, j.type), k * gap));
   // Ajudar o Reino: o excedente atravessa a esteira inteira e some no fim.
   // A Medalha (HELP_RATE ▸ 1) só é creditada quando a caixa chega ao fim.
-  overflow.forEach((o, k) => setTimeout(() => sendOverflowCrate(o.amount, o.type), (jobs.length + k) * CRATE_GAP_MS));
+  overflow.forEach((o, k) => setTimeout(() => sendOverflowCrate(o.amount, o.type), (jobs.length + k) * gap));
 }
 // crédito do excedente ao fim da esteira
 function creditHelpKingdom(amount) {
@@ -5390,9 +5417,11 @@ function creditHelpKingdom(amount) {
 function sendOverflowCrate(amount, type) {
   const icon = AMMO[type].icon;
   cratesInFlight++;
+  const vMs = beltMs(CRATE_V_MS);
   const cv = document.createElement("span");
   cv.className = "crate-v";
   cv.textContent = icon;
+  cv.style.transition = `top ${vMs}ms linear`;
   cv.style.top = "100%";
   $("belt-v").appendChild(cv);
   requestAnimationFrame(() => requestAnimationFrame(() => { cv.style.top = "-22px"; }));
@@ -5402,7 +5431,7 @@ function sendOverflowCrate(amount, type) {
     ch.className = "crate crate-help";
     ch.textContent = icon;
     ch.style.left = "100%";
-    const travelMs = Math.max(120, 108 * CRATE_SPEED_MS_PER_PCT); // até sumir da esteira
+    const travelMs = beltMs(Math.max(120, 108 * CRATE_SPEED_MS_PER_PCT)); // até sumir da esteira
     // some só no último terço do trajeto
     ch.style.transition = `left ${travelMs}ms linear, opacity ${Math.round(travelMs * 0.35)}ms ease-in ${Math.round(travelMs * 0.6)}ms, transform ${Math.round(travelMs * 0.35)}ms ease-in ${Math.round(travelMs * 0.6)}ms`;
     $("belt").appendChild(ch);
@@ -5412,15 +5441,17 @@ function sendOverflowCrate(amount, type) {
       cratesInFlight--;
       creditHelpKingdom(amount);
     }, travelMs);
-  }, CRATE_V_MS);
+  }, vMs);
 }
 
 function sendCrate(slot, amount, type) {
   const icon = AMMO[type].icon;
   cratesInFlight++;
+  const vMs = beltMs(CRATE_V_MS);
   const cv = document.createElement("span");
   cv.className = "crate-v";
   cv.textContent = icon;
+  cv.style.transition = `top ${vMs}ms linear`;   // sobrescreve o 0.5s do CSS
   cv.style.top = "100%";
   $("belt-v").appendChild(cv);
   requestAnimationFrame(() => requestAnimationFrame(() => { cv.style.top = "-22px"; }));
@@ -5433,13 +5464,16 @@ function sendCrate(slot, amount, type) {
     // Velocidade CONSTANTE: a duração acompanha a distância até o slot, para que
     // caixas para torres distantes NÃO ultrapassem as de torres próximas (fileira real).
     const targetPct = slot * 20 + 7;
-    const travelMs = Math.max(120, (100 - targetPct) * CRATE_SPEED_MS_PER_PCT);
+    const travelMs = beltMs(Math.max(120, (100 - targetPct) * CRATE_SPEED_MS_PER_PCT));
     ch.style.transition = `left ${travelMs}ms linear`;
     $("belt").appendChild(ch);
     requestAnimationFrame(() => requestAnimationFrame(() => { ch.style.left = targetPct + "%"; }));
     setTimeout(() => {
       ch.remove();
       cratesInFlight--;
+      // Libera a reserva SEMPRE, mesmo se a torre foi vendida no meio do caminho:
+      // pendência órfã deixaria aquele posto sem receber nada pelo resto da partida.
+      addPending(slot, type, -amount);
       const t = S.towers[slot];
       if (t) {
         if (isDepot(t)) depotReceive(t, type, amount);
@@ -5452,7 +5486,7 @@ function sendCrate(slot, amount, type) {
         if (el) { el.classList.add("resupply"); setTimeout(() => el.classList.remove("resupply"), 400); }
       }
     }, travelMs);
-  }, CRATE_V_MS);
+  }, vMs);
 }
 
 // ---------- Inimigos à distância ----------
