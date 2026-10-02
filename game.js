@@ -92,48 +92,48 @@ function dm(key, def) { return (S.dayMods && S.dayMods[key] != null) ? S.dayMods
 const EV_W_HEAL = 0.2, EV_W_HEAL_BIG = 0.12;
 const EVENTS = [
   // ===== POSITIVOS (20) =====
-  { id: "p1",  ic: "🌾", ty: "pos", t: "Colheita Abençoada", s: "Os campos internos renderam além do esperado. Os cofres da guarda agradecem.", e: { gold: 35, morale: 8 } },
-  { id: "p2",  ic: "🔨", ty: "pos", t: "Mutirão das Muralhas", s: "Pedreiros voluntários trabalharam a noite toda reforçando as brechas.", e: { hits: 2, morale: 6 }, w: EV_W_HEAL_BIG },
-  { id: "p3",  ic: "💎", ty: "pos", t: "Veio de Argamato", s: "Mineiros encontraram um bolsão de cristais intactos sob o distrito.", e: { hearts: 6, morale: 6 } },
-  { id: "p4",  ic: "🎺", ty: "pos", t: "Notícia da Frente Norte", s: "Um setor vizinho resistiu. O moral dispara em todas as muralhas.", e: { morale: 18 } },
-  { id: "p5",  ic: "🏹", ty: "pos", t: "Carregamento de Virotes", s: "Uma carroça de munição chegou dos arsenais reais.", e: { gold: 20, mods: { prod: 1.25 } } },
-  { id: "p6",  ic: "⚙️", ty: "pos", t: "Engrenagens Novas", s: "Um engenheiro ajustou as fábricas. Hoje elas cantam.", e: { mods: { prod: 1.35 }, morale: 5 } },
-  { id: "p7",  ic: "🔥", ty: "pos", t: "Fervor no Muro", s: "Os soldados amanheceram inspirados. Suas armas parecem mais certeiras.", e: { mods: { towerDmg: 1.3 }, morale: 5 } },
-  { id: "p8",  ic: "🪙", ty: "pos", t: "Mercadores Gratos", s: "Comerciantes salvos por suas muralhas retribuem com ouro.", e: { gold: 45 } },
-  { id: "p9",  ic: "🕊️", ty: "pos", t: "Manhã Silenciosa", s: "Por algum motivo, os mortos hesitam. O vigia enxerga mais longe.", e: { mods: { warn: 2 }, morale: 6 } },
-  { id: "p10", ic: "🍞", ty: "pos", t: "Rações Extras", s: "O conselho liberou os estoques. Ninguém luta de barriga vazia.", e: { gold: 15, morale: 10 } },
-  { id: "p11", ic: "🛡️", ty: "pos", t: "Reforços do Interior", s: "Um pelotão da guarda real reforça a linha por hoje.", e: { mods: { enemyDmg: 0.8 }, morale: 6 } },
-  { id: "p12", ic: "💰", ty: "pos", t: "Dízimo de Guerra", s: "As paróquias arrecadaram para a defesa do setor.", e: { gold: 30, hearts: 2 } },
-  { id: "p13", ic: "🌟", ty: "pos", t: "Bênção do Cristal", s: "O Turbilhão Narxis pulsa forte hoje. A cidade inteira sente.", e: { morale: 14, hits: 1 }, w: EV_W_HEAL },
-  { id: "p14", ic: "🧰", ty: "pos", t: "Peças Sobressalentes", s: "Recuperaram material de um posto abandonado.", e: { gold: 25, mods: { prod: 1.2 } } },
-  { id: "p15", ic: "🎯", ty: "pos", t: "Treino da Aurora", s: "Os artilheiros treinaram ao amanhecer. A mira está afiada.", e: { mods: { towerDmg: 1.2 }, morale: 4 } },
-  { id: "p16", ic: "🐴", ty: "pos", t: "Cavalaria de Passagem", s: "Cavaleiros a caminho de outro setor deixam suprimentos.", e: { gold: 22, hearts: 3 } },
-  { id: "p17", ic: "🌙", ty: "pos", t: "Presságio Favorável", s: "Os astros sorriem. Dizem que hoje a sorte está do seu lado.", e: { morale: 12 } },
-  { id: "p18", ic: "🔮", ty: "pos", t: "Visão do Vidente", s: "Um oráculo previu as investidas. O vigia ganha tempo precioso.", e: { mods: { warn: 3 } } },
-  { id: "p19", ic: "🏰", ty: "pos", t: "Ordem do Rei", s: "O soberano cita seu setor como exemplo. A tropa se enche de orgulho.", e: { morale: 16, gold: 10 } },
-  { id: "p20", ic: "❤️", ty: "pos", t: "Filhos das Muralhas", s: "As crianças do distrito trouxeram água e canções aos soldados.", e: { morale: 11, hits: 1 }, w: EV_W_HEAL },
+  { id: "p1",  ic: "🌾", ty: "pos", t: "Colheita Abençoada", s: "Os campos internos renderam além do esperado, e os celeiros receberam o excedente antes do anoitecer. Os cofres da guarda agradecem; o tesoureiro, pela primeira vez no mês, sorriu.", e: { gold: 35, morale: 8 } },
+  { id: "p2",  ic: "🔨", ty: "pos", t: "Mutirão das Muralhas", s: "Pedreiros voluntários trabalharam a noite toda tapando as brechas com o que acharam: pedra, viga, portão arrancado. Ninguém mandou, ninguém pagou, e ao amanhecer as muralhas estavam de pé.", e: { hits: 2, morale: 6 }, w: EV_W_HEAL_BIG },
+  { id: "p3",  ic: "💎", ty: "pos", t: "Veio de Argamato", s: "Mineiros encontraram um bolsão de cristais intactos sob o distrito, protegido por uma camada de rocha que a peste nunca atravessou. Vieram carregando o que couberam nos braços.", e: { hearts: 6, morale: 6 } },
+  { id: "p4",  ic: "🎺", ty: "pos", t: "Notícia da Frente Norte", s: "Um setor vizinho resistiu a uma noite inteira de assalto e mandou um corredor contar. O moral dispara em todas as muralhas: se eles aguentaram, nós também aguentamos.", e: { morale: 18 } },
+  { id: "p5",  ic: "🏹", ty: "pos", t: "Carregamento de Virotes", s: "Uma carroça de munição chegou dos arsenais reais, escoltada por três guardas que não dormiram no caminho. As fábricas vão poder trabalhar com folga hoje.", e: { gold: 20, mods: { prod: 1.25 } } },
+  { id: "p6",  ic: "⚙️", ty: "pos", t: "Engrenagens Novas", s: "Um engenheiro passou a madrugada ajustando as correias e trocando os dentes gastos das fábricas. Hoje elas cantam em vez de gemer.", e: { mods: { prod: 1.35 }, morale: 5 } },
+  { id: "p7",  ic: "🔥", ty: "pos", t: "Fervor no Muro", s: "Os soldados amanheceram inspirados, ninguém sabe bem por quê. Afiaram as próprias armas antes de o sino bater, e a mira está diferente.", e: { mods: { towerDmg: 1.3 }, morale: 5 } },
+  { id: "p8",  ic: "🪙", ty: "pos", t: "Mercadores Gratos", s: "Comerciantes salvos por suas muralhas voltaram com ouro e sem conversa. Deixaram as bolsas no posto da guarda e foram embora antes de alguém agradecer.", e: { gold: 45 } },
+  { id: "p9",  ic: "🕊️", ty: "pos", t: "Manhã Silenciosa", s: "Por algum motivo, os mortos hesitam no horizonte. O vigia enxerga mais longe do que em qualquer manhã deste ano, e isso assusta mais do que acalma.", e: { mods: { warn: 2 }, morale: 6 } },
+  { id: "p10", ic: "🍞", ty: "pos", t: "Rações Extras", s: "O conselho liberou os estoques sem explicar o motivo. Pão fresco, carne salgada e uma dose para cada posto: ninguém luta de barriga vazia.", e: { gold: 15, morale: 10 } },
+  { id: "p11", ic: "🛡️", ty: "pos", t: "Reforços do Interior", s: "Um pelotão da guarda real reforça a linha por hoje, com armadura de verdade e ordens claras. Amanhã seguem para outro setor, mas hoje são seus.", e: { mods: { enemyDmg: 0.8 }, morale: 6 } },
+  { id: "p12", ic: "💰", ty: "pos", t: "Dízimo de Guerra", s: "As paróquias arrecadaram para a defesa do setor e mandaram o cofre fechado. Vieram cristais no meio das moedas, o que ninguém pediu e todo mundo aceitou.", e: { gold: 30, hearts: 2 } },
+  { id: "p13", ic: "🌟", ty: "pos", t: "Bênção do Cristal", s: "O Turbilhão Narxis pulsa forte hoje, e a cidade inteira sente no peito. Até as pedras das muralhas parecem assentar melhor.", e: { morale: 14, hits: 1 }, w: EV_W_HEAL },
+  { id: "p14", ic: "🧰", ty: "pos", t: "Peças Sobressalentes", s: "Recuperaram material de um posto abandonado três lanes ao norte. Chegou tudo enferrujado e tudo aproveitável.", e: { gold: 25, mods: { prod: 1.2 } } },
+  { id: "p15", ic: "🎯", ty: "pos", t: "Treino da Aurora", s: "Os artilheiros treinaram antes do sol nascer, no frio, com os alvos de palha que sobraram. A mira está afiada e o humor, péssimo.", e: { mods: { towerDmg: 1.2 }, morale: 4 } },
+  { id: "p16", ic: "🐴", ty: "pos", t: "Cavalaria de Passagem", s: "Cavaleiros a caminho de outro setor pararam para beber água e deixaram suprimentos sem cobrar. Não disseram para onde iam.", e: { gold: 22, hearts: 3 } },
+  { id: "p17", ic: "🌙", ty: "pos", t: "Presságio Favorável", s: "Os astros sorriem, segundo quem entende dessas coisas. Dizem que hoje a sorte está do seu lado, e a tropa decidiu acreditar.", e: { morale: 12 } },
+  { id: "p18", ic: "🔮", ty: "pos", t: "Visão do Vidente", s: "Um oráculo do distrito acordou gritando as direções dos ataques e voltou a dormir. O vigia anotou tudo e ganhou tempo precioso.", e: { mods: { warn: 3 } } },
+  { id: "p19", ic: "🏰", ty: "pos", t: "Ordem do Rei", s: "O soberano citou seu setor como exemplo numa carta lida em voz alta na praça. A tropa se enche de orgulho e finge que não ligou.", e: { morale: 16, gold: 10 } },
+  { id: "p20", ic: "❤️", ty: "pos", t: "Filhos das Muralhas", s: "As crianças do distrito subiram até as ameias trazendo água e canções inventadas na hora. Os soldados fingiram que não choraram.", e: { morale: 11, hits: 1 }, w: EV_W_HEAL },
   // ===== NEGATIVOS (10) =====
-  { id: "n1",  ic: "🩸", ty: "neg", t: "Baixas na Noite", s: "Alguns guardas não voltaram da última investida. O luto pesa.", e: { morale: -12 } },
-  { id: "n2",  ic: "🕳️", ty: "neg", t: "Brecha no Alicerce", s: "Uma fenda se abriu na base das muralhas durante a madrugada.", e: { hits: -1, morale: -6 } },
-  { id: "n3",  ic: "💸", ty: "neg", t: "Cofre Saqueado", s: "Desertores levaram parte do ouro do setor ao fugir.", e: { gold: -30, morale: -6 } },
-  { id: "n4",  ic: "🌧️", ty: "neg", t: "Tempestade de Cinzas", s: "A poeira dos mortos entope as engrenagens. As fábricas engasgam.", e: { mods: { prod: 0.7 } } },
-  { id: "n5",  ic: "😨", ty: "neg", t: "Boatos de Queda", s: "Espalharam que as muralhas vizinhas caíram. O medo se alastra.", e: { morale: -16 } },
-  { id: "n6",  ic: "🦠", ty: "neg", t: "Febre no Distrito", s: "Uma doença varre os alojamentos. Menos mãos para trabalhar.", e: { mods: { prod: 0.8 }, morale: -6 } },
-  { id: "n7",  ic: "🌫️", ty: "neg", t: "Neblina Cega", s: "Uma névoa densa encobre o horizonte. O vigia mal enxerga.", e: { mods: { warn: -1.5 } } },
-  { id: "n8",  ic: "⚰️", ty: "neg", t: "Deserção", s: "Parte da guarnição fugiu na calada. A linha está mais fraca hoje.", e: { mods: { enemyDmg: 1.2 }, morale: -8 } },
-  { id: "n9",  ic: "🥀", ty: "neg", t: "Racionamento", s: "Os estoques minguam. O conselho corta as verbas do setor.", e: { gold: -20, morale: -8 } },
-  { id: "n10", ic: "🌑", ty: "neg", t: "Presságio Sombrio", s: "Corvos rodeiam as muralhas. Ninguém dorme direito.", e: { morale: -14 } },
+  { id: "n1",  ic: "🩸", ty: "neg", t: "Baixas na Noite", s: "Alguns guardas não voltaram da última investida, e os nomes foram lidos no pátio ao amanhecer. O luto pesa mais que a armadura.", e: { morale: -12 } },
+  { id: "n2",  ic: "🕳️", ty: "neg", t: "Brecha no Alicerce", s: "Uma fenda se abriu na base das muralhas durante a madrugada, larga o bastante para passar um braço. Taparam com entulho, que é o que havia.", e: { hits: -1, morale: -6 } },
+  { id: "n3",  ic: "💸", ty: "neg", t: "Cofre Saqueado", s: "Desertores levaram parte do ouro do setor ao fugir pela calada. Deixaram a porta do cofre aberta, como quem quer que você veja.", e: { gold: -30, morale: -6 } },
+  { id: "n4",  ic: "🌧️", ty: "neg", t: "Tempestade de Cinzas", s: "A poeira dos mortos entope as engrenagens e cobre tudo de cinza. As fábricas engasgam e os operários tossem sangue no fim do turno.", e: { mods: { prod: 0.7 } } },
+  { id: "n5",  ic: "😨", ty: "neg", t: "Boatos de Queda", s: "Espalharam que as muralhas vizinhas caíram e que ninguém sobrou para contar. Ninguém sabe quem começou, e o medo se alastra mais rápido que a verdade.", e: { morale: -16 } },
+  { id: "n6",  ic: "🦠", ty: "neg", t: "Febre no Distrito", s: "Uma doença varre os alojamentos e derruba quem já estava exausto. Menos mãos para trabalhar e mais bocas na enfermaria.", e: { mods: { prod: 0.8 }, morale: -6 } },
+  { id: "n7",  ic: "🌫️", ty: "neg", t: "Neblina Cega", s: "Uma névoa densa encobre o horizonte desde antes do amanhecer. O vigia mal enxerga a própria mão esticada, e a horda vem de dentro dela.", e: { mods: { warn: -1.5 } } },
+  { id: "n8",  ic: "⚰️", ty: "neg", t: "Deserção", s: "Parte da guarnição fugiu na calada, levando armas e as melhores botas. A linha está mais fraca hoje e todo mundo sabe exatamente quem faltou.", e: { mods: { enemyDmg: 1.2 }, morale: -8 } },
+  { id: "n9",  ic: "🥀", ty: "neg", t: "Racionamento", s: "Os estoques minguam e o conselho corta as verbas do setor com uma frase só, por escrito. Metade da ração, o dobro do turno.", e: { gold: -20, morale: -8 } },
+  { id: "n10", ic: "🌑", ty: "neg", t: "Presságio Sombrio", s: "Corvos rodeiam as muralhas desde a véspera e não pousam. Ninguém dorme direito, e os que dormem acordam falando.", e: { morale: -14 } },
   // ===== CAÓTICOS (5) =====
-  { id: "c1",  ic: "⚔️", ty: "cha", t: "Fúria dos Mortos", s: "Algo os enlouquece: hoje a horda avança mais rápido, mas você jurou vingança (moral em alta).", e: { mods: { enemySpd: 1.3 }, morale: 12 } },
-  { id: "c2",  ic: "🛢️", ty: "cha", t: "Munição Instável", s: "Um lote defeituoso chegou: as torres batem MUITO mais forte, mas gastam o dobro de munição.", e: { mods: { towerDmg: 1.6, ammoCost: 2 } } },
-  { id: "c3",  ic: "🐗", ty: "cha", t: "Marcha Blindada", s: "Só os mais couraçados vieram hoje: todos os mortos chegam com armadura.", e: { mods: { allArmored: true }, gold: 20 } },
-  { id: "c4",  ic: "🎲", ty: "cha", t: "Feira do Conde", s: "O Conde dos Ratos abre seu mercado: ouro farto hoje, mas as fábricas rendem menos.", e: { gold: 60, mods: { prod: 0.6 } } },
-  { id: "c5",  ic: "💥", ty: "cha", t: "Sobrecarga do Nexus", s: "O cristal transborda: produção turbinada, mas as muralhas racham com a energia.", e: { mods: { prod: 1.8 }, hits: -1 } },
+  { id: "c1",  ic: "⚔️", ty: "cha", t: "Fúria dos Mortos", s: "Algo os enlouquece hoje: a horda avança mais rápido do que qualquer registro da guarda. Você jurou vingança em voz alta, e a tropa jurou com você.", e: { mods: { enemySpd: 1.3 }, morale: 12 } },
+  { id: "c2",  ic: "🛢️", ty: "cha", t: "Munição Instável", s: "Um lote defeituoso chegou dos arsenais, mais pólvora que projétil. As torres batem MUITO mais forte e gastam o dobro para isso.", e: { mods: { towerDmg: 1.6, ammoCost: 2 } } },
+  { id: "c3",  ic: "🐗", ty: "cha", t: "Marcha Blindada", s: "Só os mais couraçados vieram hoje, como se alguém os tivesse escolhido. Todos os mortos chegam com armadura, e o saque compensa o trabalho.", e: { mods: { allArmored: true }, gold: 20 } },
+  { id: "c4",  ic: "🎲", ty: "cha", t: "Feira do Conde", s: "O Conde dos Ratos abre seu mercado no subsolo e chama os operários pelo nome. Ouro farto hoje, e as fábricas vazias de quem foi gastar.", e: { gold: 60, mods: { prod: 0.6 } } },
+  { id: "c5",  ic: "💥", ty: "cha", t: "Sobrecarga do Nexus", s: "O cristal transborda e a energia corre pelos trilhos como água em cheia. A produção turbina, e as muralhas racham no mesmo instante.", e: { mods: { prod: 1.8 }, hits: -1 } },
 ];
 // Evento FIXO ao amanhecer do dia 11: chegam os mortos antigos, o saque despenca.
 // Evento OBRIGATÓRIO do dia 1: começa a run com um empurrão nas torres.
 const DAY1_EVENT = { id: "cafecomleite", ic: "☕", ty: "pos", t: "Café com Leite",
-  s: "A primeira manhã nas muralhas começa com café quente e leite fresco das últimas cabras do reino. Os artilheiros acordam animados: a mira nunca esteve tão firme.",
+  s: "A primeira manhã nas muralhas começa com café quente e leite fresco das últimas cabras do reino. Os artilheiros acordam animados e a mira nunca esteve tão firme.",
   e: { mods: { towerDmg: 1.5 } } };
 const ELDERS_EVENT = { id: "elders", ic: "🦴", ty: "neg", t: "Os Mortos Antigos",
   s: "Os recém-tombados, ainda cheios de bolsas e relíquias, já foram todos derrubados. Agora sobem das criptas os mortos ANTIGOS: ossos secos, sem nada de valor. O saque por criatura despenca daqui em diante.",
@@ -155,6 +155,29 @@ function effectText(ev) {
   if (m.warn) out.push(`${m.warn > 0 ? "+" : ""}${m.warn}s de aviso`);
   if (m.allArmored) out.push("todos blindados");
   return out.length ? "Efeito: " + out.join(" · ") : "Sem efeito imediato.";
+}
+// Mesma leitura do effectText, mas em FICHAS com sinal e cor, para o resumo do dia.
+// Um multiplicador é bom ou ruim conforme o que ele multiplica: produção ×0.7 é perda,
+// mas ataque inimigo ×0.8 é ganho. Por isso cada linha diz explicitamente o seu sinal
+// em vez de deduzir pelo ">1".
+function effectChips(ev, income) {
+  const e = ev.e, m = e.mods || {}, out = [];
+  const chip = (txt, bom) => out.push(`<span class="ev-chip ${bom ? "up" : "down"}">${txt}</span>`);
+  if (typeof income === "number") chip(`+${income} 🪙 do conselho`, true);
+  if (e.gold) chip(`${e.gold > 0 ? "+" : ""}${e.gold} 🪙`, e.gold > 0);
+  if (e.hearts) chip(`${e.hearts > 0 ? "+" : ""}${e.hearts} 💎`, e.hearts > 0);
+  if (e.hits) chip(`${e.hits > 0 ? "+" : ""}${e.hits} 🧱 muralhas`, e.hits > 0);
+  if (e.morale) chip(`${e.morale > 0 ? "+" : ""}${e.morale} moral`, e.morale > 0);
+  if (m.prod) chip(`produção ×${m.prod}`, m.prod > 1);
+  if (m.towerDmg) chip(`dano das torres ×${m.towerDmg}`, m.towerDmg > 1);
+  if (m.income) chip(`renda ×${m.income}`, m.income > 1);
+  if (m.ammoCost) chip(`munição gasta ×${m.ammoCost}`, m.ammoCost < 1);
+  if (m.enemySpd) chip(`horda ×${m.enemySpd} de velocidade`, m.enemySpd < 1);
+  if (m.enemyDmg) chip(`ataque inimigo ×${m.enemyDmg}`, m.enemyDmg < 1);
+  if (m.warn) chip(`${m.warn > 0 ? "+" : ""}${m.warn}s de aviso`, m.warn > 0);
+  if (m.allArmored) chip("todos os mortos blindados", false);
+  if (e.eldersLoot) chip(`saque por morto −${Math.round((1 - ELDERS_LOOT_MULT) * 100)}%`, false);
+  return out.length ? out.join("") : `<span class="ev-chip">Sem efeito imediato</span>`;
 }
 function pickDailyEvent() {
   const pool = EVENTS.filter(e => e.id !== S.lastEvent);
@@ -4779,23 +4802,108 @@ const COMBAT_MSGS = {
     "Eles estão vindo.|Resista.",
     "A horda avança.|Segurem as muralhas.",
     "Que venham.|Karzstak não deve cair.",
+    "Posições.|Ninguém recua hoje.",
+    "O chão está tremendo.|Já dá para contar os passos.",
+    "Carreguem tudo.|Depois a gente conta os mortos.",
+    "É só mais uma noite.|Como todas as outras.",
+    "Eles não sabem pensar.|Nós sabemos. Usem isso.",
+    "Respira fundo, comandante.|E solta devagar.",
+    "Olhos no horizonte.|Mãos na alavanca.",
+    "Cem anos de muralha|não caem hoje.",
+    "Se der errado,|dá errado em pé.",
   ],
   half: [
     "A horda|está diminuindo.",
     "Estão caindo.|Não recuem!",
     "A maré vira.|Aguentem firme.",
+    "Metade deles|já está no chão.",
+    "Continua assim.|Está funcionando.",
+    "O cheiro mudou.|É o cheiro de vitória.",
+    "Eles estão rareando.|Não baixem a guarda.",
+    "Mais um empurrão.|Só mais um.",
+    "A linha aguentou.|Ela sempre aguenta.",
+    "Contem a munição.|Vamos precisar até o fim.",
   ],
   // Sol Negro = loucura
   blacksun: [
     "Há. Há. Há.|Estamos perdidos.",
     "O sol morreu|e ninguém percebeu. Ha!",
     "Ria comigo...|é tudo o que resta.",
+    "Que dia bonito|para o fim de tudo.",
+    "Alguém apagou o céu|e deixou a conta pra nós.",
+    "Eu já vi isso antes.|No sonho. No MEU sonho.",
+    "Não é noite.|É o sol fingindo.",
+    "Cantem.|Cantem até doer a garganta.",
   ],
   // Lua Sangrenta = depressão
   bloodmoon: [
     "Não vamos|conseguir.",
     "Para que resistir?|Eles nunca param.",
     "As muralhas vão cair.|Como sempre foi.",
+    "A lua está vermelha.|Ela sabe de algo.",
+    "Tantos nomes.|E nenhum deles volta.",
+    "A gente só adia.|É só isso que a gente faz.",
+    "Dorme, Karzstak.|Ninguém vai te culpar.",
+    "Hoje eles vêm com fome.|E nós, com o que sobrou.",
+  ],
+  // Fecho do turno, no overlay de anoitecer. Fica na mesma tabela das outras porque é a
+  // mesma voz do setor, só sem a quebra de linha: aqui o texto é parágrafo, não letreiro.
+  dusk: [
+    "O vigia observa o horizonte. Toque no astro da noite para ver o que vem.",
+    "A guarda troca de turno em silêncio. Toque no astro para ver o que a noite trouxe.",
+    "Alguém está contando os mortos no campo. Toque no astro para ver os que faltam.",
+    "O sino bateu e ninguém comemorou. Toque no astro da noite.",
+    "Os braseiros foram acesos nas ameias. Toque no astro para ver o horizonte.",
+    "Mais um turno fechado. O vigia já está no posto: toque no astro da noite.",
+    "A poeira assenta devagar sobre o campo. Toque no astro para ver o que se move nela.",
+    "Nenhum nome novo na lista hoje. Toque no astro da noite e confira o que vem.",
+  ],
+  // Lua cheia: a horda engrossa, mas o campo fica visível
+  fullmoon: [
+    "Lua cheia.|Hoje eles vêm todos.",
+    "Dá para ver cada um deles.|Isso não é um alívio.",
+    "A luz é nossa amiga.|O resto, não.",
+    "Contem quantos quiserem.|Não vai mudar nada.",
+    "Noite clara,|horda cheia.",
+    "A lua entrega eles.|Não desperdicem o favor.",
+  ],
+  // Tempestade: chuva, trovão, céu fechado
+  storm: [
+    "A chuva lava o sangue|e trás mais sangue.",
+    "Trovão.|Nem eles gostam disso.",
+    "Pólvora molhada,|coragem seca.",
+    "O céu caiu primeiro.|A muralha é a próxima da fila.",
+    "Segurem as tochas.|Vai ficar escuro.",
+  ],
+  // Turno Turvo: névoa densa, o jogador perde a horda de vista
+  fog: [
+    "Névoa.|Atirem no som.",
+    "Não enxergo nada.|As torres enxergam. Confiem nelas.",
+    "Eles estão ali.|Em algum lugar ali.",
+    "A névoa esconde eles|e esconde nós também.",
+    "Ouçam.|Hoje a gente luta de ouvido.",
+  ],
+  // Turno Perfeito: ar limpo, visibilidade total
+  clear: [
+    "Ar limpo.|Aproveitem, é raro.",
+    "Dá para ver até o fim do campo.|Que privilégio terrível.",
+    "Nenhuma desculpa hoje.|Só mira.",
+    "Céu aberto, mão firme.|Vamos trabalhar.",
+  ],
+  // Muralhas em estado crítico
+  critical: [
+    "A muralha está cedendo!|Tapem as brechas!",
+    "Último hit.|Depois dele não tem depois.",
+    "Está rachando tudo.|Aguenta, aguenta...",
+    "Se ela cair,|cai com a gente em cima.",
+  ],
+  // Onda limpa
+  cleared: [
+    "Está feito.|O campo é nosso.",
+    "Silêncio.|Pela primeira vez hoje.",
+    "Acabou.|Recolham o que sobrou.",
+    "Mais uma noite|que Karzstak não caiu.",
+    "Contem os vivos.|Depois contem o resto.",
   ],
 };
 function pickMsg(pool) { const a = COMBAT_MSGS[pool]; return a[Math.floor(Math.random() * a.length)]; }
@@ -4809,18 +4917,37 @@ function showCombatMsg(text, theme) {
   clearTimeout(combatMsgT);
   combatMsgT = setTimeout(() => { el.className = el.className.replace("cm-show", "").trim(); }, 3800);
 }
-// mensagem do INÍCIO do combate, conforme o evento celeste
+// Qual voz o turno tem. Ordem de prioridade: o que é mais raro e mais dramático fala
+// primeiro, senão a Lua Sangrenta (a cada 10 dias) perderia a vez para uma tempestade
+// (10% dos turnos) e o turno especial passaria sem ser anunciado.
+// Devolve [pool, tema] ou null para usar o pool padrão do momento.
+function combatTheme() {
+  if (bloodMoon()) return ["bloodmoon", "blood"];
+  if (blackSun()) return ["blacksun", "dark"];
+  if (S.isNight && moonPhase()) return ["fullmoon", null];
+  const w = S.weather;
+  if (w === "tempestade") return ["storm", null];
+  if (w === "turvo") return ["fog", null];
+  if (w === "perfeito") return ["clear", null];
+  return null;
+}
+// mensagem do INÍCIO do combate, conforme o evento celeste e o clima
 function combatStartMsg() {
-  if (bloodMoon()) showCombatMsg(pickMsg("bloodmoon"), "blood");
-  else if (blackSun()) showCombatMsg(pickMsg("blacksun"), "dark");
+  const t = combatTheme();
+  if (t) showCombatMsg(pickMsg(t[0]), t[1]);
   else showCombatMsg(pickMsg("start"));
 }
 // mensagem da METADE da horda
 function combatHalfMsg() {
-  if (bloodMoon()) showCombatMsg(pickMsg("bloodmoon"), "blood");
-  else if (blackSun()) showCombatMsg(pickMsg("blacksun"), "dark");
+  const t = combatTheme();
+  // No especial a voz do turno repete; no normal, a fala é a do meio da horda.
+  if (t && Math.random() < 0.5) showCombatMsg(pickMsg(t[0]), t[1]);
   else showCombatMsg(pickMsg("half"));
 }
+// muralhas no limite: uma vez por turno, para não virar alarme repetido
+function combatCritMsg() { showCombatMsg(pickMsg("critical"), "blood"); }
+// onda limpa
+function combatClearedMsg() { showCombatMsg(pickMsg("cleared")); }
 
 // ---------- Horda / eventos celestes ----------
 function moonPhase() { return S.day % 4 === 0; }
@@ -4958,6 +5085,7 @@ function renderAll() { renderHUD(); renderTowers(); renderCity(); renderSupplyRa
 // ---------- Onda / combate ----------
 let spawnQueue = [], spawnTimer = 0, supplyTimer = 0, lastT = 0;
 let waveTotal = 0, waveHalfShown = false; // total da horda e flag da mensagem "metade"
+let waveCritShown = false; // aviso de muralha no limite: uma vez por turno, nao um alarme
 // Fade in/out do astro (lua/sol): some no combate, reaparece no planejamento.
 let astroFade = 1, astroFadeT = 0;
 let qCd = {};        // cooldown dos quartéis de arqueiros
@@ -4982,7 +5110,7 @@ function startWave() {
   S.turnHitsLost = 0;
   qCd = {};
   blockPool = cityFxScan(c => c.built === "quartel", "block");
-  waveTotal = S.nextWave.length; waveHalfShown = false; // rastreio da metade da horda
+  waveTotal = S.nextWave.length; waveHalfShown = false; waveCritShown = false; // rastreio da metade da horda
   combatStartMsg();
   renderAll();
 }
@@ -5769,6 +5897,9 @@ function update(dt) {
     const alive = spawnQueue.length + S.warnings.length + (S.enemies.length - dead.length);
     if (waveTotal - alive >= waveTotal / 2) { waveHalfShown = true; combatHalfMsg(); }
   }
+  // Muralhas no limite: fala uma vez por turno. Sem a flag o aviso dispararia em todo
+  // frame enquanto o HP estiver baixo e viraria um letreiro preso na tela.
+  if (!waveCritShown && S.hits > 0 && S.hits <= 2) { waveCritShown = true; combatCritMsg(); }
   for (const e of dead) {
     // Roxo (Magia negra): chance do morto ressurgir como Sombra aliada temporária
     const spChance = facSpectralChance();
@@ -5872,6 +6003,9 @@ function tickStructs() {
 
 function endWave() {
   S.waveActive = false;
+  // Fala de onda limpa. Antes do overlay de fim de turno, senão ela apareceria atrás da
+  // caixa de texto e o jogador nunca a leria.
+  if (S.hits > 0) combatClearedMsg();
   tickExtractors(); // O Feudo produz e desgasta a cada turno
   favPunishTick();  // punições ativas dos Favores (Rei/Conde)
   $("conveyor").classList.remove("running");
@@ -6001,16 +6135,27 @@ function endWave() {
     saveGame();
     if (S.autoTurn) { addFloat(2, 0.15, `+${income} 🪙 · 🌙`, "#eecd5c"); scheduleAuto(); }
     else showOverlay("A noite se aproxima 🌙",
-      `As muralhas resistiram (${S.hits}/${maxHits()} hits).\n+${income} 🪙 do conselho da cidade.${evento}\n\nO vigia observa o horizonte, toque no astro da noite para ver o que vem.`);
+      `As muralhas resistiram (${S.hits}/${maxHits()} hits).\n+${income} 🪙 do conselho da cidade.${evento}\n\n${pickMsg("dusk")}`);
   }
   renderAll();
 }
 
 // Card do Evento Diário (ao amanhecer)
-function showDailyEvent(ev, income) {
-  const tierTxt = S.moraleLocked ? `\n\nO distrito está em ${moraleName(S.moraleLocked)}.` : "";
+function showDailyEvent(ev, income, cb) {
+  // Descrição e balanço do dia separados por uma régua: antes os números vinham no mesmo
+  // bloco de prosa e o jogador tinha que caçar o que mudou no meio do texto.
+  const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  // Tudo em <span> com display:block, não <hr>/<div>: o container é um <p>, que só aceita
+  // conteúdo de frase. O Chrome tolera o inválido aqui, mas se esse HTML for lido e
+  // reescrito em outro lugar o parser parte o parágrafo no primeiro bloco.
+  const tier = S.moraleLocked ? `<span class="ev-tier">O distrito está em ${esc(moraleName(S.moraleLocked))}.</span>` : "";
   showOverlay(`${ev.ic} Dia ${S.day}: ${ev.t}`,
-    `${ev.s}\n\n${effectText(ev)}\n+${income} 🪙 do conselho da cidade.${tierTxt}`);
+    `<span class="ev-story">${esc(ev.s)}</span>`
+    + `<span class="ev-rule"></span>`
+    + `<span class="ev-sum-t">O BALANÇO DO DIA</span>`
+    + `<span class="ev-chips">${effectChips(ev, income)}</span>`
+    + tier,
+    cb || null, "html");
 }
 
 // ---------- Teto do modo infinito (MVP) ----------
@@ -6222,9 +6367,12 @@ function loreHTML(txt) {
     // e o miolo da tela ficava esparramado. A separação passa a vir da margem do bloco.
     .replace(/\n*\*([^*]+)\*\n*/g, '<b class="lore-hi">$1</b>');
 }
-function showOverlay(title, text, cb, rich) {
+// mode: undefined = texto puro · "lore" = *asteriscos* viram destaque · "html" = HTML
+// já montado por quem chamou (só para telas internas, nunca para texto de fora).
+function showOverlay(title, text, cb, mode) {
   $("overlay-title").textContent = title;
-  if (rich) $("overlay-text").innerHTML = loreHTML(text);
+  if (mode === "html") $("overlay-text").innerHTML = text;
+  else if (mode === "lore") $("overlay-text").innerHTML = loreHTML(text);
   else $("overlay-text").textContent = text;
   overlayCb = cb || null;
   overlaySkipCb = null;                          // só sequências (re)armam o "Pular"
@@ -6254,7 +6402,7 @@ function showOverlaySeq(screens, done) {
   const step = () => {
     if (i >= screens.length) { done && done(); return; }
     const [title, text] = screens[i++];
-    showOverlay(title, text, step, true);   // rich: a abertura tem trechos em destaque
+    showOverlay(title, text, step, "lore");   // a abertura tem trechos em destaque
     overlaySkipCb = () => { i = screens.length; done && done(); };
     $("overlay-skip").classList.remove("hidden");
   };
@@ -8151,7 +8299,9 @@ $("btn-infinito").onclick = () => {
     ], () => {
       // O evento do dia 1 nunca é pulado: ele explica o modificador já aplicado.
       // Fechado ele, o tutorial roda SOBRE o campo, com o jogo já à vista.
-      showOverlay(`${DAY1_EVENT.ic} Dia 1: ${DAY1_EVENT.t}`, `${DAY1_EVENT.s}\n\n${effectText(DAY1_EVENT)}`, runTutorial);
+      // Pelo showDailyEvent para o evento do dia 1 ter a MESMA régua e as mesmas fichas
+      // dos outros dias. Sem income: no dia 1 o conselho ainda não pagou nada.
+      showDailyEvent(DAY1_EVENT, null, runTutorial);
     });
   });
 };

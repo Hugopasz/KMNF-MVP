@@ -1752,6 +1752,26 @@ html, body {
 @media (prefers-reduced-motion: reduce) {
   #overlay-text .lore-hi { animation: none; text-shadow: 0 0 12px rgba(232,201,92,.5); }
 }
+/* Evento do dia: prosa em cima, régua, e o balanço em fichas. A régua é o que separa
+   "o que aconteceu" de "o que isso te custou", que antes vinham no mesmo parágrafo. */
+#overlay-text .ev-story { display: block; }
+#overlay-text .ev-rule {
+  display: block; height: 2px; margin: 16px 0 12px;
+  background: linear-gradient(90deg, transparent, rgba(201,162,39,.8), transparent);
+}
+#overlay-text .ev-sum-t {
+  display: block;
+  font-family: var(--display); font-size: 11px; letter-spacing: 2.5px;
+  color: rgba(232,201,92,.75); margin-bottom: 9px;
+}
+#overlay-text .ev-chips { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+#overlay-text .ev-chip {
+  font-size: 13px; padding: 4px 10px; border-radius: 999px; white-space: nowrap;
+  background: rgba(0,0,0,.4); border: 1px solid rgba(243,234,210,.2); color: var(--beige);
+}
+#overlay-text .ev-chip.up { border-color: rgba(143,220,122,.5); color: #a8e89a; }
+#overlay-text .ev-chip.down { border-color: rgba(224,95,95,.5); color: #ff9d8a; }
+#overlay-text .ev-tier { display: block; margin-top: 13px; font-size: 13.5px; color: var(--dim, #9b8f77); }
 /* Rodapé FORA da caixa, sobre o fundo escurecido: substitui o antigo "Continuar" */
 #overlay {
   flex-direction: column;
