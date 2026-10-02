@@ -6381,6 +6381,9 @@ const MOTES = Array.from({ length: 24 }, () => ({
 // performance.now(): no 5x a poeira, a chuva, as nuvens e a passada da horda aceleram
 // com o resto do mundo, em vez de ficarem num ritmo de relógio de parede.
 let vClock = 0;
+// Relógio do SANGUE, em segundos de mundo: não leva o multiplicador de velocidade e para
+// quando o campo não está à vista (pausa/menu). Ver frame() e drawBloodPools().
+let bClock = 0;
 
 // Paleta do ar: a névoa do horizonte e as partículas seguem o ciclo e os eventos celestes.
 function airTone() {
@@ -6760,10 +6763,12 @@ function ensureGroundTex(w, h) {
 // ---------- Sangue fresco ----------
 // Cada morto deixa uma poça que seca e some. Vive fora de S: é puramente decorativo,
 // não entra no save nem no update (some pelo relógio visual, então acelera no 5x).
-const BLOOD_LIFE = 24;     // segundos de vida da poça (era 6)
-// Vive 4x mais, então 4x mais poças coexistem no mesmo ritmo de mortes: o teto sobe
-// junto, senão o campo voltaria a limpar sozinho e a duração maior não apareceria.
-const BLOOD_MAX = 150;     // teto: no dia 30 morrem centenas por turno
+// A vida corre no bClock (segundos de MUNDO), não no vClock: ver frame().
+const BLOOD_LIFE = 70;     // segundos de vida da poça (era 24 de relógio visual)
+// O teto tem que acompanhar a vida, senão ele vira o verdadeiro limite e as poças somem
+// por DESPEJO em vez de secarem. Despejo é um pop instantâneo no meio do campo; secar é
+// um fade. A 4 mortes/s no dia 30, 70s de vida pedem ~280 poças vivas ao mesmo tempo.
+const BLOOD_MAX = 260;     // teto: no dia 30 morrem centenas por turno
 // Fração da vida em que a poça COMEÇA a secar. Antes o fade nascia no instante zero,
 // então esticar a duração só deixaria a mancha pálida por mais tempo, em vez de
 // realmente presente no chão. Mas segurar opacidade cheia a vida toda também não
@@ -6786,7 +6791,7 @@ function addBloodPool(lane, y) {
       ry: (burst ? 3 : 2.5) + Math.random() * (burst ? 7 : 5),
     });
   }
-  bloodPools.push({ lane, y, born: vClock, spots, burst });
+  bloodPools.push({ lane, y, born: bClock, spots, burst });
   if (burst) {
     // Animação própria: anel de respingo abrindo, separado da poça que fica no chão.
     S.effects.push({ x: lane, y, life: 0.42, max: 0.42, type: "burst" });
@@ -6798,9 +6803,9 @@ function drawBloodPools(laneW, h) {
   // O clamp em 0 não é zelo excessivo: se o relógio visual recuar (debug, seek de
   // animação), a idade fica negativa e o raio da elipse vai a negativo — o canvas lança
   // IndexSizeError e derruba o draw inteiro, levando o jogo junto.
-  bloodPools = bloodPools.filter(p => vClock - p.born < BLOOD_LIFE && vClock >= p.born);
+  bloodPools = bloodPools.filter(p => bClock - p.born < BLOOD_LIFE && bClock >= p.born);
   for (const p of bloodPools) {
-    const age = Math.max(0, Math.min(1, (vClock - p.born) / BLOOD_LIFE));
+    const age = Math.max(0, Math.min(1, (bClock - p.born) / BLOOD_LIFE));
     // cresce depressa no primeiro instante e depois seca devagar
     const spread = Math.max(0, Math.min(1, age * 24));
     const dry = Math.max(0, (age - BLOOD_DRY_AT) / (1 - BLOOD_DRY_AT));
@@ -6815,6 +6820,19 @@ function drawBloodPools(laneW, h) {
   }
 }
 
+// Fogo no chão. Desenhado DEPOIS do sangue: o fogo emite luz e a poça de sangue,
+// sendo opaca, estava pintada em cima dele e apagava a chama.
+function drawGroundFires(laneW, h) {
+  for (const gf of S.groundFires) {
+    const gx = gf.lane * laneW + laneW / 2, gy = gf.y * h;
+    const flick = 0.6 + 0.4 * Math.sin(performance.now() / 70 + gf.y * 40);
+    const gg = ctx.createRadialGradient(gx, gy, 2, gx, gy, gf.r * h * 1.4);
+    gg.addColorStop(0, `rgba(240,140,40,${0.5 * flick * Math.min(1, gf.t)})`);
+    gg.addColorStop(1, "transparent");
+    ctx.fillStyle = gg;
+    ctx.fillRect(gx - gf.r * h * 1.5, gy - gf.r * h * 1.5, gf.r * h * 3, gf.r * h * 3);
+  }
+}
 function drawGroundShadows(laneW, h) {
   ctx.fillStyle = "rgba(0,0,0,.32)";
   const blob = (lane, y, rx) => {
@@ -7042,17 +7060,6 @@ function draw() {
     ctx.fillRect(sx + 2, sy - 18, laneW - 4, 36);
     ctx.fillStyle = "rgba(255,244,255,.85)";
     ctx.fillRect(sx + 2, sy - 1, laneW - 4, 2);
-  }
-
-  // fogo no chão
-  for (const gf of S.groundFires) {
-    const gx = gf.lane * laneW + laneW / 2, gy = gf.y * h;
-    const flick = 0.6 + 0.4 * Math.sin(performance.now() / 70 + gf.y * 40);
-    const gg = ctx.createRadialGradient(gx, gy, 2, gx, gy, gf.r * h * 1.4);
-    gg.addColorStop(0, `rgba(240,140,40,${0.5 * flick * Math.min(1, gf.t)})`);
-    gg.addColorStop(1, "transparent");
-    ctx.fillStyle = gg;
-    ctx.fillRect(gx - gf.r * h * 1.5, gy - gf.r * h * 1.5, gf.r * h * 3, gf.r * h * 3);
   }
 
   ctx.textAlign = "center";
@@ -7303,6 +7310,7 @@ function draw() {
   }
 
   drawBloodPools(laneW, h); // no chão, sob as sombras e a horda
+  drawGroundFires(laneW, h); // DEPOIS do sangue: fogo é luz, não mancha, e a poça o cobria
   drawGroundShadows(laneW, h);
   for (const e of S.enemies) {
     const t = ENEMY_TYPES[e.type];
@@ -7403,9 +7411,15 @@ function menusOpen() {
 }
 function frame(now) {
   requestAnimationFrame(frame);
-  const dt = Math.min(0.1, (now - lastT) / 1000) * S.debug.speed;
+  const raw = Math.min(0.1, (now - lastT) / 1000);
+  const dt = raw * S.debug.speed;
   lastT = now;
   vClock += dt;   // relógio VISUAL: já vem multiplicado pela velocidade do jogo
+  // Relógio do SANGUE: segundos de mundo, sem o multiplicador de velocidade e parado
+  // quando o jogador não está olhando o campo. A mancha é um vestígio, não uma animação:
+  // no 3x ela secava em 8s reais e o campo amanhecia limpo depois de qualquer virada de
+  // turno; e um minuto no menu de pausa não deveria apagar a noite anterior.
+  if (!S.paused && !menusOpen()) bClock += raw;
   update(dt);
   if (menusOpen()) return;
   syncLiveRes();
