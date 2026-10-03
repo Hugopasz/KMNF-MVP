@@ -334,9 +334,9 @@ html, body {
 .tower-slot .ammo-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 1px 4px; line-height: 1.1; }
 .tower-slot .ammo { font-size: 11px; color: var(--text); opacity: .9; font-weight: 700; }
 .tower-slot .ammo.empty { color: #ff8a6a; opacity: 1; animation: ammo-blink 1s steps(2) infinite; }
-/* Estoque de Munições: o total ocupa a linha inteira e os tipos guardados vêm embaixo,
-   senão "🗃️30/30" e três munições disputariam a mesma linha de 11px. */
-.tower-slot .ammo.dep-tot { flex: 0 0 100%; color: var(--gold-hi); opacity: 1; }
+/* O Estoque mostra uma vaga por tipo, como as torres de várias munições. Vaga vazia
+   só apaga: não é alarme como a de uma torre sem munição. */
+.tower-slot .ammo.dep-vazio { opacity: .3; }
 @keyframes ammo-blink { 50% { opacity: .45; } }
 .tower-slot .stars {
   position: absolute; top: 2px; left: 0; right: 0;

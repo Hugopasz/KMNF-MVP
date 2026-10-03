@@ -2307,10 +2307,14 @@ const VTREES = {
            { id: "camp",    n: "Campeões",           d: "Tropas: +30% vida e +10% dano", fx: { tHp: .3, tD: .1 } }],
     },
     guarn: {
-      l3: [{ id: "muralhaV", n: "Muralha Viva",  d: "Bloqueia +1 por turno",       fx: { block: 1 } },
-           { id: "lanc",     n: "Lanceiros",     d: "Bloqueia +1 e tropas +10% vida", fx: { block: 1, tHp: .1 } }],
-      l4: [{ id: "escudos",  n: "Escudos Altos", d: "Bloqueia +1 por turno",       fx: { block: 1 } },
-           { id: "contra",   n: "Contra-ataque", d: "Bloqueios rendem 🪙 normal",  fx: { block: 1, bGold: 1 } }],
+      // Os dois primeiros níveis eram botões, não escolhas: "Muralha Viva" e "Escudos
+      // Altos" davam exatamente +1 bloqueio, o mesmo dos irmãos, que ainda somavam vida
+      // de tropa e ouro por cima. Agora um lado é QUANTIDADE de bloqueio e o outro é o
+      // que cada bloqueio devolve.
+      l3: [{ id: "muralhaV", n: "Muralha Viva",  d: "Bloqueia +1 e a muralha remenda 1 por dia", fx: { block: 1, repair: 1 } },
+           { id: "lanc",     n: "Lanceiros",     d: "Bloqueia +1 e tropas +15% vida", fx: { block: 1, tHp: .15 } }],
+      l4: [{ id: "escudos",  n: "Escudos Altos", d: "Bloqueia +2 por turno",       fx: { block: 2 } },
+           { id: "contra",   n: "Contra-ataque", d: "Bloqueia +1 e bloqueios rendem 🪙", fx: { block: 1, bGold: 1 } }],
       l5: [{ id: "falange",  n: "Falange Eterna",d: "+1 hit máximo das muralhas",    fx: { hitMax: 1 } },
            { id: "ving",     n: "Vingança",      d: "Bloqueia +2 por turno",       fx: { block: 2 } }],
     },
@@ -2973,11 +2977,14 @@ const MAX_LVL = 5;
 
 // ---------- Prestígio de torres (objetivo opcional de end-game) ----------
 // No nível máximo a torre pode PRESTIGIAR (mantém o build): +60% dano e +10% cadência
-// PERMANENTES e empilháveis, até 3 vezes. Custo exponencial sobre o climb cheio (535🪙): ×3/×9/×27.
+// PERMANENTES e empilháveis, até 3 vezes. Custo sobre o climb cheio (535🪙), ×1,6 por
+// degrau: 856 / 1370 / 2192, 4418 no total. Era ×3/×9/×27 (1605/4815/14445), e os dois
+// últimos degraus passavam do que uma run inteira arrecada: o terceiro prestígio não era
+// caro, era inalcançável. Continua sendo o projeto de end-game mais caro do jogo.
 const PRESTIGE_MAX = 3;
 const FULL_CLIMB_COST = EV_COST_TOWER.reduce((a, b) => a + b, 0); // 535
 function prestigeOf(t) { return t.prestige || 0; }
-function prestigeCost(p) { return FULL_CLIMB_COST * Math.pow(3, p + 1); } // p atual → 645/1935/5805
+function prestigeCost(p) { return Math.round(FULL_CLIMB_COST * Math.pow(1.6, p + 1)); }
 function prestigeDmgMult(t) { return Math.pow(1.6, prestigeOf(t)); }
 function prestigeRateMult(t) { return Math.pow(1.1, prestigeOf(t)); }
 const PRESTIGE_STAR = ["#f2d64a", "#ff5a4a", "#c89aff", "#ffd24a"]; // 0 amarela · 1 vermelha · 2 roxa · 3 dourada
@@ -3191,7 +3198,9 @@ function tryAura(pts) {
 const POWER_DPS = 3.9;        // dano por segundo, de leve, só uma ajuda (era 3)
 const POWER_RADIUS = 13;      // alcance da linha em px (nerfado de 20)
 const POWER_LIFE = 0.45;      // segundos até a linha se dissipar (some bem rápido)
-const POWER_MAX_PTS = 20;     // limite de comprimento do traço = menos distância (nerfado de 36)
+// Energia base do cajado: quantos pontos o traço comporta antes de acabar. Era 20, e
+// fechar uma forma em volta de um inimigo nos primeiros dias não cabia no traço.
+const POWER_MAX_PTS = 25;     // limite de comprimento do traço = menos distância (nerfado de 36)
 const SEAL_DMG = 20;          // dano extra do selo (traço fechado ao redor do inimigo) (era 15)
 const SEAL_CLOSE_PX = 34;     // distância máxima entre início e fim para fechar o selo
 
@@ -4237,13 +4246,19 @@ function renderTowers() {
       // estrelas = nível; COR = prestígio (0 amarela · 1 vermelha · 2 roxa · 3 dourada)
       const pc = PRESTIGE_STAR[prestigeOf(t)];
       const stars = t.lvl > 1 ? `<span class="stars" style="color:${pc};text-shadow:0 0 6px ${pc}">${"★".repeat(Math.min(5, t.lvl - 1))}</span>` : "";
-      // Estoque: mostra o que está GUARDADO por tipo, não o que consome (não consome
-      // nada). O total aparece junto do teto, senão o jogador não sabe quanto ainda cabe.
+      // Estoque: uma vaga por TIPO que o galpão aceita, cada uma enchendo sozinha, igual
+      // a uma torre de três munições. O total com o teto saiu: era mais um número para
+      // ler num slot pequeno, e a vaga vazia já conta a mesma história.
       const parts = tt.support === "depot"
         ? (() => {
-            const st = Object.entries(t.stock || {}).filter(([, n]) => n > 0);
-            const tot = `<span class="ammo dep-tot">🗃️${depotTotal(t)}/${depotCap(t)}</span>`;
-            return tot + st.map(([a, n]) => `<span class="ammo">${AMMO[a].icon}${n}</span>`).join("");
+            const tipos = depotTypes(i);
+            if (!tipos.length) return `<span class="ammo dep-vazio">🗃️0</span>`;
+            // Vaga vazia aqui é NORMAL (o galpão enche com a sobra), então ela só apaga.
+            // O vermelho piscando do `.empty` é alarme de torre sem munição.
+            return tipos.map(a => {
+              const n = (t.stock && t.stock[a]) || 0;
+              return `<span class="ammo${n === 0 ? " dep-vazio" : ""}">${AMMO[a].icon}${n}</span>`;
+            }).join("");
           })()
         : tt.fuel
         ? `<span class="ammo${fuelPool(tt.fuel.k) < tt.fuel.cost ? " empty" : ""}">${FUEL_ICON[tt.fuel.k]}${Math.floor(fuelPool(tt.fuel.k))}</span>`
