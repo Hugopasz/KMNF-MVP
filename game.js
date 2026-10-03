@@ -1455,13 +1455,20 @@ ASTRO_IMG.night.src = "ICONE-NOITE.png?v=2";
 
 // ---------- Holofote e Moedor de Plebe ----------
 // HOLOFOTE: não fere ninguém. Acende UMA lane e tudo que atira ali bate mais forte, crita
-// mais e acerta mais rápido. Demora SPOT_MOVE_SEC para mudar de foco, então escolher a
-// lane certa é uma decisão, não um reflexo — é o preço de um suporte tão forte.
-const SPOT_MOVE_SEC = 8;     // tempo parado antes de poder varrer para outra lane
+// mais e acerta mais rápido. O facho persegue a FRENTE da horda, com SPOT_MOVE_SEC de
+// atraso para virar: é esse atraso que o caminho Torre compra.
+// Eram 8s. Com a mira "near" varrendo o campo inteiro, a frente muda a cada abate, e um
+// facho oito segundos atrasado acendia a lane errada: medido, o Holofote base rendia ao
+// grupo MENOS que o posto vazio (89,7 contra 90,2 de vazão).
+const SPOT_MOVE_SEC = 3;     // tempo parado antes de poder varrer para outra lane
 const SPOT_DMG = 0.3;        // +30% de dano na lane acesa
 const SPOT_CRIT = 0.15;      // +15 pontos percentuais de crítico
 const SPOT_SPEED = 0.75;     // projéteis viajam mais rápido: menos tiro desperdiçado
-let litLanes = new Set();    // recalculado a cada update, a partir dos holofotes vivos
+// Mapa lane -> { critC, critM } do holofote que acende a lane. Era um Set de lanes, e
+// por isso o caminho Lente do Holofote ("+25% de crítico na lane acesa") não fazia NADA:
+// o crítico é lido do `fx` da torre que ATIRA, e o holofote nunca atira. O bônus dele
+// precisa viajar com a lane, não com o projétil.
+let litLanes = new Map();    // recalculado a cada update, a partir dos holofotes vivos
 // MOEDOR DE PLEBE: mói uma tropa a cada GRIND_EVERY segundos e o sangue anima o resto.
 // Não consome munição — consome VIDAS, que custaram ouro no Portão. Expira no fim do turno.
 const GRIND_EVERY = 30, GRIND_DUR = 25, GRIND_MULT = 0.5;
@@ -1594,28 +1601,39 @@ function depotTotal(t) { return Object.values(t.stock || {}).reduce((s, n) => s 
 // Tipos que ESTE Estoque aceita. O que já está guardado vem primeiro: se o jogador
 // trocar a torre vizinha, a munição antiga continua servindo até acabar, em vez de
 // virar espaço morto. Depois entram os tipos das vizinhas, até o limite de DEPOT_TYPES.
+// Quantos postos de cada lado o depósito alcança e quantos tipos ele comporta
+// (caminho Carregadores). Numa muralha de torres Avançadas são duas munições por torre,
+// e o galpão base guarda só três tipos: é aí que o braço curto aparece.
+function depotReach(t) { return 1 + (towerFx(t).reach || 0); }
+function depotTypeMax(t) { return DEPOT_TYPES + (towerFx(t).types || 0); }
+function depotSlots(slot, reach) {
+  const out = [];
+  for (let d = 1; d <= reach; d++) { out.push(slot - d); out.push(slot + d); }
+  return out;
+}
 function depotTypes(slot) {
   const t = S.towers[slot];
   if (!t) return [];
   const out = Object.keys(t.stock || {}).filter(a => (t.stock[a] || 0) > 0);
-  // Reparte as vagas em RODADAS entre as duas vizinhas. Varrer a lista de uma antes
+  // Reparte as vagas em RODADAS entre as vizinhas. Varrer a lista de uma antes
   // da outra deixava uma torre de 3 munições ocupar as 3 vagas e a do outro lado
   // seca — justamente o contrário do que um depósito entre duas torres serve para.
-  const filas = [slot - 1, slot + 1]
+  const filas = depotSlots(slot, depotReach(t))
     .map(j => S.towers[j])
     .filter(n => n && !isDepot(n) && !TOWER_TYPES[n.type].fuel)
     .map(n => towerAmmos(n.type).slice());
+  const maxT = depotTypeMax(t);
   let mexeu = true;
-  while (mexeu && out.length < DEPOT_TYPES) {
+  while (mexeu && out.length < maxT) {
     mexeu = false;
     for (const f of filas) {
       while (f.length && out.includes(f[0])) f.shift();
-      if (!f.length || out.length >= DEPOT_TYPES) continue;
+      if (!f.length || out.length >= maxT) continue;
       out.push(f.shift());
       mexeu = true;
     }
   }
-  return out.slice(0, DEPOT_TYPES);
+  return out.slice(0, maxT);
 }
 function depotRoom(t) { return Math.max(0, depotCap(t) - depotTotal(t)); }
 // Crédito na CHEGADA da caixa, igual às torres. Guardar no despacho adiantaria a
@@ -1632,9 +1650,11 @@ function depotAdjFx(t) {
   const slot = S.towers.indexOf(t);
   if (slot < 0) return null;
   let rate = 0, save = 0;
-  for (const j of [slot - 1, slot + 1]) {
+  for (let j = 0; j < LANES; j++) {
     const d = S.towers[j];
-    if (!isDepot(d)) continue;
+    // O galpão dá a mão a quem ele ALCANÇA (ver depotReach): com o caminho Carregadores
+    // a disciplina dele vale para a muralha inteira, não só para as duas encostadas.
+    if (j === slot || !isDepot(d) || Math.abs(j - slot) > depotReach(d)) continue;
     const fx = towerFx(d);
     rate += DEPOT_RATE + (fx.adjRate || 0);
     save += DEPOT_SAVE + (fx.adjSave || 0);
@@ -1652,7 +1672,7 @@ function tickDepots(dt) {
     if (!isDepot(d) || !depotTotal(d)) continue;
     const fx = towerFx(d);
     const perPush = DEPOT_FEED + (fx.feed || 0);
-    for (const j of [i - 1, i + 1]) {
+    for (const j of depotSlots(i, depotReach(d))) {
       const n = S.towers[j];
       if (!n || isDepot(n) || TOWER_TYPES[n.type].fuel) continue;
       for (const a of towerAmmos(n.type)) {
@@ -1944,11 +1964,20 @@ function factoryStarved(c) {
   return !!(b && b.feed && !cellOff(c) && groupStock(c.gid) <= 0);
 }
 // Espaço que as torres ainda comportam desta munição. 0 = ninguém aceita.
+// O Estoque de Munições conta aqui. Sem ele nesta soma a produção parava no instante em
+// que as torres enchiam, e o depósito NUNCA acumulava reserva — medido: fábrica nível 5,
+// 90s de planejamento, depósito com teto 50 e nada guardado. O galpão existe justamente
+// para encher enquanto ninguém atira.
 function ammoDemand(type) {
   let d = 0;
   for (let i = 0; i < S.towers.length; i++) {
     const t = S.towers[i];
-    if (!t || !TOWER_TYPES[t.type].ammos.includes(type)) continue;
+    if (!t) continue;
+    if (isDepot(t)) {
+      if (depotTypes(i).includes(type)) d += Math.max(0, depotRoom(t) - pendingTotal(i));
+      continue;
+    }
+    if (!TOWER_TYPES[t.type].ammos.includes(type)) continue;
     d += towerRoom(t, i, type);   // espaço livre MENOS o que já vem na esteira
   }
   return d;
@@ -2321,7 +2350,10 @@ const VTREES = {
     },
     festival: {
       l3: [{ id: "process", n: "Procissão", d: "+1 💎 se o turno fechar sem perder hit", fx: { hNoHit: 1 } },
-           { id: "taverna", n: "Taverna",   d: "Moral global +5%",                fx: { moralG: .05 } }],
+           // O efeito sempre foi cadência de torre (ver moralBoost/towerRate), nunca
+           // moral: nada no sistema de moral lia esta chave. O nome do nó segue o mesmo,
+           // o texto passou a dizer a verdade.
+           { id: "taverna", n: "Taverna",   d: "TODAS as torres: +5% de cadência", fx: { rateG: .05 } }],
       l4: [{ id: "carna",   n: "Carnaval",  d: "+2% eficiência por vizinho",      fx: { eN: .02 } },
            { id: "vigilia", n: "Vigília",   d: "Avisos de chegada +1s",           fx: { warn: 1 } }],
       l5: [{ id: "sagrado", n: "Dia Sagrado",       d: "+2 💎 por turno sem perder hit", fx: { hNoHit: 2 } },
@@ -2347,7 +2379,8 @@ const TOWER_PATHS = {
         { n: "Balista Divina",  d: "O virote varre a lane inteira; dano +50%",fx: { pierce: 9, d: .5 } },
       ] },
       { key: "cadencia", name: "Cadência", tiers: [
-        { n: "Besta de Repetição", d: "Cadência +50%, dano −20%",            fx: { r: .5, d: -.2 } },
+        // Sem o −20% de dano: era o caminho mais fraco da Besta em toda cena medida.
+        { n: "Besta de Repetição", d: "Cadência +50%",                       fx: { r: .5 } },
         { n: "Metralha",           d: "Cadência +40%",                        fx: { r: .4 } },
         { n: "Tempestade de Virotes", d: "Cadência +60% e 25% de crítico ×2", fx: { r: .6, critC: .25, critM: 2 } },
       ] },
@@ -2362,10 +2395,16 @@ const TOWER_PATHS = {
     { key: "poder", name: "Poder", tiers: [
       { n: "Contrapeso de Ferro", d: "Dano +50%",                        fx: { d: .5 } },
       { n: "Projétil Duplo",      d: "Dano ×2, consome 2 projéteis",     fx: { d: 1, cost: 1 } },
-      { n: "Punho de Karzstak",   d: "Dano ×3, cadência −30%",           fx: { d: 2, r: -.3 } },
+      // Sem o freio de cadência. O arquétipo "golpe enorme, mais lento" estava medido
+      // como PIORA: o inimigo médio tem 123 de vida, o excesso do golpe se perde, e cada
+      // tiro a menos é um alvo a menos. Nove tiers 3 do jogo tinham esse formato.
+      { n: "Punho de Karzstak",   d: "Dano ×3",                          fx: { d: 2 } },
     ] },
     { key: "estilhaco", name: "Estilhaços", tiers: [
-      { n: "De Estilhaços", d: "Área +50%, dano −25%",                   fx: { aoeM: .5, d: -.25 } },
+      // Sem o −25% de dano: a Catapulta já tem área 1, que cobre a fila inteira, então
+      // +50% de área quase não acrescentava alvo e o corte no dano era o efeito líquido
+      // (medido: 19,9 -> 15,6 de vazão no primeiro tier).
+      { n: "De Estilhaços", d: "Área +50%",                             fx: { aoeM: .5 } },
       { n: "Bombardeio",    d: "+2 alvos, área +20%",                    fx: { extra: 2, aoeM: .2 } },
       { n: "Chuva de Meteoros", d: "+2 alvos, atordoa 1s",              fx: { extra: 2, stun: 1 } },
     ] },
@@ -2384,7 +2423,11 @@ const TOWER_PATHS = {
     { key: "alcance", name: "Alcance", tiers: [
       { n: "Transbordante", d: "Alcança metade do campo",                fx: { range: .4 } },
       { n: "Cascata",       d: "+1 alvo e escorre 2 atrás",              fx: { extra: 1, pierce: 2 } },
-      { n: "Dilúvio Negro", d: "Campo inteiro, cadência −30%",           fx: { rangeAll: 1, r: -.3 } },
+      // Era alcance total com −30% de cadência, e isso media −25% de dano nas duas arenas:
+      // com a mira padrão a torre atira no inimigo mais perto de qualquer jeito, então
+      // alcance extra quase não muda o alvo — só o freio aparecia. Agora o campo inteiro
+      // vem com um alvo a mais, que é o que faz o alcance render.
+      { n: "Dilúvio Negro", d: "Campo inteiro e +1 alvo",               fx: { rangeAll: 1, extra: 1 } },
     ] },
     { key: "alquimico", name: "Alquímico", tiers: [
       { n: "Alquímico",   d: "Ácido corrói resistências",               fx: { shredHit: 1 } },
@@ -2424,9 +2467,9 @@ const TOWER_PATHS = {
       // O texto precisa dizer "tira" e "furando armadura": o bônus é somado DEPOIS da
       // redução por armadura (ver projectileHit), e é justamente isso que faz alguém
       // escolher este caminho em vez do Focalizador, que é dano puro e apanha da armadura.
-      { n: "Umbral",    d: "Tira 5% da vida máx. do alvo, furando armadura", fx: { maxhp: .05 } },
+      { n: "Umbral",    d: "Tira 6% da vida máx. do alvo, furando armadura", fx: { maxhp: .06 } },
       { n: "Maldição",  d: "Marcados tomam +30% de tudo",              fx: { mark: .3 } },
-      { n: "Devorador de Almas", d: "Mais 5% da vida máx. (10% no total) e +15% de 💎", fx: { maxhp: .05, kh: .15 } },
+      { n: "Devorador de Almas", d: "Mais 8% da vida máx. (14% no total) e +15% de 💎", fx: { maxhp: .08, kh: .15 } },
     ] },
   ] },
   acido: { paths: [
@@ -2467,7 +2510,7 @@ const TOWER_PATHS = {
     { key: "calibre", name: "Calibre", tiers: [
       { n: "Bala de Aço",  d: "Dano +60%",                              fx: { d: .6 } },
       { n: "Perfurante",   d: "+80% vs resistentes",                    fx: { vsArm: .8 } },
-      { n: "Bomba de Cerco", d: "Dano ×2, cadência −20%",               fx: { d: 1, r: -.2 } },
+      { n: "Bomba de Cerco", d: "Dano ×2",                              fx: { d: 1 } },
     ] },
     { key: "bombardeio", name: "Bombardeio", tiers: [
       { n: "Metralha",  d: "+1 alvo e área +30%",                       fx: { extra: 1, aoeM: .3 } },
@@ -2498,10 +2541,13 @@ const TOWER_PATHS = {
     ] },
   ] },
   soprador: { paths: [
+    // O Soprador JÁ congela de fábrica (slow .5 na torre base), então um caminho de só
+    // lentidão repetia o que a torre faz de graça: 30% do melhor irmão, o pior número da
+    // auditoria. Agora o gelo abre o inimigo para o resto da muralha.
     { key: "geada", name: "Geada", tiers: [
-      { n: "Congelante",     d: "Inimigos 30% mais lentos",             fx: { slow: .3 } },
-      { n: "Nevoeiro Gélido", d: "Atordoa 1s",                          fx: { stun: 1 } },
-      { n: "Zero Absoluto",  d: "50% lentos e atordoa 1s",              fx: { slow: .5, stun: 1 } },
+      { n: "Congelante",     d: "30% mais lentos e tomam +15%",         fx: { slow: .3, mark: .15 } },
+      { n: "Nevoeiro Gélido", d: "Atordoa 1s e dano +30%",              fx: { stun: 1, d: .3 } },
+      { n: "Zero Absoluto",  d: "50% lentos, atordoa 1s, +30% e dano +40%", fx: { slow: .5, stun: 1, mark: .3, d: .4 } },
     ] },
     { key: "nevasca", name: "Nevasca", tiers: [
       { n: "Rajada",   d: "Área +50%",                                  fx: { aoeM: .5 } },
@@ -2518,7 +2564,7 @@ const TOWER_PATHS = {
     { key: "refracao", name: "Refração", tiers: [
       { n: "Lente Focal",  d: "Dano +60%",                              fx: { d: .6 } },
       { n: "Prisma Duplo", d: "25% de crítico ×3",                      fx: { critC: .25, critM: 3 } },
-      { n: "Feixe Concentrado", d: "Dano ×2, cadência −20%",            fx: { d: 1, r: -.2 } },
+      { n: "Feixe Concentrado", d: "Dano ×2",                           fx: { d: 1 } },
     ] },
     { key: "espectro", name: "Espectro", tiers: [
       { n: "Dispersão", d: "+1 elo",                                    fx: { chain: 1 } },
@@ -2527,8 +2573,8 @@ const TOWER_PATHS = {
     ] },
     { key: "luz", name: "Luz", tiers: [
       { n: "Marca de Luz", d: "Marcados tomam +25%",                    fx: { mark: .25 } },
-      { n: "Radiância",   d: "+30% vs resistentes",                     fx: { vsArm: .3 } },
-      { n: "Julgamento",  d: "Abaixo de 20% morrem",                    fx: { exec: .2 } },
+      { n: "Radiância",   d: "+50% vs resistentes",                     fx: { vsArm: .5 } },
+      { n: "Julgamento",  d: "Abaixo de 20% morrem e dano +30%",        fx: { exec: .2, d: .3 } },
     ] },
   ] },
   lancaacido: { paths: [
@@ -2537,10 +2583,13 @@ const TOWER_PATHS = {
       { n: "Ácido Real",  d: "Corrói resistências",                    fx: { shredHit: 1, vsArm: .5 } },
       { n: "Solvente Universal", d: "Dano +60% e +80% vs resistentes", fx: { d: .6, vsArm: .8 } },
     ] },
+    // Perfuração PURA, sem uma gota de dano, era o caminho mais fraco do jogo em todas
+    // as quatro cenas (42% do melhor irmão). O irmão equivalente da Balista (Perfuração)
+    // leva dano e anti-resistente junto — é isso que faz o furo valer.
     { key: "jato", name: "Jato", tiers: [
       { n: "Jato Pressurizado", d: "Perfura 2 atrás",                  fx: { pierce: 2 } },
-      { n: "Lança Longa", d: "Mira o mais distante e perfura +2",      fx: { far: 1, pierce: 2 } },
-      { n: "Lança de Guerra", d: "Varre a lane inteira",               fx: { pierce: 9 } },
+      { n: "Lança Longa", d: "Mira o mais distante, perfura +2, dano +30%", fx: { far: 1, pierce: 2, d: .3 } },
+      { n: "Lança de Guerra", d: "Varre a lane, +1 alvo e dano +30%",  fx: { pierce: 9, extra: 1, d: .3 } },
     ] },
     { key: "pecanha", name: "Peçonha", tiers: [
       { n: "Venenosa",   d: "Veneno 3/s",                              fx: { poison: 3 } },
@@ -2559,10 +2608,14 @@ const TOWER_PATHS = {
       { n: "Ressaca",    d: "+1 alvo e empurra",                       fx: { extra: 1, knock: .05 } },
       { n: "Maremoto",   d: "Campo inteiro e +1 alvo",                 fx: { rangeAll: 1, extra: 1 } },
     ] },
+    // Controle SOZINHO não defende: prender sem matar só adia a fila, e uma torre não
+    // tranca cinco lanes com um ciclo de tiro. Medido, era o pior caminho da torre em
+    // todas as cenas e nem afastava a morte da muralha. A marca transforma o controle em
+    // dano do GRUPO, que é o que um caminho de controle deveria fazer.
     { key: "turbilhao", name: "Turbilhão", tiers: [
-      { n: "Redemoinho", d: "30% mais lentos",                         fx: { slow: .3 } },
-      { n: "Vórtice",    d: "Atordoa 1s",                              fx: { stun: 1 } },
-      { n: "Maelström",  d: "50% lentos e atordoa 1s",                 fx: { slow: .5, stun: 1 } },
+      { n: "Redemoinho", d: "30% mais lentos e tomam +15%",            fx: { slow: .3, mark: .15 } },
+      { n: "Vórtice",    d: "Atordoa 1s e dano +30%",                  fx: { stun: 1, d: .3 } },
+      { n: "Maelström",  d: "50% lentos, atordoa 1s e tomam +30%",     fx: { slow: .5, stun: 1, mark: .3 } },
     ] },
   ] },
   cacadores: { paths: [
@@ -2577,16 +2630,16 @@ const TOWER_PATHS = {
       { n: "Enxame de Lâminas", d: "+2 alvos e cadência +40%",         fx: { extra: 2, r: .4 } },
     ] },
     { key: "armadilha", name: "Armadilha", tiers: [
-      { n: "Ponta Envenenada", d: "Veneno 3/s",                        fx: { poison: 3 } },
-      { n: "Rede de Caça", d: "20% mais lentos",                       fx: { pSlow: .2, poison: 2 } },
-      { n: "Cilada Mortal", d: "Marca +30%; abaixo de 15% morrem",     fx: { mark: .3, exec: .15 } },
+      { n: "Ponta Envenenada", d: "Veneno 4/s",                        fx: { poison: 4 } },
+      { n: "Rede de Caça", d: "Veneno +3/s e 20% mais lentos",         fx: { pSlow: .2, poison: 3 } },
+      { n: "Cilada Mortal", d: "Veneno +6/s, marca +30%; abaixo de 15% morrem", fx: { mark: .3, exec: .15, poison: 6 } },
     ] },
   ] },
   serras: { paths: [
     { key: "serra", name: "Serra", tiers: [
       { n: "Dente de Aço",  d: "Dano +50%",                            fx: { d: .5 } },
       { n: "Serra de Guerra", d: "+80% vs resistentes",               fx: { vsArm: .8 } },
-      { n: "Roda Dentada",  d: "Dano ×2, cadência −20%",              fx: { d: 1, r: -.2 } },
+      { n: "Roda Dentada",  d: "Dano ×2",                             fx: { d: 1 } },
     ] },
     { key: "velocidade", name: "Velocidade", tiers: [
       { n: "Eixo Lubrificado", d: "Cadência +50%",                     fx: { r: .5 } },
@@ -2608,7 +2661,7 @@ const TOWER_PATHS = {
     { key: "ceifa", name: "Ceifa", tiers: [
       { n: "Foice Afiada", d: "Dano +60%",                             fx: { d: .6 } },
       { n: "Ceifadora",  d: "+80% vs resistentes",                     fx: { vsArm: .8 } },
-      { n: "Colheita Sombria", d: "Dano ×2, cadência −20%",            fx: { d: 1, r: -.2 } },
+      { n: "Colheita Sombria", d: "Dano ×2",                           fx: { d: 1 } },
     ] },
     { key: "terror", name: "Terror", tiers: [
       { n: "Aura de Medo", d: "30% mais lentos",                       fx: { slow: .3 } },
@@ -2637,7 +2690,7 @@ const TOWER_PATHS = {
     { key: "feixe", name: "Feixe", tiers: [
       { n: "Lente Solar", d: "Dano +70%",                              fx: { d: .7 } },
       { n: "Chama Solar", d: "25% de crítico ×3",                      fx: { critC: .25, critM: 3 } },
-      { n: "Supernova",   d: "Dano ×2, cadência −20%",                 fx: { d: 1, r: -.2 } },
+      { n: "Supernova",   d: "Dano ×2",                                fx: { d: 1 } },
     ] },
     { key: "aurora", name: "Aurora", tiers: [
       { n: "Reflexo",     d: "+1 elo",                                 fx: { chain: 1 } },
@@ -2646,32 +2699,35 @@ const TOWER_PATHS = {
     ] },
     { key: "purificacao", name: "Purificação", tiers: [
       { n: "Luz Sagrada", d: "Marcados tomam +25%",                    fx: { mark: .25 } },
-      { n: "Brasa Solar", d: "Deixa fogo no chão",                     fx: { ground: 5 } },
-      { n: "Juízo Final", d: "Fogo +6/s; abaixo de 20% morrem",        fx: { ground: 6, exec: .2 } },
+      { n: "Brasa Solar", d: "Deixa fogo no chão (5/s)",               fx: { ground: 5 } },
+      { n: "Juízo Final", d: "Fogo +10/s, poça maior; abaixo de 20% morrem", fx: { ground: 10, groundR: .04, exec: .2 } },
     ] },
   ] },
   midas: { paths: [
     { key: "ganancia", name: "Ganância", tiers: [
       { n: "Cunhagem Pesada", d: "Dano +60%",                          fx: { d: .6 } },
       { n: "Ouro Maciço", d: "+80% vs resistentes",                    fx: { vsArm: .8 } },
-      { n: "Peso do Tesouro", d: "Dano ×2, cadência −20%",             fx: { d: 1, r: -.2 } },
+      { n: "Peso do Tesouro", d: "Dano ×2",                            fx: { d: 1 } },
     ] },
     { key: "chuvaouro", name: "Chuva de Ouro", tiers: [
       { n: "Moedas Espalhadas", d: "+1 alvo e área +30%",              fx: { extra: 1, aoeM: .3 } },
       { n: "Cofre Estourado", d: "+2 alvos",                           fx: { extra: 2 } },
       { n: "Fortuna",     d: "+2 alvos e área +40%",                   fx: { extra: 2, aoeM: .4 } },
     ] },
+    // 6 🪙 por abate (os três tiers somavam) rendiam 442 🪙 em 80s de horda, contra 42 de
+    // saque normal: dez vezes a economia do jogo numa torre só. Agora são 3 no total,
+    // que ainda é o dobro do que a melhor praça de ouro dá por turno.
     { key: "toque", name: "Toque de Midas", tiers: [
       { n: "Toque Dourado", d: "+1 🪙 por abate",                      fx: { kg: 1 } },
-      { n: "Alquimia Real", d: "+2 🪙 por abate e marca +25%",         fx: { kg: 2, mark: .25 } },
-      { n: "Rei Midas",   d: "Abaixo de 20% viram ouro (+3 🪙)",       fx: { exec: .2, kg: 3 } },
+      { n: "Alquimia Real", d: "Mais +1 🪙 por abate e marca +25%",    fx: { kg: 1, mark: .25 } },
+      { n: "Rei Midas",   d: "Abaixo de 20% viram ouro (+1 🪙, 3 no total)", fx: { exec: .2, kg: 1 } },
     ] },
   ] },
   baladeira: { paths: [
     { key: "estilingue", name: "Estilingue", tiers: [
       { n: "Correia Reforçada", d: "Dano +60%",                        fx: { d: .6 } },
       { n: "Pedra Encantada", d: "25% de crítico ×3",                  fx: { critC: .25, critM: 3 } },
-      { n: "Disparo Divino", d: "Dano ×2, cadência −20%",              fx: { d: 1, r: -.2 } },
+      { n: "Disparo Divino", d: "Dano ×2",                             fx: { d: 1 } },
     ] },
     { key: "ricochete", name: "Ricochete", tiers: [
       { n: "Salto Duplo", d: "+1 elo",                                 fx: { chain: 1 } },
@@ -2679,16 +2735,19 @@ const TOWER_PATHS = {
       { n: "Chuva de Estrelas", d: "+2 elos e +2 alvos",               fx: { chain: 2, extra: 2 } },
     ] },
     { key: "encanto", name: "Encanto", tiers: [
-      { n: "Selo de Sangue", d: "+10% de 💎 por abate",                fx: { kh: .1 } },
+      // O bônus de 💎 é por ABATE, então um caminho de dano puro rendia mais cristais que
+      // o caminho dos cristais: medido, Ricochete dava 54 💎 contra 36 do Encanto, por
+      // matar 2,4x mais. Um caminho de economia que perde no próprio eixo não é escolha.
+      { n: "Selo de Sangue", d: "+15% de 💎 por abate e dano +40%",    fx: { kh: .15, d: .4 } },
       { n: "Maldição",   d: "Marcados tomam +30%",                     fx: { mark: .3 } },
-      { n: "Coração Partido", d: "+20% de 💎; abaixo de 20% morrem",   fx: { kh: .2, exec: .2 } },
+      { n: "Coração Partido", d: "+25% de 💎, dano +30%; abaixo de 20% morrem", fx: { kh: .25, exec: .2, d: .3 } },
     ] },
   ] },
   trabuco: { paths: [
     { key: "entulho", name: "Entulho", tiers: [
       { n: "Carga Pesada", d: "Dano +60%",                             fx: { d: .6 } },
       { n: "Ferro-Velho", d: "+80% vs resistentes",                    fx: { vsArm: .8 } },
-      { n: "Demolidor",   d: "Dano ×2, cadência −20%",                 fx: { d: 1, r: -.2 } },
+      { n: "Demolidor",   d: "Dano ×2",                                fx: { d: 1 } },
     ] },
     { key: "chuvalixo", name: "Chuva de Lixo", tiers: [
       { n: "Estilhaços",  d: "+1 alvo e área +30%",                    fx: { extra: 1, aoeM: .3 } },
@@ -2713,7 +2772,7 @@ const TOWER_PATHS = {
       { n: "Vala Comum", d: "+2 alvos e área +40%",                    fx: { extra: 2, aoeM: .4 } },
     ] },
     { key: "terror", name: "Terror", tiers: [
-      { n: "Gritaria", d: "30% mais lentos",                           fx: { slow: .3 } },
+      { n: "Gritaria", d: "30% mais lentos e tomam +15%",              fx: { slow: .3, mark: .15 } },
       { n: "Pânico",   d: "Atordoa 1s",                                fx: { stun: 1 } },
       { n: "Horror",   d: "Atordoa 1s; abaixo de 20% morrem",          fx: { stun: 1, exec: .2 } },
     ] },
@@ -2754,20 +2813,24 @@ const TOWER_PATHS = {
     ] },
   ] },
   holofote: { paths: [
+    // O crítico do facho vale para TODA torre que atira na lane acesa (ver litLanes em
+    // projectileHit). Os valores somam ao longo do caminho: 8 + 7 + 10 = 25 pontos.
     { key: "lente", name: "Lente", tiers: [
-      { n: "Vidro Polido",   d: "+8% de crítico na lane acesa",        fx: { critC: .08 } },
-      { n: "Cristal Focal",  d: "+15% de crítico na lane acesa",       fx: { critC: .15 } },
-      { n: "Olho de Argamato", d: "+25% de crítico e crítico ×2,5",    fx: { critC: .25, critM: 2.5 } },
+      { n: "Vidro Polido",   d: "+8 pontos de crítico na lane acesa",  fx: { critC: .08 } },
+      { n: "Cristal Focal",  d: "Mais +7 pontos de crítico",           fx: { critC: .07 } },
+      { n: "Olho de Argamato", d: "Mais +10 pontos e crítico ×2,5",    fx: { critC: .10, critM: 2.5 } },
     ] },
+    // Os números somam ao longo do caminho, então o texto fala do DEGRAU: 40 + 30 + 50
+    // = 120% no fim, que é o que o nome do caminho promete.
     { key: "torre", name: "Torre", tiers: [
       { n: "Mancal Leve",    d: "Varre de lane 40% mais rápido",        fx: { r: .4 } },
-      { n: "Rolamento Duplo", d: "Varre 70% mais rápido",               fx: { r: .7 } },
-      { n: "Giro Livre",     d: "Varre 120% mais rápido",               fx: { r: 1.2 } },
+      { n: "Rolamento Duplo", d: "Mais 30% de giro",                    fx: { r: .3 } },
+      { n: "Giro Livre",     d: "Mais 50% de giro e acende DUAS lanes", fx: { r: .5, lanes: 1 } },
     ] },
     { key: "facho", name: "Facho", tiers: [
-      { n: "Espelho Côncavo", d: "Consome menos condutores",            fx: { save: .3 } },
-      { n: "Refletor Duplo", d: "Reforça as tropas em +10%",            fx: { buffAtk: .1 } },
-      { n: "Aurora",        d: "Reforça as tropas em +25%",             fx: { buffAtk: .25 } },
+      { n: "Espelho Côncavo", d: "Consome 30% menos condutores",        fx: { save: .3 } },
+      { n: "Refletor Duplo", d: "Reforça o ataque das tropas em +10%",  fx: { buffAtk: .1 } },
+      { n: "Aurora",        d: "Mais +25% de ataque (35% no total)",    fx: { buffAtk: .25 } },
     ] },
   ] },
   moedor: { paths: [
@@ -2776,15 +2839,19 @@ const TOWER_PATHS = {
       { n: "Eixo Reforçado", d: "Bônus das tropas +20%",                fx: { buffAtk: .2 } },
       { n: "Rolo de Ferro", d: "Bônus das tropas +40%",                 fx: { buffAtk: .4 } },
     ] },
+    // DURAÇÃO + CURA. Só duração não era escolha: o bônus dura 25s num ciclo de 30s, ou
+    // 83% do tempo, então +25s compra no máximo os 17% que faltam (medido: +0,8%).
     { key: "turno", name: "Turno", tiers: [
-      { n: "Hora Extra",    d: "Bônus dura +8s",                        fx: { buffT: 8 } },
-      { n: "Jornada Dobrada", d: "Bônus dura +15s",                     fx: { buffT: 15 } },
-      { n: "Sem Descanso",  d: "Bônus dura +25s",                       fx: { buffT: 25 } },
+      { n: "Hora Extra",    d: "Bônus dura +8s e cura 6 nas tropas",    fx: { buffT: 8, heal: 6 } },
+      { n: "Jornada Dobrada", d: "Mais +7s e mais 6 de cura",           fx: { buffT: 7, heal: 6 } },
+      { n: "Sem Descanso",  d: "Mais +10s e mais 10 de cura",           fx: { buffT: 10, heal: 10 } },
     ] },
+    // RITMO + POUPANÇA. Moer mais rápido sem poupar a tropa era um upgrade para gastar
+    // as próprias tropas 2,2x mais rápido (medido: +1% de dano, mais uma baixa por minuto).
     { key: "esteira", name: "Esteira", tiers: [
-      { n: "Alimentação Rápida", d: "Mói 40% mais rápido",              fx: { r: .4 } },
-      { n: "Funil Largo",   d: "Mói 70% mais rápido",                   fx: { r: .7 } },
-      { n: "Linha Contínua", d: "Mói 120% mais rápido e cura as tropas", fx: { r: 1.2, heal: 6 } },
+      { n: "Alimentação Rápida", d: "Mói 40% mais rápido; 35% de poupar a tropa", fx: { r: .4, poupa: .35 } },
+      { n: "Funil Largo",   d: "Mais 30% de ritmo; +20% de poupança",    fx: { r: .3, poupa: .2 } },
+      { n: "Linha Contínua", d: "Mais 50% de ritmo; +15% de poupança",   fx: { r: .5, poupa: .15 } },
     ] },
   ] },
   estoque: { paths: [
@@ -2792,13 +2859,21 @@ const TOWER_PATHS = {
     // 50 do DEPOT_CAP_MAX — passar disso não faz nada, o teto trava por cima.
     { key: "armazem", name: "Armazém", tiers: [
       { n: "Prateleiras Altas", d: "Guarda 38 de munição",              fx: { stock: 8 } },
-      { n: "Porão Escavado",  d: "Guarda 44 de munição",                fx: { stock: 14 } },
-      { n: "Arsenal do Setor", d: "Guarda 50, o máximo do depósito",    fx: { stock: 20 } },
+      { n: "Porão Escavado",  d: "Guarda 45 de munição",                fx: { stock: 7 } },
+      { n: "Arsenal do Setor", d: "Guarda 50, o máximo do depósito",    fx: { stock: 5 } },
     ] },
+    // ALCANCE, não tamanho do empurrão: o empurrão base já é 4 de munição a cada 1,2s,
+    // ou 3,3/s por vizinha, e a torre mais sedenta do jogo gasta 1,56/s. Somar munição
+    // por empurrão era somar num número que nunca foi o gargalo (medido: +4 e +7 davam
+    // exatamente o mesmo total de tiros que o depósito base). O que falta ao galpão é
+    // braço longo — servir o setor, não só as duas torres encostadas nele.
+    // LARGURA (tipos + alcance), com fundo suficiente para sustentá-la: medido, dar
+    // largura sem capacidade PIORAVA o depósito (177 -> 166 tiros), porque espalhar o
+    // mesmo bolo em seis tipos deixa cinco de cada. Largura sem fundo é prateleira vazia.
     { key: "carregadores", name: "Carregadores", tiers: [
-      { n: "Mais Braços",   d: "Entrega +2 de munição por vez",         fx: { feed: 2 } },
-      { n: "Turno Dobrado", d: "Entrega +4 de munição por vez",         fx: { feed: 4 } },
-      { n: "Corrente Humana", d: "Entrega +7 de munição por vez",       fx: { feed: 7 } },
+      { n: "Mais Braços",   d: "Guarda 4 tipos e +4 de munição",         fx: { types: 1, stock: 4, feed: 3 } },
+      { n: "Turno Dobrado", d: "Alcança a 2ª torre de cada lado e +4",   fx: { reach: 1, stock: 4 } },
+      { n: "Corrente Humana", d: "TODOS os 6 tipos, muralha inteira e +4", fx: { types: 2, reach: 1, stock: 4 } },
     ] },
     { key: "disciplina", name: "Disciplina", tiers: [
       { n: "Munição Contada", d: "Vizinhas poupam +8% de munição",      fx: { adjSave: .08 } },
@@ -2970,9 +3045,11 @@ function cityFxScan(pred, key) {
   return s;
 }
 function ammoTypeFx(type, key) { return cityFxScan(c => BUILDINGS[c.built] && BUILDINGS[c.built].prod === type, key); }
-function globalBeltBonus() { return Math.min(.4, cityFxScan(null, "belt")); }
+// Teto 0,5: Ferramentaria + Manutenção + Golem de Carga somam 0,42, e com o teto antigo
+// de 0,4 os dois últimos pontos de esteira caíam no chão.
+function globalBeltBonus() { return Math.min(.5, cityFxScan(null, "belt")); }
 function globalProdBonus() { return cityFxScan(null, "gProd"); }
-function globalMoralFx() { return cityFxScan(null, "moralG"); }
+function globalRateFx() { return cityFxScan(null, "rateG"); }   // Taverna: cadência de TODAS as torres
 function globalAdjM() { return 1 + cityFxScan(null, "adjM"); }
 function globalWarnFx() { return cityFxScan(null, "warn"); }
 function globalIncM() { return 1 + cityFxScan(null, "incM"); }
@@ -3411,10 +3488,9 @@ function totalProdAll() {
 }
 function prodPerSec() { return totalProdAll() / supplyInterval(); }
 
-// Quartéis não dão mais moral às torres (viraram buffs de tropa);
-// só a Taverna (praça) mantém moral global.
+// Bônus global de CADÊNCIA das torres. Hoje só a Taverna (praça) alimenta isto.
 function moralBoost() {
-  return globalMoralFx();
+  return globalRateFx();
 }
 
 // ---------- Posicionamento FLEXÍVEL (pintura) ----------
@@ -5158,7 +5234,7 @@ function startWave() {
   // mesmo topo da tela. Sem essa folga as duas coisas se sobrepõem na virada do turno.
   spawnTimer = 1.5; supplyTimer = 0;
   S.allyGrind = null;                                   // o Moedor recomeça a cada turno
-  for (const t of S.towers) if (t) { t.spot = null; t.spotT = 0; } // holofotes reapontam
+  for (const t of S.towers) if (t) { t.spot = null; t.spots = null; t.spotT = 0; } // holofotes reapontam
   S.groundFires = [];
   S.turnHitsLost = 0;
   openTurnSum();   // abre o livro-caixa do turno (ver turnChips)
@@ -5595,10 +5671,17 @@ function projectileHit(p) {
   let hit;
   if (p.aoe) {
     hit = S.enemies.filter(e => e.lane === Math.round(p.ex) && Math.abs(e.y - p.ey) < p.aoe * 0.25);
-  } else if (p.chain) {
-    hit = [...S.enemies].sort((a, b) => b.y - a.y).slice(0, p.chain);
   } else {
     hit = alive ? [p.target] : [];
+  }
+  // A cadeia SOMA à área, não é substituída por ela. A Tesla ganha área no tier 2 de
+  // Voltaica e perdia em silêncio os 3 elos que definem a torre — a área cobre um pedaço
+  // de UMA lane, a cadeia salta entre lanes. Medido numa cena de 1 inimigo por lane:
+  // ×4,7 de dano rendia +5% de vazão, porque o multiplicador comprava o que o elo perdido
+  // já dava de graça.
+  if (p.chain) {
+    const elos = [...S.enemies].sort((a, b) => b.y - a.y).slice(0, p.chain);
+    hit = [...new Set([...hit, ...elos])];
   }
   // perfuração: acerta também os próximos atrás do alvo na mesma lane
   // (soma perfuração de leis/upgrades + perfuração-base da torre, ex.: Serras/Caçadores)
@@ -5617,10 +5700,12 @@ function projectileHit(p) {
   }
   for (const e of hit) {
     let dmg = p.dmg;
-    // Crítico: base global + o que os caminhos da torre somarem + o holofote da lane.
-    const critC = Math.min(0.95, CRIT_BASE + (fx.critC || 0) + (litLanes.has(e.lane) ? SPOT_CRIT : 0));
+    // Crítico: base global + o que os caminhos da torre somarem + o holofote da lane
+    // (o facho tem crítico PRÓPRIO: ele não atira, então o bônus entra aqui, pela lane).
+    const lit = litLanes.get(e.lane);
+    const critC = Math.min(0.95, CRIT_BASE + (fx.critC || 0) + (lit ? SPOT_CRIT + lit.critC : 0));
     const crit = Math.random() < critC;
-    if (crit) dmg *= Math.max(CRIT_MULT, fx.critM || 0);
+    if (crit) dmg *= Math.max(CRIT_MULT, fx.critM || 0, lit ? lit.critM : 0);
     if (fx.vsArm && e.armor < 1) dmg *= 1 + fx.vsArm;
     if (fx.ramp) { e._ramp = (e._ramp || 0) + 1; dmg *= 1 + Math.min(1, e._ramp * fx.ramp); }
     dmg *= p.magic ? 1 : armorFactor(e);
@@ -5664,9 +5749,15 @@ function update(dt) {
   if (S.towerBuff && S.towerBuff.t > 0) S.towerBuff.t -= dt; // Infusor Arcano (buff de tropas)
   if (S.allyGrind && S.allyGrind.t > 0) S.allyGrind.t -= dt; // Moedor de Plebe
   // Lanes acesas pelos holofotes: recalculado aqui para o tiro e o crítico consultarem.
-  litLanes = new Set();
+  litLanes = new Map();
   for (const t of S.towers) {
-    if (t && TOWER_TYPES[t.type] && TOWER_TYPES[t.type].support === "spot" && t.spot != null) litLanes.add(t.spot);
+    if (!t || !TOWER_TYPES[t.type] || TOWER_TYPES[t.type].support !== "spot" || t.spot == null) continue;
+    const f = towerFx(t);
+    for (const L of (t.spots && t.spots.length ? t.spots : [t.spot])) {
+      const cur = litLanes.get(L) || { critC: 0, critM: 0 };
+      // dois holofotes na mesma lane não somam: vale o melhor facho, como o SPOT_CRIT
+      litLanes.set(L, { critC: Math.max(cur.critC, f.critC || 0), critM: Math.max(cur.critM, f.critM || 0) });
+    }
   }
   for (const fx of S.effects) fx.life -= dt;
   S.effects = S.effects.filter(fx => fx.life > 0);
@@ -5821,16 +5912,35 @@ function update(dt) {
         else { S.towerBuff = { atk: 0.2 + (fx.buffAtk || 0), t: buffT }; }
       }
       else if (tt.support === "spot") {
+        // Refletor Duplo / Aurora: o facho também reforça as tropas. Sem isto o `buffAtk`
+        // dos dois últimos tiers do caminho Facho não era lido por ninguém.
+        if (fx.buffAtk) S.towerBuff = { atk: fx.buffAtk, t: buffT };
         // Varre para a lane com mais inimigos, mas só depois de SPOT_MOVE_SEC parado.
+        // O relógio da varredura desconta o PRÓPRIO intervalo de pulso, então o caminho
+        // Torre ("varre mais rápido") se anulava: pulsos mais curtos, mais pulsos para
+        // completar os mesmos 8s. A espera agora cai com a cadência, que é o que o
+        // caminho promete — e ele já paga por isso em condutores.
         t.spotT = (t.spotT ?? 0) - towerRate(t);
-        if (t.spot == null) t.spot = i;
+        if (t.spot == null) { t.spot = i; t.spots = [i]; }
         if (t.spotT <= 0) {
-          const carga = [0, 0, 0, 0, 0];
-          for (const e of S.enemies) if (e.hp > 0) carga[e.lane] += e.maxHp;
-          let alvo = t.spot;
-          for (let L = 0; L < LANES; L++) if (carga[L] > carga[alvo]) alvo = L;
-          if (alvo !== t.spot) { t.spot = alvo; addFloat(alvo, 0.86, "🔦 iluminado", "#ffe9a8"); }
-          t.spotT = SPOT_MOVE_SEC;
+          // Acende a lane da FRENTE da horda, não a mais carregada. As torres miram o
+          // inimigo mais adiantado do campo (mira "near" filtra o campo inteiro, não a
+          // lane), então o facho apontado para a lane mais pesada iluminava justamente
+          // onde ninguém estava atirando: medido, o caminho Torre rendia +1,5% e a Lente
+          // +3% no grupo. Alinhado com a frente, o bônus cai onde o tiro cai.
+          const frente = [-1, -1, -1, -1, -1];
+          for (const e of S.enemies) if (e.hp > 0 && e.y > frente[e.lane]) frente[e.lane] = e.y;
+          // Giro Livre acende DUAS lanes: varrer mais rápido só vale se houver o que acender.
+          const quantas = Math.min(LANES, 1 + (fx.lanes || 0));
+          const atual = new Set(t.spots && t.spots.length ? t.spots : [t.spot]);
+          const ordem = [0, 1, 2, 3, 4].sort((a, b) =>
+            (frente[b] - frente[a]) || ((atual.has(b) ? 1 : 0) - (atual.has(a) ? 1 : 0)));
+          const novas = ordem.slice(0, quantas);
+          if (novas.join(",") !== [...atual].join(",")) {
+            for (const L of novas) if (!atual.has(L)) addFloat(L, 0.86, "🔦 iluminado", "#ffe9a8");
+          }
+          t.spots = novas; t.spot = novas[0];
+          t.spotT = SPOT_MOVE_SEC / (1 + (fx.r || 0));
         }
       }
       else if (tt.support === "grind") {
@@ -5838,9 +5948,15 @@ function update(dt) {
         const vivos = S.allies.filter(a => a.hp > 0);
         if (vivos.length) {
           const vitima = vivos.reduce((a, b) => (b.hp < a.hp ? b : a));
-          vitima.hp = 0;
+          // Funil Largo: às vezes a tropa atravessa a engrenagem e sai viva. Sem isto o
+          // caminho Esteira só moía mais rápido — comprava um upgrade para gastar as
+          // próprias tropas 2,2x mais rápido por +1% de dano.
+          const poupou = Math.random() < Math.min(0.85, fx.poupa || 0);   // o funil nunca sai de graça
+          if (!poupou) vitima.hp = 0;
+          // Hora Extra: o sangue na engrenagem venda as feridas dos que ficaram.
+          if (fx.heal) for (const a of S.allies) if (a !== vitima || poupou) healAlly(a, fx.heal);
           S.allyGrind = { t: GRIND_DUR + (fx.buffT || 0), mult: GRIND_MULT + (fx.buffAtk || 0) };
-          addFloat(vitima.lane, vitima.y, "⚙️ MOÍDO", "#e0705f");
+          addFloat(vitima.lane, vitima.y, poupou ? "⚙️ ESCAPOU" : "⚙️ MOÍDO", poupou ? "#c8b088" : "#e0705f");
           addFloat(2, 0.8, `⚙️ Tropas +${Math.round(S.allyGrind.mult * 100)}%`, "#eecd5c");
           S.effects.push({ x: vitima.lane, y: vitima.y, life: 0.4, max: 0.4, type: "grind" });
         }
@@ -7404,7 +7520,7 @@ function draw() {
   // Feixe do Holofote: a lâmpada está NA MURALHA, então o cone nasce estreito embaixo e
   // se abre subindo até o horizonte — e clareia mais perto da fonte, porque lá a luz
   // ainda está concentrada. Fica sob as unidades: ilumina o chão sem lavar os sprites.
-  for (const L of litLanes) {
+  for (const L of litLanes.keys()) {
     const cx = L * laneW + laneW / 2;
     const beam = ctx.createLinearGradient(0, h, 0, 0);
     beam.addColorStop(0, "rgba(255,238,190,.22)");
