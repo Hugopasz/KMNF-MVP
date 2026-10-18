@@ -1115,7 +1115,7 @@ function renderFavHub(scr) {
   scr.innerHTML = `
     <div class="laws-top"><button class="tavola-round tavola-back" id="fav-back">‹</button><button class="tavola-round" id="fav-help-btn">?</button></div>
     <h2 class="tavola-title fav-title"><span class="tt-a">— AS —</span><span class="tt-main">ALIANÇAS</span></h2>
-    <div id="fav-help" class="hidden"><b>As Alianças</b><p>Quatro figuras de Karzstak podem ajudar (ou atrapalhar) suas muralhas. Você pode <b>visitar</b> qualquer uma delas <b>desde o dia 1</b>: converse, peça algo ou presenteie, <b>1 vez por dia</b>, entre os turnos. A partir do <b>dia ${FAV_VISIT_MIN_DAY}</b>, uma delas também pode <b>vir até você</b>: ignorar quem veio custa relação com todos, e quem veio está sempre disponível, fora de horário ou não.</p><p><b>Expediente:</b> o Rei atende dia e noite · a Rainha só de <b>dia</b> · o Conde só à <b>noite</b> · o Povo tem <b>70%</b> de dia e <b>30%</b> à noite. Tentar fora de horário não gasta sua visita.</p><p>Cada escolha muda a <b>relação</b> (0–100%). Relação no chão = <b>punição ativa</b>; relação no máximo = <b>bênção ativa</b>. O que você descobre nas conversas fica lembrado para sempre, entre todas as partidas.</p><p><b>A relação inclina todo o trato:</b> quanto mais baixa, menor a chance de ser <b>recebido</b> (conversar e pedir podem dar com a porta na cara), mais <b>caro</b> fica cada pedido e menos esse personagem <b>aparece</b> na sua porta. Quanto mais alta, mais barato e mais fácil de ser recebido. No <b>máximo</b>, o pedido tem ${Math.round(ASK_BOON_CHANCE * 100)}% de sair de graça e render ${Math.round(ASK_BOON_BONUS * 100)}% a mais. <b>Presentear nunca é recusado</b>, em relação nenhuma: é sempre o caminho de volta.</p><button id="fav-dbg">debug: visitas infinitas ${favFreeVisits ? "✅" : "❌"}</button></div>
+    <div id="fav-help" class="hidden"><b>As Alianças</b><p>Quatro figuras de Karzstak podem ajudar (ou atrapalhar) suas muralhas. Você pode <b>visitar</b> qualquer uma delas <b>desde o dia 1</b>: converse, peça algo ou presenteie, <b>1 vez por turno</b>, entre os turnos. A partir do <b>dia ${FAV_VISIT_MIN_DAY}</b>, uma delas também pode <b>vir até você</b>: ignorar quem veio custa relação com todos, e quem veio está sempre disponível, fora de horário ou não.</p><p><b>Expediente:</b> o Rei atende dia e noite · a Rainha só de <b>dia</b> · o Conde só à <b>noite</b> · o Povo tem <b>70%</b> de dia e <b>30%</b> à noite. Tentar fora de horário não gasta sua visita, mas <b>abrir um pedido ou um presente e desistir gasta</b>: o custo é descer da muralha, não o que se trata lá embaixo.</p><p>Cada escolha muda a <b>relação</b> (0–100%). Relação no chão = <b>punição ativa</b>; relação no máximo = <b>bênção ativa</b>. O que você descobre nas conversas fica lembrado para sempre, entre todas as partidas.</p><p><b>A relação inclina todo o trato:</b> quanto mais baixa, menor a chance de ser <b>recebido</b> (conversar e pedir podem dar com a porta na cara), mais <b>caro</b> fica cada pedido e menos esse personagem <b>aparece</b> na sua porta. Quanto mais alta, mais barato e mais fácil de ser recebido. No <b>máximo</b>, o pedido tem ${Math.round(ASK_BOON_CHANCE * 100)}% de sair de graça e render ${Math.round(ASK_BOON_BONUS * 100)}% a mais. <b>Presentear nunca é recusado</b>, em relação nenhuma: é sempre o caminho de volta.</p><button id="fav-dbg">debug: visitas infinitas ${favFreeVisits ? "✅" : "❌"}</button></div>
     <div class="fav-carousel">
       <button class="fav-card fav-side left" data-k="${prev}"><img src="${FAV_CHARS[prev].img}?v=1" alt=""><div class="fav-card-t">-${FAV_CHARS[prev].art}-<br>${FAV_CHARS[prev].name}</div></button>
       <div class="fav-card fav-main"><img src="${c.img}?v=1" alt=""><div class="fav-card-t">-${c.art}-<br><b>${c.name}</b><span>${c.sub}</span></div></div>
@@ -1208,7 +1208,17 @@ function renderFavEncounter(scr) {
     }).join("");
   }
   // Conversa não tem volta: precisa responder. Pedir/presentear oferecem "Deixa Pra Lá".
+  // Desistir QUEIMA a interação do turno, igual a ter pedido. É medida de balanceamento:
+  // sem isso dava para abrir o pedido, ler o preço em relação, voltar e tentar o mesmo
+  // pedido em outro personagem, e a interação por turno (o freio do sistema inteiro) não
+  // freava nada. Descer da muralha para falar com alguém é o custo, não o que se fala lá.
+  // Exceção: se NADA ali pode ser escolhido (nenhum presente cabe no bolso), não houve
+  // escolha a proteger, e cobrar seria punir quem só descobriu que não tem o recurso.
   const canCancel = !v.done && (v.mode === "ask" || v.mode === "gift");
+  const cancelCusta = canCancel && !favFreeVisits && (v.mode !== "gift" || c.gifts.some(g => {
+    const [rk, rv] = Object.entries(g.cost)[0];
+    return giftCostHave(rk) >= rv;
+  }));
   scr.innerHTML = `
     <div class="fav-enc">
       <div class="fav-stars">***</div>
@@ -1217,12 +1227,19 @@ function renderFavEncounter(scr) {
       ${favNameBlock(k)}
       <div class="fav-quote">“ ${quote} ”</div>
       <div class="fav-choices">${choices}</div>
-      ${canCancel ? `<button class="fav-choice fav-ok" id="fav-cancel">Deixa Pra Lá</button>` : ""}
+      ${canCancel ? `<button class="fav-choice fav-ok" id="fav-cancel">Deixa Pra Lá${cancelCusta ? `<span class="fav-relcost">gasta a interação do turno</span>` : ""}</button>` : ""}
       ${v.done ? `<div class="fav-result">${v.done}</div><button class="fav-choice fav-ok" id="fav-done">Continuar</button>` : ""}
       <div class="fav-count">${footer}</div>
     </div>`;
   const cancel = $("fav-cancel");
-  if (cancel) cancel.onclick = () => { favView = "hub"; renderFavScr(); };
+  if (cancel) cancel.onclick = () => {
+    if (cancelCusta) {
+      favSpend(k); saveGame();
+      toast(`🚪 Você deu meia-volta: a interação deste turno foi gasta.`);
+      renderHUD();
+    }
+    favView = "hub"; renderFavScr();
+  };
   const done = $("fav-done");
   if (done) done.onclick = () => { favView = "hub"; renderFavScr(); };
   if (v.done) { scr.querySelectorAll(".fav-choice[data-i]").forEach(b => b.disabled = true); return; }
