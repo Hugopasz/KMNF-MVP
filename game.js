@@ -21,8 +21,8 @@ const S = {
   lastEvent: null,        // id do último evento (não repetir 2x seguidas)
   eventLog: [],           // histórico de eventos do dia (Seu Distrito)
   fav: { rel: { rei: 50, rainha: 50, conde: 50, povo: 50 }, used: false, last: {} }, // Os Favores (relação reseta por run)
-  sector: "",             // nome cosmético do setor desta run
-  sectorId: 0,            // número do setor (aleatório por run, 7.000–15.000)
+  sector: "",             // nome cosmético do condado desta run
+  sectorId: 0,            // número do condado (aleatório por run, 7.000–15.000)
   factions: [],           // 2 facções escolhidas nesta run
   purpleThisRun: false,   // pacto sombrio selado nesta run
   darkChain: 0,           // progresso da cadeia de eventos secreta (0..3)
@@ -95,33 +95,33 @@ const EVENTS = [
   { id: "p1",  ic: "🌾", ty: "pos", t: "Colheita Abençoada", s: "Os campos internos renderam além do esperado, e os celeiros receberam o excedente antes do anoitecer. Os cofres da guarda agradecem; o tesoureiro, pela primeira vez no mês, sorriu.", e: { gold: 35, morale: 8 } },
   { id: "p2",  ic: "🔨", ty: "pos", t: "Mutirão das Muralhas", s: "Pedreiros voluntários trabalharam a noite toda tapando as brechas com o que acharam: pedra, viga, portão arrancado. Ninguém mandou, ninguém pagou, e ao amanhecer as muralhas estavam de pé.", e: { hits: 2, morale: 6 }, w: EV_W_HEAL_BIG },
   { id: "p3",  ic: "💎", ty: "pos", t: "Veio de Argamato", s: "Mineiros encontraram um bolsão de cristais intactos sob o distrito, protegido por uma camada de rocha que a peste nunca atravessou. Vieram carregando o que couberam nos braços.", e: { hearts: 6, morale: 6 } },
-  { id: "p4",  ic: "🎺", ty: "pos", t: "Notícia da Frente Norte", s: "Um setor vizinho resistiu a uma noite inteira de assalto e mandou um corredor contar. O moral dispara em todas as muralhas: se eles aguentaram, nós também aguentamos.", e: { morale: 18 } },
+  { id: "p4",  ic: "🎺", ty: "pos", t: "Notícia da Frente Norte", s: "Um condado vizinho resistiu a uma noite inteira de assalto e mandou um corredor contar. O moral dispara em todas as muralhas: se eles aguentaram, nós também aguentamos.", e: { morale: 18 } },
   { id: "p5",  ic: "🏹", ty: "pos", t: "Carregamento de Virotes", s: "Uma carroça de munição chegou dos arsenais reais, escoltada por três guardas que não dormiram no caminho. As fábricas vão poder trabalhar com folga hoje.", e: { gold: 20, mods: { prod: 1.25 } } },
   { id: "p6",  ic: "⚙️", ty: "pos", t: "Engrenagens Novas", s: "Um engenheiro passou a madrugada ajustando as correias e trocando os dentes gastos das fábricas. Hoje elas cantam em vez de gemer.", e: { mods: { prod: 1.35 }, morale: 5 } },
   { id: "p7",  ic: "🔥", ty: "pos", t: "Fervor no Muro", s: "Os soldados amanheceram inspirados, ninguém sabe bem por quê. Afiaram as próprias armas antes de o sino bater, e a mira está diferente.", e: { mods: { towerDmg: 1.3 }, morale: 5 } },
   { id: "p8",  ic: "🪙", ty: "pos", t: "Mercadores Gratos", s: "Comerciantes salvos por suas muralhas voltaram com ouro e sem conversa. Deixaram as bolsas no posto da guarda e foram embora antes de alguém agradecer.", e: { gold: 45 } },
   { id: "p9",  ic: "🕊️", ty: "pos", t: "Manhã Silenciosa", s: "Por algum motivo, os mortos hesitam no horizonte. O vigia enxerga mais longe do que em qualquer manhã deste ano, e isso assusta mais do que acalma.", e: { mods: { warn: 2 }, morale: 6 } },
   { id: "p10", ic: "🍞", ty: "pos", t: "Rações Extras", s: "O conselho liberou os estoques sem explicar o motivo. Pão fresco, carne salgada e uma dose para cada posto: ninguém luta de barriga vazia.", e: { gold: 15, morale: 10 } },
-  { id: "p11", ic: "🛡️", ty: "pos", t: "Reforços do Interior", s: "Um pelotão da guarda real reforça a linha por hoje, com armadura de verdade e ordens claras. Amanhã seguem para outro setor, mas hoje são seus.", e: { mods: { enemyDmg: 0.8 }, morale: 6 } },
-  { id: "p12", ic: "💰", ty: "pos", t: "Dízimo de Guerra", s: "As paróquias arrecadaram para a defesa do setor e mandaram o cofre fechado. Vieram cristais no meio das moedas, o que ninguém pediu e todo mundo aceitou.", e: { gold: 30, hearts: 2 } },
+  { id: "p11", ic: "🛡️", ty: "pos", t: "Reforços do Interior", s: "Um pelotão da guarda real reforça a linha por hoje, com armadura de verdade e ordens claras. Amanhã seguem para outro condado, mas hoje são seus.", e: { mods: { enemyDmg: 0.8 }, morale: 6 } },
+  { id: "p12", ic: "💰", ty: "pos", t: "Dízimo de Guerra", s: "As paróquias arrecadaram para a defesa do condado e mandaram o cofre fechado. Vieram cristais no meio das moedas, o que ninguém pediu e todo mundo aceitou.", e: { gold: 30, hearts: 2 } },
   { id: "p13", ic: "🌟", ty: "pos", t: "Bênção do Cristal", s: "O Turbilhão Narxis pulsa forte hoje, e a cidade inteira sente no peito. Até as pedras das muralhas parecem assentar melhor.", e: { morale: 14, hits: 1 }, w: EV_W_HEAL },
   { id: "p14", ic: "🧰", ty: "pos", t: "Peças Sobressalentes", s: "Recuperaram material de um posto abandonado três lanes ao norte. Chegou tudo enferrujado e tudo aproveitável.", e: { gold: 25, mods: { prod: 1.2 } } },
   { id: "p15", ic: "🎯", ty: "pos", t: "Treino da Aurora", s: "Os artilheiros treinaram antes do sol nascer, no frio, com os alvos de palha que sobraram. A mira está afiada e o humor, péssimo.", e: { mods: { towerDmg: 1.2 }, morale: 4 } },
-  { id: "p16", ic: "🐴", ty: "pos", t: "Cavalaria de Passagem", s: "Cavaleiros a caminho de outro setor pararam para beber água e deixaram suprimentos sem cobrar. Não disseram para onde iam.", e: { gold: 22, hearts: 3 } },
+  { id: "p16", ic: "🐴", ty: "pos", t: "Cavalaria de Passagem", s: "Cavaleiros a caminho de outro condado pararam para beber água e deixaram suprimentos sem cobrar. Não disseram para onde iam.", e: { gold: 22, hearts: 3 } },
   { id: "p17", ic: "🌙", ty: "pos", t: "Presságio Favorável", s: "Os astros sorriem, segundo quem entende dessas coisas. Dizem que hoje a sorte está do seu lado, e a tropa decidiu acreditar.", e: { morale: 12 } },
   { id: "p18", ic: "🔮", ty: "pos", t: "Visão do Vidente", s: "Um oráculo do distrito acordou gritando as direções dos ataques e voltou a dormir. O vigia anotou tudo e ganhou tempo precioso.", e: { mods: { warn: 3 } } },
-  { id: "p19", ic: "🏰", ty: "pos", t: "Ordem do Rei", s: "O soberano citou seu setor como exemplo numa carta lida em voz alta na praça. A tropa se enche de orgulho e finge que não ligou.", e: { morale: 16, gold: 10 } },
+  { id: "p19", ic: "🏰", ty: "pos", t: "Ordem do Rei", s: "O soberano citou seu condado como exemplo numa carta lida em voz alta na praça. A tropa se enche de orgulho e finge que não ligou.", e: { morale: 16, gold: 10 } },
   { id: "p20", ic: "❤️", ty: "pos", t: "Filhos das Muralhas", s: "As crianças do distrito subiram até as ameias trazendo água e canções inventadas na hora. Os soldados fingiram que não choraram.", e: { morale: 11, hits: 1 }, w: EV_W_HEAL },
   // ===== NEGATIVOS (10) =====
   { id: "n1",  ic: "🩸", ty: "neg", t: "Baixas na Noite", s: "Alguns guardas não voltaram da última investida, e os nomes foram lidos no pátio ao amanhecer. O luto pesa mais que a armadura.", e: { morale: -12 } },
   { id: "n2",  ic: "🕳️", ty: "neg", t: "Brecha no Alicerce", s: "Uma fenda se abriu na base das muralhas durante a madrugada, larga o bastante para passar um braço. Taparam com entulho, que é o que havia.", e: { hits: -1, morale: -6 } },
-  { id: "n3",  ic: "💸", ty: "neg", t: "Cofre Saqueado", s: "Desertores levaram parte do ouro do setor ao fugir pela calada. Deixaram a porta do cofre aberta, como quem quer que você veja.", e: { gold: -30, morale: -6 } },
+  { id: "n3",  ic: "💸", ty: "neg", t: "Cofre Saqueado", s: "Desertores levaram parte do ouro do condado ao fugir pela calada. Deixaram a porta do cofre aberta, como quem quer que você veja.", e: { gold: -30, morale: -6 } },
   { id: "n4",  ic: "🌧️", ty: "neg", t: "Tempestade de Cinzas", s: "A poeira dos mortos entope as engrenagens e cobre tudo de cinza. As fábricas engasgam e os operários tossem sangue no fim do turno.", e: { mods: { prod: 0.7 } } },
   { id: "n5",  ic: "😨", ty: "neg", t: "Boatos de Queda", s: "Espalharam que as muralhas vizinhas caíram e que ninguém sobrou para contar. Ninguém sabe quem começou, e o medo se alastra mais rápido que a verdade.", e: { morale: -16 } },
   { id: "n6",  ic: "🦠", ty: "neg", t: "Febre no Distrito", s: "Uma doença varre os alojamentos e derruba quem já estava exausto. Menos mãos para trabalhar e mais bocas na enfermaria.", e: { mods: { prod: 0.8 }, morale: -6 } },
   { id: "n7",  ic: "🌫️", ty: "neg", t: "Neblina Cega", s: "Uma névoa densa encobre o horizonte desde antes do amanhecer. O vigia mal enxerga a própria mão esticada, e a horda vem de dentro dela.", e: { mods: { warn: -1.5 } } },
   { id: "n8",  ic: "⚰️", ty: "neg", t: "Deserção", s: "Parte da guarnição fugiu na calada, levando armas e as melhores botas. A linha está mais fraca hoje e todo mundo sabe exatamente quem faltou.", e: { mods: { enemyDmg: 1.2 }, morale: -8 } },
-  { id: "n9",  ic: "🥀", ty: "neg", t: "Racionamento", s: "Os estoques minguam e o conselho corta as verbas do setor com uma frase só, por escrito. Metade da ração, o dobro do turno.", e: { gold: -20, morale: -8 } },
+  { id: "n9",  ic: "🥀", ty: "neg", t: "Racionamento", s: "Os estoques minguam e o conselho corta as verbas do condado com uma frase só, por escrito. Metade da ração, o dobro do turno.", e: { gold: -20, morale: -8 } },
   { id: "n10", ic: "🌑", ty: "neg", t: "Presságio Sombrio", s: "Corvos rodeiam as muralhas desde a véspera e não pousam. Ninguém dorme direito, e os que dormem acordam falando.", e: { morale: -14 } },
   // ===== CAÓTICOS (5) =====
   { id: "c1",  ic: "⚔️", ty: "cha", t: "Fúria dos Mortos", s: "Algo os enlouquece hoje: a horda avança mais rápido do que qualquer registro da guarda. Você jurou vingança em voz alta, e a tropa jurou com você.", e: { mods: { enemySpd: 1.3 }, morale: 12 } },
@@ -517,7 +517,7 @@ function maybeDarkEvent() {
   return ev;
 }
 
-// ---------- Setor da run (nome cosmético) ----------
+// ---------- Condado da run (nome cosmético) ----------
 const SECTOR_A = ["Portão", "Bastião", "Muralha", "Trincheira", "Redoubt", "Baluarte", "Posto", "Torre"];
 const SECTOR_B = ["do Corvo", "das Cinzas", "do Norte", "do Ocaso", "da Foice", "dos Lamentos", "do Cristal", "da Alvorada", "do Silêncio", "dos Mártires"];
 function randomSector() {
@@ -709,7 +709,7 @@ const FAV_EVENTS = {
       c: [{ t: "Ao Rei e a Karzstak!", e: { morale: 10 }, rel: 7, r: "A Karzstak, então. Que ela nos enterre velhos." },
           { t: "Brindo quando a horda recuar.", e: { bens: 4 }, rel: -3, r: "Então beberá sozinho, comandante. Ela não recua." },
           { t: "Prefiro brindar com os soldados.", e: { morale: 5, comida: 3 }, rel: -5, r: "Justo. O vinho desce melhor entre quem sangra." }] },
-    { id: "r4", s: "O Rei recebeu cartas de outros setores pedindo seu remanejamento.", q: "Querem tirá-lo de mim. O que responde?",
+    { id: "r4", s: "O Rei recebeu cartas de outros condados pedindo seu remanejamento.", q: "Querem tirá-lo de mim. O que responde?",
       c: [{ t: "Meu posto é aqui, alteza.", e: { morale: 8 }, rel: 8, r: "Era o que eu queria ouvir. A carta vai para o fogo." },
           { t: "Talvez seja hora de subir na vida...", e: { gold: 20 }, rel: -8, r: "Suba, então. A porta do palácio é larga." },
           { t: "Deixe que decidam as muralhas.", e: { bens: 5 }, rel: 2, r: "As muralhas não escrevem cartas. Mas entendi." }] },
@@ -805,7 +805,7 @@ const FAV_EVENTS = {
       c: [{ t: "Uma noite. E some ao amanhecer.", e: { combustivel: 5 }, rel: 6, r: "Uma noite! O senhor é um príncipe entre soldados." },
           { t: "O que você aprontou dessa vez?", e: { gold: 20 }, rel: 2, r: "Detalhes. Detalhes atrapalham a hospitalidade." },
           { t: "Guardas! Temos um fugitivo!", e: { morale: 3 }, rel: -9, r: "GUARDAS?! Eu trouxe QUEIJO, seu ingrato!" }] },
-    { id: "c7", s: "Ele abre a capa: relíquias de setores caídos, ainda com poeira.", q: "Recém-chegadas. Preço de amigo.",
+    { id: "c7", s: "Ele abre a capa: relíquias de condados caídos, ainda com poeira.", q: "Recém-chegadas. Preço de amigo.",
       c: [{ t: "Isso é saque de mortos...", e: { morale: -3, hearts: 3 }, rel: 2, r: "Morto não usa aliança, comandante. Eu uso." },
           { t: "Levo tudo. Sem perguntas.", e: { gold: -40, hearts: 5 }, rel: 5, r: "Sem perguntas! Minha frase favorita do reino." },
           { t: "Devolva às famílias. Já.", e: { morale: 8 }, rel: -6, r: "Às famílias. E eu como o quê? Moral?" }] },
@@ -827,7 +827,7 @@ const FAV_EVENTS = {
       c: [{ t: "A horda também. Voltem ao trabalho!", e: { morale: 5 }, rel: -8, r: "Então é assim. Trabalhar de barriga vazia, de novo." },
           { t: "Teremos um banquete no fim do expediente", e: { maos: 1 }, rel: 6, r: "Banquete! Ouviram? O comandante prometeu!" },
           { t: "Devemos pedir ao Rei primeiro...", e: {}, rel: -4, r: "O Rei. Sempre o Rei. E a gente espera sentado." }] },
-    { id: "p2", s: "Uma multidão se reúne no portão pedindo notícias dos setores vizinhos.", q: "É verdade que o Portão Sul caiu?!",
+    { id: "p2", s: "Uma multidão se reúne no portão pedindo notícias dos condados vizinhos.", q: "É verdade que o Portão Sul caiu?!",
       c: [{ t: "Mentira. E o Oeste não cai.", e: { morale: 8 }, rel: 4, r: "Não cai. O senhor falou, a gente acredita." },
           { t: "Caiu. Por isso treinamos dobrado.", e: { morale: -4, maos: 2 }, rel: 5, r: "Caiu mesmo. Pelo menos o senhor não mentiu." },
           { t: "Sem perguntas. Circulando!", e: { bens: 3 }, rel: -7, r: "Circulando. É o que a gente faz melhor: calar." }] },
@@ -1336,9 +1336,9 @@ function getBrasao() {
 function cycleBrasao() {
   META.brasao = ((META.brasao || 0) + 1) % (BRASAO_EMOJIS.length * BRASAO_COLORS.length);
   saveMeta(META);
-  renderHudBrasao(); // o brasão do HUD acompanha a troca feita em "Seu Setor"
+  renderHudBrasao(); // o brasão do HUD acompanha a troca feita em "Seu Condado"
 }
-// Brasão no HUD: atalho para "Seu Setor", ao lado do HP
+// Brasão no HUD: atalho para "Seu Condado", ao lado do HP
 function renderHudBrasao() {
   const el = $("hud-brasao");
   if (!el) return;
@@ -1346,17 +1346,17 @@ function renderHudBrasao() {
   el.textContent = br.emoji;
   el.style.background = br.color;
 }
-// Nº de setor: aleatório por run (7.000–15.000), formatado com ponto de milhar
+// Nº de condado: aleatório por run (7.000–15.000), formatado com ponto de milhar
 function randomSectorId() { return 7000 + Math.floor(Math.random() * 8001); }
 function formatSectorId(n) { return String(n || 0).replace(/\B(?=(\d{3})+(?!\d))/g, "."); }
-// Ponto cardeal do setor: sorteado por run junto do número
+// Ponto cardeal do condado: sorteado por run junto do número
 const SECTOR_DIRS = ["Norte", "Nordeste", "Leste", "Sudeste", "Sul", "Sudoeste", "Oeste"];
 function randomSectorDir() { return SECTOR_DIRS[Math.floor(Math.random() * SECTOR_DIRS.length)]; }
 
 // Resumo de recursos dos dois campos, em uma linha: Cidade (🪙💎✋) + Feudo (recursos brutos).
 // Fica fora do openDistrict porque o loop reusa isso para manter a linha ao vivo.
 function distResHTML() {
-  // "Seu Setor" marca a dívida igual à barra: as duas leem o mesmo estado, e um
+  // "Seu Condado" marca a dívida igual à barra: as duas leem o mesmo estado, e um
   // saldo negativo em vermelho só na barra faria o jogador duvidar de qual vale.
   const n = (v, txt) => `<span class="dr-v${v < 0 ? " neg" : ""}">${txt}</span>`;
   const cidade = `🪙 ${n(S.gold, Math.trunc(S.gold))}&nbsp;💎 ${n(S.hearts, Math.trunc(S.hearts))}`
@@ -1398,7 +1398,7 @@ function openDistrict() {
           <div class="dist-stat"><span class="ds-dot"></span>SÓIS NEGROS: ${S.blackSuns || 0}</div>
         </div>
       </div>
-      <div class="dist-sector">SETOR <b>${formatSectorId(S.sectorId)}</b> DE KARZSTAK · <b>${(S.sectorDir || "").toUpperCase()}</b></div>
+      <div class="dist-sector">CONDADO <b>${formatSectorId(S.sectorId)}</b> DE KARZSTAK · <b>${(S.sectorDir || "").toUpperCase()}</b></div>
       <div class="dist-div"></div>
       <div class="dist-line"><span class="dl-k">IDEOLOGIA:</span> <span class="dl-v" style="color:${f ? FACTIONS[f].color : "#9b8f77"}">${f ? FACTIONS[f].name.toUpperCase() : "NENHUMA"}</span></div>
       ${f ? `<div class="dist-sub">${FACTIONS[f].desc}</div>` : ""}
@@ -1408,7 +1408,7 @@ function openDistrict() {
       ${cc ? `<div class="dl-cost">💎 ${councilCost(cid)} Cristais por uso</div>` : ""}
       ${cc ? `<div class="dist-sub">${cc.desc}</div>` : `<div class="dist-sub">Jure um Lorde na Távola (menu inicial).</div>`}
       <div class="dist-div"></div>
-      <div class="dist-chron-h">Crônicas do Setor</div>
+      <div class="dist-chron-h">Crônicas do Condado</div>
       <div class="dist-chron"></div>
       <div class="dist-div"></div>
       <div class="dist-line dist-res"><span class="dl-v dr-line">${distResHTML()}</span></div>`;
@@ -1865,7 +1865,7 @@ function resMeta(k) { return k === "maos" ? MAOS : RESOURCES[k]; }
 const GIFT_COST_META = { gold: { n: "Ouro" } };
 function giftCostMeta(k) { return GIFT_COST_META[k] || FAV_FX_META[k] || { n: (resMeta(k) || {}).name || k }; }
 function giftCostHave(k) { return k === "hearts" ? S.hearts : resAmount(k); }
-// Quanto o setor tem de um recurso ("maos" vive na moeda de topo, o resto no Feudo).
+// Quanto o condado tem de um recurso ("maos" vive na moeda de topo, o resto no Feudo).
 function resAmount(k) { return k === "maos" ? S.maos : (k === "gold" ? S.gold : S.res[k] || 0); }
 // roteia produção: "maos" vai pra moeda de topo; o resto pro estoque do Feudo
 // Clampa ao teto SÓ ao ganhar, nunca reduz estoque já acima do limite (compat. com saves antigos).
@@ -1990,14 +1990,14 @@ function ammoBlocked(type) { return !S.helpKingdom && ammoDemand(type) <= 0; }
 // Com a chave ligada as fábricas produzem ALÉM da demanda das torres, e isso consome
 // recurso bruto do Feudo sem parar. Esquecer a chave ligada zerava o estoque. Agora há um
 // piso: se QUALQUER recurso do Feudo cair abaixo de HELP_MIN_RES, a chave cai sozinha e
-// não pode ser religada até o setor se recompor.
+// não pode ser religada até o condado se recompor.
 const HELP_MIN_RES = 50;
 function helpResFloor() { return Math.min(...Object.keys(RESOURCES).map(k => S.res[k] || 0)); }
 function helpKingdomBlocked() { return helpResFloor() < HELP_MIN_RES; }
 function helpKingdomGuard() {
   if (!S.helpKingdom || !helpKingdomBlocked()) return;
   S.helpKingdom = false;
-  toast(`🎖️ Ajudar o Reino desligado: recurso do Feudo abaixo de ${HELP_MIN_RES}. O setor vem primeiro.`);
+  toast(`🎖️ Ajudar o Reino desligado: recurso do Feudo abaixo de ${HELP_MIN_RES}. O condado vem primeiro.`);
   saveGame(); renderResBar(); renderHUD();
 }
 // cobertura instantânea: 1 se o estoque tem recurso (ou a fábrica não consome), senão 0
@@ -2100,7 +2100,7 @@ function summonAlly(type, fac) {
   return true;
 }
 
-// ---------- AS MELHORIAS: 48 leis do setor (roda radial; ver melhorias-design.md) ----------
+// ---------- AS MELHORIAS: 48 leis do condado (roda radial; ver melhorias-design.md) ----------
 // 8 linhas × 5 nós (sequenciais, do centro p/ fora) + 8 lendárias (exigem as 2 linhas vizinhas).
 // Limite de LAW_LIMIT leis por partida. Moral da lei é aplicada POR TURNO (leis são permanentes).
 const LAW_LIMIT = 30;
@@ -2344,7 +2344,7 @@ const VTREES = {
     },
     oficina: {
       // Eram +1% contra +2% por vizinho: o segundo dominava o primeiro e a escolha era
-      // falsa. Agora um aprofunda a vizinhança e o outro acelera a esteira de todo o setor.
+      // falsa. Agora um aprofunda a vizinhança e o outro acelera a esteira de todo o condado.
       l3: [{ id: "eng",    n: "Engenheiros",   d: "+2% de eficiência por vizinho", fx: { eN: .02 } },
            { id: "ferram", n: "Ferramentaria", d: "Esteira 12% mais rápida",       fx: { belt: .12 } }],
       l4: [{ id: "manut",  n: "Manutenção",    d: "Esteira 15% mais rápida",      fx: { belt: .15 } },
@@ -2864,13 +2864,13 @@ const TOWER_PATHS = {
     { key: "armazem", name: "Armazém", tiers: [
       { n: "Prateleiras Altas", d: "Guarda 38 de munição",              fx: { stock: 8 } },
       { n: "Porão Escavado",  d: "Guarda 45 de munição",                fx: { stock: 7 } },
-      { n: "Arsenal do Setor", d: "Guarda 50, o máximo do depósito",    fx: { stock: 5 } },
+      { n: "Arsenal do Condado", d: "Guarda 50, o máximo do depósito",    fx: { stock: 5 } },
     ] },
     // ALCANCE, não tamanho do empurrão: o empurrão base já é 4 de munição a cada 1,2s,
     // ou 3,3/s por vizinha, e a torre mais sedenta do jogo gasta 1,56/s. Somar munição
     // por empurrão era somar num número que nunca foi o gargalo (medido: +4 e +7 davam
     // exatamente o mesmo total de tiros que o depósito base). O que falta ao galpão é
-    // braço longo — servir o setor, não só as duas torres encostadas nele.
+    // braço longo — servir o condado, não só as duas torres encostadas nele.
     // LARGURA (tipos + alcance), com fundo suficiente para sustentá-la: medido, dar
     // largura sem capacidade PIORAVA o depósito (177 -> 166 tiros), porque espalhar o
     // mesmo bolo em seis tipos deixa cinco de cada. Largura sem fundo é prateleira vazia.
@@ -3476,7 +3476,7 @@ function cellProd(i) {
 const CAPATAZ_MULT = 1.5;       // Capataz: produção da cidade acelerada...
 const CAPATAZ_MORALE = 4;       // ...ao custo de moral por turno (≈8 por dia)
 // Ajudar o Reino: munição excedente → medalhas. Era 100 ▸ 1 e rendia Medalha demais —
-// um setor com fábricas sobrando comprava o Arsenal inteiro sem jogar bem. Os textos da
+// um condado com fábricas sobrando comprava o Arsenal inteiro sem jogar bem. Os textos da
 // interface leem esta constante, senão voltam a divergir dela no próximo ajuste.
 const HELP_RATE = 1000;
 // Toggles do Feudo (campo 2): custam MUITA moral por turno ativo
@@ -3795,8 +3795,8 @@ function renderResBar() {
   // toggles de política (Cidade e Feudo): pill com bolinha, tudo ancorado no centro
   const TOG_MSG = {
     capataz:       ["👊 Capataz ativo: produção acelerada, o povo sofre (-moral por turno).", "O Capataz foi dispensado."],
-    helpKingdom:   [`🎖️ Ajudando o Reino: munição excedente vira Medalhas (${HELP_RATE} ▸ 1).`, "O setor voltou a guardar seu excedente."],
-    feudAid:       [`🆘 Pedindo ajuda ao Reino: +${FEUD_AID_RES} de cada material bruto por turno, mas o povo perde muita moral.`, "O setor dispensou a ajuda do Reino."],
+    helpKingdom:   [`🎖️ Ajudando o Reino: munição excedente vira Medalhas (${HELP_RATE} ▸ 1).`, "O condado voltou a guardar seu excedente."],
+    feudAid:       [`🆘 Pedindo ajuda ao Reino: +${FEUD_AID_RES} de cada material bruto por turno, mas o povo perde muita moral.`, "O condado dispensou a ajuda do Reino."],
     feudOverdrive: ["⚙️ Sobrecarga: os extratores rendem +50%, mas o povo perde muita moral por turno.", "Os extratores voltaram ao ritmo normal."],
   };
   const tog = (label, key, title) => {
@@ -3825,7 +3825,7 @@ function renderResBar() {
     for (const [key, r] of Object.entries(RESOURCES)) item(r.icon, Math.trunc(S.res[key] || 0));
     tog("Sobrecarga", "feudOverdrive", "Extratores produzem +50%, mas o povo perde muita moral enquanto ativo");
   } else {
-    tog("Ajudar Reino", "helpKingdom", `Envia a munição excedente para outros setores: ${HELP_RATE} munições ▸ 1 🎖️ Medalha`);
+    tog("Ajudar Reino", "helpKingdom", `Envia a munição excedente para outros condados: ${HELP_RATE} munições ▸ 1 🎖️ Medalha`);
     mid = document.createElement("div");
     mid.className = "fres-mid";
     el.appendChild(mid);
@@ -3836,7 +3836,7 @@ function renderResBar() {
   }
 }
 
-// Números de recurso ao vivo. A barra e o resumo de "Seu Setor" leem o MESMO estado a
+// Números de recurso ao vivo. A barra e o resumo de "Seu Condado" leem o MESMO estado a
 // cada frame — a produção corre continuamente, então esperar por um renderHUD deixava
 // os dois defasados. Só encosta no DOM quando o texto muda de fato.
 function setText(el, txt) {
@@ -4605,7 +4605,7 @@ function openGate() {
 // ---------- Modal genérico ----------
 function openModal(title, buildFn) {
   $("modal").classList.remove("dist-modal", "tower-modal"); // limpa modificadores de painéis específicos
-  $("modal").querySelector(".modal-foot")?.remove(); // rodapé externo é exclusivo do "Seu Setor"
+  $("modal").querySelector(".modal-foot")?.remove(); // rodapé externo é exclusivo do "Seu Condado"
   $("modal-title").textContent = title;
   const m = $("modal-content");
   m.innerHTML = "";
@@ -4991,7 +4991,7 @@ const COMBAT_MSGS = {
     "Hoje eles vêm com fome.|E nós, com o que sobrou.",
   ],
   // Fecho do turno, no overlay de anoitecer. Fica na mesma tabela das outras porque é a
-  // mesma voz do setor, só sem a quebra de linha: aqui o texto é parágrafo, não letreiro.
+  // mesma voz do condado, só sem a quebra de linha: aqui o texto é parágrafo, não letreiro.
   dusk: [
     "O vigia observa o horizonte. Toque no astro da noite para ver o que vem.",
     "A guarda troca de turno em silêncio. Toque no astro para ver o que a noite trouxe.",
@@ -5209,7 +5209,7 @@ function renderHUD() {
   if (mk) mk.style.left = (50 + S.morale / 3) + "%";
   renderHudBrasao();
   $("hud-hp").innerHTML = `<span class="hp-d">◆</span> ${Math.max(0, S.hits)}/${maxHits()} HP`;
-  syncLiveRes(); // moedas globais vivem na barra de recursos (e no resumo de "Seu Setor")
+  syncLiveRes(); // moedas globais vivem na barra de recursos (e no resumo de "Seu Condado")
   $("btn-wave").disabled = S.waveActive;
   const phaseFull = `${S.isNight ? "Noite" : "Dia"} ${S.day}`;
   const phaseShort = `${S.isNight ? "N" : "D"}${S.day}`;
@@ -6250,7 +6250,7 @@ function turnChips(income) {
   const chip = (txt, bom) => out.push(`<span class="ev-chip ${bom ? "up" : "down"}">${txt}</span>`);
   const lost = S.turnHitsLost;
   // A muralha vem primeiro: é o número que decide a run. Estado e desgaste na mesma
-  // ficha, porque "intactas" sozinho esconderia que o setor já está em 3 de 5.
+  // ficha, porque "intactas" sozinho esconderia que o condado já está em 3 de 5.
   chip(`🧱 ${S.hits}/${maxHits()} · ${lost ? `${lost} ${lost === 1 ? "hit perdido" : "hits perdidos"}` : "nenhum hit perdido"}`, !lost);
   if (t && t.rep) chip(`+${t.rep} 🧱 remendado`, true);
   const mortos = t ? S.kills - t.kills0 : 0;
@@ -6308,7 +6308,7 @@ function endWave() {
     if (turnSum) turnSum.hGain += hNo;
   }
   // Motor de Argamato consome 💎; Autômato Reparador conserta as muralhas.
-  // Sem trava: a manutenção cobra mesmo sem saldo e o setor fecha o turno devendo.
+  // Sem trava: a manutenção cobra mesmo sem saldo e o condado fecha o turno devendo.
   const hUp = cityFxScan(null, "hUp");
   S.hearts -= hUp;
   if (turnSum) turnSum.hCost += hUp;
@@ -6340,7 +6340,7 @@ function endWave() {
     const perda = Math.min(NEG_MORALE_CAP, NEG_MORALE_EACH * devendo.length);
     gainMorale(-perda);
     addFloat(2, 0.45, `📉 No vermelho (${devendo.join(" ")}): -${perda} moral`, "#e0705f");
-    toast(`📉 O setor fechou o turno no vermelho em ${devendo.join(" ")} · -${perda} de moral.`);
+    toast(`📉 O condado fechou o turno no vermelho em ${devendo.join(" ")} · -${perda} de moral.`);
   }
   // Praça Estranha: bônus caótico por nível (ouro / moral / 💎)
   for (let k = 0; k < groupLvlSum("praca_estranha"); k++) {
@@ -6363,7 +6363,7 @@ function endWave() {
     }
     if (healed) addFloat(2, 0.85, "🟢 tropas regeneradas", "#7ac36a");
   }
-  // Leis do setor: peso permanente na moral, a cada turno
+  // Leis do condado: peso permanente na moral, a cada turno
   const lawM = lawsMoralPerTurn();
   if (lawM > 0) gainMorale(lawM);
   else if (lawM < 0) gainMorale(lawM);
@@ -6679,7 +6679,7 @@ function showOverlay(title, text, cb, mode) {
   $("overlay-box").scrollTop = 0;                // texto longo sempre começa do topo
   fadeInScreen("overlay");
 }
-// Sem botão "Continuar": sair é clicar fora, como no painel do Setor. O rodapé sobre o
+// Sem botão "Continuar": sair é clicar fora, como no painel do Condado. O rodapé sobre o
 // fundo escurecido diz isso, e o clique só conta se cair FORA da caixa.
 function closeOverlay() {
   if ($("overlay").classList.contains("fading")) return; // ignora cliques durante o fade
@@ -8003,14 +8003,14 @@ const LORE_DECREE =
 const LORE_WORLD =
   "Os mortos se levantaram, cova atrás de cova. Em poucos anos, o mundo de Estta mudou por completo. A humanidade, desesperada para sobreviver, se encolheu em um punhado de metrópoles muradas, cada vez mais lotadas. Lá fora marcham os restos: homens, animais e criaturas mágicas corrompidos pela vontade de um inimigo que só vai descansar quando a última cidade cair.\n\n"
   + "*Eles nunca param de chegar. Dia e noite.*\n\n"
-  + "Você é de Karzstak. A cidade imensa resiste há mais de um século, e hoje você finalmente foi escolhido para proteger um dos setores das muralhas.\n\n"
+  + "Você é de Karzstak. A cidade imensa resiste há mais de um século, e hoje você finalmente foi escolhido para proteger um dos condados das muralhas.\n\n"
   + "*Ha! Comandante-arquimago. Nada mal.*";
 
 const LORE_COMMAND =
   "Vinte anos treinando para este momento. Você sacrificou muito para chegar aqui, e vai ter que sacrificar ainda mais para se manter.\n\n"
-  + "Seu setor acaba de ser reerguido, reconquistado pedra por pedra depois que o comandante anterior tombou. Muitas vidas pagaram por este chão, e seus superiores esperam que a aposta tenha valido a pena.\n\n"
+  + "Seu condado acaba de ser reerguido, reconquistado pedra por pedra depois que o comandante anterior tombou. Muitas vidas pagaram por este chão, e seus superiores esperam que a aposta tenha valido a pena.\n\n"
   + "Direto da mão do rei você recebeu um Cetro Real, forjado nas chamas do Turbilhão Narxis, a única fonte mágica do reino. Não desperdice esta dádiva.\n\n"
-  + "Proteja seu setor. Atravesse os turnos. Sobreviva 30 dias para talhar seu nome nos tijolos das muralhas internas. Nosso juramento é um só:\n\n"
+  + "Proteja seu condado. Atravesse os turnos. Sobreviva 30 dias para talhar seu nome nos tijolos das muralhas internas. Nosso juramento é um só:\n\n"
   + "*Karzstak NÃO deve cair. Não importa o custo.*";
 
 
@@ -8594,7 +8594,7 @@ $("btn-infinito").onclick = () => {
     showOverlaySeq([
       ["O Decreto", LORE_DECREE],
       ["O que Sobrou do Mundo", LORE_WORLD],
-      [`Setor ${formatSectorId(S.sectorId)} · Muralha ${S.sectorDir}`, LORE_COMMAND],
+      [`Condado ${formatSectorId(S.sectorId)} · Muralha ${S.sectorDir}`, LORE_COMMAND],
     ], () => {
       // O evento do dia 1 nunca é pulado: ele explica o modificador já aplicado.
       // Fechado ele, o tutorial roda SOBRE o campo, com o jogo já à vista.

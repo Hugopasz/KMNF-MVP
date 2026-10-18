@@ -12,9 +12,9 @@ As grandes civilizações desapareceram, substituídas por cidades-fortaleza cer
 
 O lema da cidade é simples: **Karzstak não deve cair.** Sua existência depende disso.
 
-Todos os dias, homens, mulheres e crianças trabalham até a exaustão para manter as muralhas de pé. Recursos são escassos, o descanso é um luxo e praticamente toda a produção da cidade é destinada à guerra. Muralhas são reconstruídas sem parar, trincheiras são ampliadas, setores são conquistados e perdidos diariamente. Do lado de fora, o rugido incessante dos mortos nunca silencia.
+Todos os dias, homens, mulheres e crianças trabalham até a exaustão para manter as muralhas de pé. Recursos são escassos, o descanso é um luxo e praticamente toda a produção da cidade é destinada à guerra. Muralhas são reconstruídas sem parar, trincheiras são ampliadas, condados são conquistados e perdidos diariamente. Do lado de fora, o rugido incessante dos mortos nunca silencia.
 
-Você é o novo comandante de uma das centenas de setores defensivos que cercam Karzstak. Sua responsabilidade é proteger um trecho das muralhas, onde incontáveis trincheiras enfrentam ataques contínuos. Os mortos jamais param de chegar.
+Você é o novo comandante de uma das centenas de condados defensivos que cercam Karzstak. Sua responsabilidade é proteger um trecho das muralhas, onde incontáveis trincheiras enfrentam ataques contínuos. Os mortos jamais param de chegar.
 
 Acima de todos governa o rei, soberano absoluto de Karzstak e único detentor do **Turbilhão Narxis**, uma poderosa fonte de magia que abastece todo o reino. Graças a esse artefato, a cidade ainda permanece viva.
 

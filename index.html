@@ -19,14 +19,14 @@
 <link rel="preload" as="image" href="ASSET_ICONE-MIOLO.png?v=1">
 <link rel="preload" as="image" href="ASSET_ICONE-CONSELHO.png?v=1">
 <link rel="preload" as="image" href="ASSET_ICONE-ARSENAL.png?v=1">
-<link rel="stylesheet" href="style.css?v=206">
+<link rel="stylesheet" href="style.css?v=207">
 </head>
 <body>
 <div id="game">
 
   <!-- Topo: HUD -->
   <header id="hud">
-    <button id="hud-brasao" title="Seu Setor"></button>
+    <button id="hud-brasao" title="Seu Condado"></button>
     <div class="hud-item" id="hud-hp">🧱 100</div>
     <button id="btn-wave">▶ Turno</button>
     <button id="btn-lock" title="Turnos automáticos">🔓</button>
@@ -66,7 +66,7 @@
     <button id="field-toggle" class="to-feud" title="Ir para O Feudo"><span class="ft-tri"></span></button>
   </div>
 
-  <!-- Sombra das nuvens sobre o setor inteiro (campo + muralha + cidade) -->
+  <!-- Sombra das nuvens sobre o condado inteiro (campo + muralha + cidade) -->
   <div id="cloud-shade" aria-hidden="true"></div>
 
   <!-- Toast leve -->
@@ -76,7 +76,7 @@
   <nav id="tabs">
     <button class="tab" id="tab-melhorias">Foral</button>
     <button class="tab" id="tab-favores">Alianças</button>
-    <button class="tab" id="tab-distrito">Setor</button>
+    <button class="tab" id="tab-distrito">Condado</button>
   </nav>
 
   <!-- Barra de posicionamento (modo construção) -->
@@ -97,11 +97,11 @@
     </div>
   </div>
 
-  <!-- AS MELHORIAS: roda radial de leis do setor -->
+  <!-- AS MELHORIAS: roda radial de leis do condado -->
   <div id="laws-scr" class="hidden">
     <div class="laws-top"><button class="tavola-round tavola-back" id="laws-back">‹</button><button class="tavola-round" id="laws-help-btn">?</button></div>
     <div id="laws-help" class="hidden">
-      <b>As Leis do Setor</b>
+      <b>As Leis do Condado</b>
       <p>Cada melhoria é uma lei assinada por você, comandante. Leis são permanentes e pesam na moral do povo a cada turno: algumas melhoram a vida de todos, outras trocam bem-estar por poder.</p>
       <p>Avance cada linha do centro para fora. As leis lendárias exigem as duas linhas vizinhas completas.</p>
       <p class="laws-limit">Leis assinadas: <b id="laws-limit-n">0/30</b></p>
@@ -275,6 +275,6 @@ Agora só resta continuar resistindo. O rei negativa não descansa, e nem suas h
     <div id="factions-box"></div>
   </div>
 </div>
-<script src="game.js?v=303"></script>
+<script src="game.js?v=304"></script>
 </body>
 </html>

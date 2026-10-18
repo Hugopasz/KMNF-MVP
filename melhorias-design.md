@@ -1,4 +1,4 @@
-# As Melhorias — Design v2 (48 leis do setor)
+# As Melhorias — Design v2 (48 leis do condado)
 
 > Roda de 8 linhas × 5 nós + 8 lendárias. Limite de **30 leis por partida**.
 > Custos: principais **30/60/100/150/220** · adjacentes **40/80/125/180/260** · lendárias **750**.
